@@ -1,0 +1,113 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+
+import { ARCHIVE, ArchiveEntry, ClubEvent, EVENTS, sortArchive } from './data';
+import { isFirebaseConfigured } from './firebaseConfig';
+
+/**
+ * Events and archive entries — from Firestore when it is reachable, and from the
+ * bundled `src/data.ts` copy when it is not.
+ *
+ * The fallback is deliberate: a club app that shows a blank screen because the
+ * network blipped is worse than one showing slightly stale content. `source`
+ * says which one you are looking at.
+ */
+export type ContentSource = 'firestore' | 'local';
+
+type ContentValue = {
+  events: ClubEvent[];
+  archive: ArchiveEntry[];
+  source: ContentSource;
+  loading: boolean;
+  /** Why we fell back, if we did. Null when Firestore answered. */
+  error: string | null;
+  refresh: () => void;
+  getEvent: (id?: string | string[]) => ClubEvent;
+};
+
+const Ctx = createContext<ContentValue | null>(null);
+
+export function ContentProvider({ children }: { children: React.ReactNode }) {
+  const [events, setEvents] = useState<ClubEvent[]>(EVENTS);
+  const [archive, setArchive] = useState<ArchiveEntry[]>(() => sortArchive(ARCHIVE));
+  const [source, setSource] = useState<ContentSource>('local');
+  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      console.log('[content] Firebase yapılandırılmamış — yerel içerik kullanılıyor.');
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    // Dynamic import keeps the Firestore SDK out of the startup bundle.
+    import('./firebase')
+      .then(({ fetchContent }) => fetchContent())
+      .then(({ events: remoteEvents, archive: remoteArchive }) => {
+        if (cancelled) return;
+
+        // An empty collection almost always means "not seeded yet" rather than
+        // "the club has no events", so keep the bundled copy on screen.
+        if (!remoteEvents.length) {
+          setError('Firestore boş — `npm run seed` çalıştırın.');
+          setSource('local');
+          console.log('[content] Firestore boş, yerel içerik gösteriliyor. `npm run seed` ile doldurun.');
+          return;
+        }
+
+        setEvents(remoteEvents);
+        if (remoteArchive.length) setArchive(sortArchive(remoteArchive));
+        setSource('firestore');
+        setError(null);
+        console.log(
+          `[content] Firestore bağlı — ${remoteEvents.length} etkinlik, ${remoteArchive.length} arşiv kaydı.`,
+        );
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        setSource('local');
+        console.log(`[content] Firestore okunamadı, yerel içeriğe düşüldü: ${message}`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nonce]);
+
+  const value = useMemo<ContentValue>(
+    () => ({
+      events,
+      archive,
+      source,
+      loading,
+      error,
+      refresh: () => setNonce((n) => n + 1),
+      getEvent: (id) => {
+        const key = Array.isArray(id) ? id[0] : id;
+        return events.find((e) => e.id === key) ?? events[0] ?? EVENTS[0];
+      },
+    }),
+    [events, archive, source, loading, error],
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useContent() {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useContent must be used inside <ContentProvider>');
+  return ctx;
+}
+
+/** Convenience for screens that only need one event. */
+export function useEvent(id?: string | string[]) {
+  return useContent().getEvent(id);
+}

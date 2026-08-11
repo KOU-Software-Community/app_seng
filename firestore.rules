@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// KOÜ Yazılım Kulübü — Firestore Security Rules
+//
+// Bu kuralları Firebase Console → Firestore Database → Rules sekmesine yapıştırıp
+// "Publish" deyin.
+//
+// Neden önemli: uygulamadaki Firebase config (apiKey vb.) derleme sırasında
+// pakete gömülür, yani uygulamayı kuran herkes ona ulaşabilir. Veriyi koruyan şey
+// o anahtar değil, aşağıdaki kurallardır.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Etkinlikler ve arşiv herkese açık okunur; yazma sadece konsoldan veya
+    // seed script'inden (aşağıdaki nota bakın).
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /archive/{entryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Kayıtlar: öğrenci kendi kaydını oluşturabilir, ama kimse başkasının
+    // kaydını okuyamaz veya değiştiremez. Kulüp yönetimi kayıtları konsoldan
+    // veya Admin SDK ile görür.
+    match /registrations/{registrationId} {
+      allow read: if false;
+      allow update, delete: if false;
+
+      allow create: if
+        // Beklenen alanlar dışında bir şey yazılamasın.
+        request.resource.data.keys().hasOnly(
+          ['eventId', 'code', 'name', 'studentNo', 'department', 'year', 'createdAt']
+        )
+        && request.resource.data.eventId is string
+        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 80
+        // Öğrenci numarası tam 9 hane.
+        && request.resource.data.studentNo is string
+        && request.resource.data.studentNo.matches('^[0-9]{9}$')
+        && request.resource.data.department is string
+        && request.resource.data.year is string;
+    }
+
+    // Yukarıda eşleşmeyen her şey kapalı.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// SEED NOTU
+// `npm run seed` istemci SDK'sı kullandığı için yukarıdaki `events`/`archive`
+// yazma yasağına takılır. Seed'i çalıştırmadan önce o iki bloktaki
+//   allow write: if false;
+// satırlarını geçici olarak
+//   allow write: if true;
+// yapın, seed'i çalıştırın, sonra MUTLAKA geri alın.

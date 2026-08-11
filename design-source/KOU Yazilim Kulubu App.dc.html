@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:radial-gradient(1200px 700px at 22% 8%,#0a2455 0%,#04122c 55%,#020a1a 100%);font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#93CBDC;text-decoration:none}a:hover{color:#0389BC}
+*{-webkit-font-smoothing:antialiased}
+::selection{background:rgba(3,137,188,.35)}
+@keyframes pxspin{0%,100%{opacity:.25}25%{opacity:1}}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+.scr{animation:fadein .22s ease both}
+.nos::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<div style="display:flex;gap:40px;align-items:flex-start;padding:44px 48px 60px;min-height:100vh;box-sizing:border-box">
+
+  <aside style="width:340px;flex:none;display:flex;flex-direction:column;gap:16px;color:#D2E7EC">
+    <div style="display:flex;align-items:center;gap:11px">
+      <img src="uploads/Asset%201@4x.png" alt="KOÜ Yazılım Kulübü" style="width:40px;height:40px;border-radius:50%">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff;letter-spacing:-.2px">KOÜ Yazılım Kulübü</div>
+        <div style="font-size:11px;color:#6f8fb0">Mobil uygulama · MVP tur 1</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px 16px 14px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">VARSAYIMLAR</div>
+      <ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:1.65;color:#b8cfdd">
+        <li>Yüklediğin rozet, wordmark ve laptop maskotu splash, header ve boş durumlarda kullanıldı.</li>
+        <li>Kayıt formu native; giriş zorunlu değil — öğrenci no ile eşleşme.</li>
+        <li>Arşiv fotoğrafları boş bırakıldı; kartlara sürükleyip bırakarak doldurabilirsin.</li>
+        <li>iOS 402×874 referans; Android'de aynı sistem çalışır.</li>
+      </ul>
+    </div>
+
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">PIXEL AKSAN KURALI</div>
+      <div style="font-size:12.5px;line-height:1.65;color:#b8cfdd">Pixel dil yalnızca <b style="color:#fff">rozet ikonları, boş durumlar, loading ve splash wordmark</b>'ında. Gövde metni, form ve butonlar Plus Jakarta Sans — okunabilirlik önce.</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px;background:rgba(3,137,188,.18);border:1px solid rgba(147,203,220,.3);color:#93CBDC;font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 7px;border-radius:5px">
+          <svg width="9" height="9" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v2h-2z M0 2h8v2h-8z M2 4h4v2h-4z M1 6h2v2h-2z M5 6h2v2h-2z"></path></svg>YENI</span>
+        <span style="display:flex;align-items:center;gap:5px;background:rgba(3,137,188,.18);border:1px solid rgba(147,203,220,.3);color:#93CBDC;font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 7px;border-radius:5px">
+          <svg width="9" height="9" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M1 2h6v1h-6z M2 3h4v5h-4z M3 0h1v2h-1z M4 1h1v1h-1z"></path></svg>CEKILIS</span>
+        <span style="display:flex;align-items:center;gap:5px;background:rgba(3,137,188,.18);border:1px solid rgba(147,203,220,.3);color:#93CBDC;font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 7px;border-radius:5px">
+          <svg width="9" height="9" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h-4z M0 2h1v4h-1z M7 2h1v4h-1z M2 7h4v1h-4z M3 2h1v3h-1z M4 4h1v1h-1z"></path></svg>SON GUN</span>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">EKRANLAR</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ screenIndex }}" as="s" hint-placeholder-count="7">
+          <button onClick="{{ s.go }}" style="display:flex;align-items:center;gap:10px;background:transparent;border:0;border-radius:8px;padding:7px 8px;cursor:pointer;text-align:left;color:#b8cfdd;font:500 12.5px 'Plus Jakarta Sans',sans-serif" style-hover="background:rgba(147,203,220,.1);color:#fff">
+            <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;width:16px">{{ s.n }}</span>{{ s.label }}
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </aside>
+
+  <div style="display:flex;flex-direction:column;gap:14px;align-items:center;flex:none">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+
+      <div style="height:100%;width:402px;max-width:402px;display:flex;flex-direction:column;background:#F4F9FB;font-family:'Plus Jakarta Sans',system-ui,sans-serif;position:relative;overflow:hidden">
+        <div class="nos" style="flex:1;width:402px;overflow-y:auto;overflow-x:hidden;position:relative;scrollbar-width:none">
+
+          <!-- SPLASH -->
+          <sc-if value="{{ isSplash }}">
+            <div class="scr" style="height:874px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;background:linear-gradient(160deg,#001B4A 0%,#014576 58%,#0389BC 128%)">
+              <div style="position:absolute;inset:0;background-image:radial-gradient(rgba(147,203,220,.22) 1.5px,transparent 1.6px);background-size:16px 16px"></div>
+              <img src="uploads/Asset%201@4x.png" alt="KOÜ Yazılım Kulübü" style="position:relative;width:216px;height:216px;border-radius:50%;box-shadow:0 24px 60px rgba(0,0,0,.4);animation:pop .5s ease both">
+              <div style="display:flex;gap:5px;margin-top:6px">
+                <span style="width:8px;height:8px;background:#93CBDC;animation:pxspin 1s steps(1) infinite"></span>
+                <span style="width:8px;height:8px;background:#93CBDC;animation:pxspin 1s steps(1) .25s infinite"></span>
+                <span style="width:8px;height:8px;background:#93CBDC;animation:pxspin 1s steps(1) .5s infinite"></span>
+                <span style="width:8px;height:8px;background:#93CBDC;animation:pxspin 1s steps(1) .75s infinite"></span>
+              </div>
+              <div style="position:absolute;bottom:64px;font-size:11.5px;letter-spacing:2.5px;color:rgba(210,231,236,.6);font-weight:600">KOCAELİ ÜNİVERSİTESİ</div>
+            </div>
+          </sc-if>
+
+          <!-- ONBOARDING -->
+          <sc-if value="{{ isOnboard }}">
+            <div class="scr" style="height:874px;display:flex;flex-direction:column;background:#F4F9FB">
+              <div style="height:452px;background:linear-gradient(160deg,#001B4A 0%,#014576 62%,#0389BC 130%);border-radius:0 0 28px 28px;position:relative;display:flex;align-items:center;justify-content:center">
+                <button onClick="{{ skipOnboard }}" style="position:absolute;top:62px;right:18px;background:rgba(255,255,255,.12);border:0;color:#D2E7EC;font:600 12.5px 'Plus Jakarta Sans',sans-serif;padding:8px 14px;border-radius:20px;cursor:pointer" style-hover="background:rgba(255,255,255,.22)">Atla</button>
+                <sc-if value="{{ onbIsLogo }}" hint-placeholder-val="{{ true }}">
+                  <img src="uploads/Asset%204@4x.png" alt="" style="width:232px;animation:pop .4s ease both;filter:drop-shadow(0 18px 34px rgba(0,0,0,.35))">
+                </sc-if>
+                <sc-if value="{{ onbIsArt }}">
+                  <svg width="164" height="128" viewBox="0 0 22 17" shape-rendering="crispEdges" style="animation:pop .35s ease both" dangerouslySetInnerHTML="{{ onbArt }}"></svg>
+                </sc-if>
+              </div>
+              <div style="flex:1;padding:34px 28px 0;display:flex;flex-direction:column">
+                <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:1px">{{ onbKicker }}</div>
+                <h2 style="margin:14px 0 10px;font-size:27px;line-height:1.2;font-weight:800;color:#001B4A;letter-spacing:-.6px;text-wrap:pretty">{{ onbTitle }}</h2>
+                <p style="margin:0;font-size:15px;line-height:1.6;color:#5B7185;text-wrap:pretty">{{ onbBody }}</p>
+                <div style="flex:1"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:46px">
+                  <div style="display:flex;gap:6px">
+                    <sc-for list="{{ onbDots }}" as="d" hint-placeholder-count="3">
+                      <span style="width:{{ d.w }};height:7px;border-radius:4px;background:{{ d.bg }};transition:all .25s"></span>
+                    </sc-for>
+                  </div>
+                  <button onClick="{{ nextOnboard }}" style="background:linear-gradient(135deg,#014576,#0389BC);border:0;color:#fff;font:700 15px 'Plus Jakarta Sans',sans-serif;padding:15px 30px;border-radius:12px;cursor:pointer;box-shadow:0 8px 20px rgba(3,137,188,.32)" style-hover="filter:brightness(1.08)" style-active="transform:translateY(1px)">{{ onbCta }}</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- HOME -->
+          <sc-if value="{{ isHome }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:24px">
+              <div style="background:linear-gradient(140deg,#001B4A 0%,#014576 65%,#0389BC 135%);border-radius:0 0 24px 24px;padding:62px 20px 22px">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <img src="uploads/Asset%201@4x.png" alt="" style="width:40px;height:40px;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,.3)">
+                  <div style="flex:1">
+                    <div style="font-size:11.5px;color:#93CBDC;font-weight:600;letter-spacing:.3px">Merhaba Elif 👋</div>
+                    <div style="font-size:16.5px;color:#fff;font-weight:700;letter-spacing:-.3px">KOÜ Yazılım Kulübü</div>
+                  </div>
+                  <button onClick="{{ goNotifs }}" style="position:relative;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.13);border:0;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:rgba(255,255,255,.22)">
+                    <svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="#D2E7EC" d="M3 0h2v1h-2z M2 1h4v4h-4z M1 5h6v1h-6z M3 6h2v1h-2z"></path></svg>
+                    <span style="position:absolute;top:8px;right:9px;width:7px;height:7px;background:#93CBDC;border-radius:2px"></span>
+                  </button>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:18px">
+                  <div style="flex:1;background:rgba(255,255,255,.1);border-radius:11px;padding:10px 12px">
+                    <div style="font-size:19px;font-weight:800;color:#fff">4</div>
+                    <div style="font-size:10.5px;color:#93CBDC;font-weight:600">Yaklaşan etkinlik</div>
+                  </div>
+                  <div style="flex:1;background:rgba(255,255,255,.1);border-radius:11px;padding:10px 12px">
+                    <div style="font-size:19px;font-weight:800;color:#fff">2</div>
+                    <div style="font-size:10.5px;color:#93CBDC;font-weight:600">Kaydın var</div>
+                  </div>
+                  <div style="flex:1;background:rgba(255,255,255,.1);border-radius:11px;padding:10px 12px">
+                    <div style="font-size:19px;font-weight:800;color:#fff">38</div>
+                    <div style="font-size:10.5px;color:#93CBDC;font-weight:600">Arşiv etkinliği</div>
+                  </div>
+                </div>
+                <div style="height:6px;margin-top:16px;background-image:repeating-linear-gradient(90deg,rgba(147,203,220,.85) 0 6px,transparent 6px 14px)"></div>
+              </div>
+
+              <div style="display:flex;align-items:baseline;justify-content:space-between;padding:24px 20px 12px">
+                <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;color:#001B4A;letter-spacing:-.3px">
+                  <svg width="14" height="14" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="#0389BC" d="M0 0h3v3h-3z M5 0h3v3h-3z M0 5h3v3h-3z M5 5h3v3h-3z"></path></svg>Öne Çıkanlar</h3>
+                <span style="font-size:12px;color:#0389BC;font-weight:600">{{ featIndicator }}</span>
+              </div>
+              <div class="nos" style="display:flex;gap:12px;width:402px;box-sizing:border-box;overflow-x:auto;padding:2px 20px 6px;scroll-snap-type:x mandatory;scrollbar-width:none">
+                <sc-for list="{{ featured }}" as="f" hint-placeholder-count="3">
+                  <button onClick="{{ f.go }}" style="scroll-snap-align:start;flex:none;width:272px;text-align:left;border:0;cursor:pointer;padding:0;border-radius:16px;overflow:hidden;background:{{ f.bg }};box-shadow:0 10px 24px rgba(0,27,74,.13)" style-hover="transform:translateY(-2px)" style-active="transform:translateY(0)">
+                    <div style="padding:16px 16px 18px;position:relative;min-height:150px;display:flex;flex-direction:column">
+                      <div style="display:flex;align-items:center;gap:6px;align-self:flex-start;background:{{ f.badgeBg }};color:{{ f.badgeFg }};font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 8px;border-radius:6px;letter-spacing:.5px">
+                        <svg width="9" height="9" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="{{ f.icon }}"></path></svg>{{ f.kicker }}
+                      </div>
+                      <div style="margin-top:14px;font-size:17px;font-weight:800;line-height:1.25;color:{{ f.fg }};letter-spacing:-.3px;text-wrap:pretty">{{ f.title }}</div>
+                      <div style="margin-top:6px;font-size:12.5px;line-height:1.45;color:{{ f.sub }}">{{ f.body }}</div>
+                      <div style="flex:1"></div>
+                      <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:11.5px;font-weight:700;color:{{ f.sub }}">{{ f.meta }}</span>
+                        <span style="font-size:12px;font-weight:700;color:{{ f.fg }}">Detay →</span>
+                      </div>
+                    </div>
+                  </button>
+                </sc-for>
+              </div>
+
+              <h3 style="margin:0;padding:24px 20px 12px;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;color:#001B4A;letter-spacing:-.3px">
+                <svg width="14" height="14" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="#0389BC" d="M0 0h8v2h-8z M0 3h6v2h-6z M0 6h4v2h-4z"></path></svg>Akış</h3>
+              <div style="display:flex;flex-direction:column;gap:10px;padding:0 20px">
+                <sc-for list="{{ feed }}" as="p" hint-placeholder-count="4">
+                  <button onClick="{{ p.go }}" style="display:flex;gap:13px;align-items:flex-start;text-align:left;background:#fff;border:1px solid #E4EEF3;border-radius:14px;padding:14px;cursor:pointer" style-hover="border-color:#93CBDC;box-shadow:0 6px 16px rgba(0,27,74,.07)">
+                    <div style="width:46px;height:46px;flex:none;border-radius:11px;background:{{ p.tint }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+                      <span style="font-size:15px;font-weight:800;color:#001B4A;line-height:1">{{ p.day }}</span>
+                      <span style="font-size:8.5px;font-weight:700;color:#014576;letter-spacing:.6px">{{ p.mon }}</span>
+                    </div>
+                    <div style="flex:1;min-width:0">
+                      <div style="display:flex;align-items:center;gap:7px">
+                        <span style="font-size:10.5px;font-weight:700;color:#0389BC;letter-spacing:.4px;text-transform:uppercase">{{ p.tag }}</span>
+                        <sc-if value="{{ p.isNew }}" hint-placeholder-val="{{ true }}">
+                          <span style="display:flex;align-items:center;gap:4px;background:#D2E7EC;color:#014576;font-family:'Press Start 2P',monospace;font-size:6px;padding:4px 5px;border-radius:4px">
+                            <svg width="7" height="7" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v2h-2z M0 2h8v2h-8z M2 4h4v2h-4z M1 6h2v2h-2z M5 6h2v2h-2z"></path></svg>YENI</span>
+                        </sc-if>
+                      </div>
+                      <div style="margin-top:4px;font-size:15px;font-weight:700;color:#0B1F3A;line-height:1.3;letter-spacing:-.2px;text-wrap:pretty">{{ p.title }}</div>
+                      <div style="margin-top:4px;font-size:12.5px;color:#5B7185">{{ p.meta }}</div>
+                    </div>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- TAKVIM -->
+          <sc-if value="{{ isCal }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:20px">
+              <div style="background:linear-gradient(140deg,#001B4A,#014576 80%,#0389BC 140%);border-radius:0 0 22px 22px;padding:62px 20px 18px">
+                <h2 style="margin:0;font-size:24px;font-weight:800;color:#fff;letter-spacing:-.5px">Etkinlik Takvimi</h2>
+                <div style="margin-top:4px;font-size:12.5px;color:#93CBDC">Mart – Nisan 2026 · 4 etkinlik</div>
+                <div style="height:6px;margin-top:12px;background-image:repeating-linear-gradient(90deg,rgba(147,203,220,.85) 0 6px,transparent 6px 14px)"></div>
+                <div style="margin-top:16px;display:flex;background:rgba(255,255,255,.12);border-radius:11px;padding:4px">
+                  <sc-for list="{{ calViews }}" as="v" hint-placeholder-count="2">
+                    <button onClick="{{ v.go }}" style="flex:1;border:0;cursor:pointer;padding:9px 0;border-radius:8px;font:700 13px 'Plus Jakarta Sans',sans-serif;background:{{ v.bg }};color:{{ v.fg }};transition:all .18s">{{ v.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:20px 20px 0;display:flex;flex-direction:column;gap:22px">
+                  <sc-for list="{{ months }}" as="m" hint-placeholder-count="2">
+                    <div>
+                      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:1px;margin-bottom:12px">{{ m.label }}</div>
+                      <div style="display:flex;flex-direction:column;gap:10px">
+                        <sc-for list="{{ m.items }}" as="e" hint-placeholder-count="2">
+                          <button onClick="{{ e.go }}" style="display:flex;gap:14px;text-align:left;background:#fff;border:1px solid #E4EEF3;border-radius:14px;padding:14px;cursor:pointer;align-items:center" style-hover="border-color:#93CBDC;box-shadow:0 6px 16px rgba(0,27,74,.07)">
+                            <div style="width:54px;flex:none;text-align:center;border-right:1px solid #E4EEF3;padding-right:12px">
+                              <div style="font-size:22px;font-weight:800;color:#001B4A;line-height:1">{{ e.day }}</div>
+                              <div style="font-size:9.5px;font-weight:700;color:#0389BC;letter-spacing:.7px;margin-top:2px">{{ e.mon }}</div>
+                              <div style="font-size:10px;color:#8FA3B5;margin-top:3px">{{ e.wd }}</div>
+                            </div>
+                            <div style="flex:1;min-width:0">
+                              <div style="font-size:15.5px;font-weight:700;color:#0B1F3A;letter-spacing:-.2px;line-height:1.3;text-wrap:pretty">{{ e.title }}</div>
+                              <div style="margin-top:5px;font-size:12.5px;color:#5B7185">{{ e.time }}</div>
+                              <div style="margin-top:9px;display:flex;gap:6px;align-items:center">
+                                <span style="font-size:10.5px;font-weight:700;color:#014576;background:#D2E7EC;padding:4px 8px;border-radius:6px">{{ e.tag }}</span>
+                                <sc-if value="{{ e.soon }}">
+                                  <span style="display:flex;align-items:center;gap:4px;background:#0389BC;color:#fff;font-family:'Press Start 2P',monospace;font-size:6px;padding:5px 6px;border-radius:5px">
+                                    <svg width="7" height="7" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h-4z M0 2h1v4h-1z M7 2h1v4h-1z M2 7h4v1h-4z M3 2h1v3h-1z M4 4h1v1h-1z"></path></svg>SON GUN</span>
+                                </sc-if>
+                                <sc-if value="{{ e.registered }}">
+                                  <span style="font-size:10.5px;font-weight:700;color:#0389BC;border:1px solid #93CBDC;padding:3px 8px;border-radius:6px">Kayıtlısın</span>
+                                </sc-if>
+                              </div>
+                            </div>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isGridView }}">
+                <div style="padding:20px">
+                  <div style="background:#fff;border:1px solid #E4EEF3;border-radius:16px;padding:16px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                      <span style="font-size:15px;font-weight:800;color:#001B4A">Mart 2026</span>
+                      <div style="display:flex;gap:6px">
+                        <span style="width:28px;height:28px;border-radius:8px;background:#F4F9FB;display:flex;align-items:center;justify-content:center;color:#5B7185;font-size:13px">‹</span>
+                        <span style="width:28px;height:28px;border-radius:8px;background:#F4F9FB;display:flex;align-items:center;justify-content:center;color:#5B7185;font-size:13px">›</span>
+                      </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px">
+                      <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7">
+                        <div style="text-align:center;font-size:10px;font-weight:700;color:#8FA3B5">{{ w.l }}</div>
+                      </sc-for>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+                      <sc-for list="{{ calDays }}" as="d" hint-placeholder-count="35">
+                        <button onClick="{{ d.go }}" style="aspect-ratio:1;border:0;cursor:{{ d.cursor }};border-radius:9px;background:{{ d.bg }};color:{{ d.fg }};font-weight:{{ d.font }};font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0">
+                          {{ d.n }}
+                          <sc-if value="{{ d.dot }}">
+                            <span style="width:5px;height:5px;background:#0389BC"></span>
+                          </sc-if>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+                    <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+                      <button onClick="{{ e.go }}" style="display:flex;gap:12px;align-items:center;text-align:left;background:#fff;border:1px solid #E4EEF3;border-radius:12px;padding:12px;cursor:pointer" style-hover="border-color:#93CBDC">
+                        <span style="width:4px;height:34px;border-radius:3px;background:#0389BC;flex:none"></span>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-size:14px;font-weight:700;color:#0B1F3A;letter-spacing:-.2px">{{ e.title }}</div>
+                          <div style="margin-top:3px;font-size:12px;color:#5B7185">{{ e.short }}</div>
+                        </div>
+                        <span style="font-size:12px;color:#93CBDC">›</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <!-- ETKINLIK DETAY -->
+          <sc-if value="{{ isDetail }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:110px">
+              <div style="position:relative;height:280px;background:linear-gradient(140deg,#001B4A,#0389BC)">
+                <image-slot id="kyk-detail-hero" shape="rect" fit="cover" placeholder="Etkinlik görseli"></image-slot>
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,27,74,.55) 0%,rgba(0,27,74,0) 42%,rgba(0,27,74,.82) 100%);pointer-events:none"></div>
+                <button onClick="{{ back }}" style="position:absolute;top:60px;left:16px;width:38px;height:38px;border-radius:11px;border:0;background:rgba(0,27,74,.5);color:#fff;font-size:17px;cursor:pointer" style-hover="background:rgba(0,27,74,.8)">‹</button>
+                <div style="position:absolute;left:20px;right:20px;bottom:18px;pointer-events:none">
+                  <span style="display:inline-flex;align-items:center;gap:6px;background:#0389BC;color:#fff;font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 8px;border-radius:6px">
+                    <svg width="9" height="9" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h-4z M0 2h1v4h-1z M7 2h1v4h-1z M2 7h4v1h-4z M3 2h1v3h-1z M4 4h1v1h-1z"></path></svg>{{ det.badge }}</span>
+                  <h2 style="margin:12px 0 0;font-size:25px;line-height:1.2;font-weight:800;color:#fff;letter-spacing:-.5px;text-wrap:pretty">{{ det.title }}</h2>
+                </div>
+              </div>
+
+              <div style="padding:18px 20px 0;display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ det.facts }}" as="ft" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;align-items:center;background:#fff;border:1px solid #E4EEF3;border-radius:12px;padding:12px 14px">
+                    <div style="width:34px;height:34px;border-radius:9px;background:#D2E7EC;display:flex;align-items:center;justify-content:center;color:#014576">
+                      <svg width="14" height="14" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="{{ ft.icon }}"></path></svg>
+                    </div>
+                    <div>
+                      <div style="font-size:11px;color:#8FA3B5;font-weight:600;letter-spacing:.3px">{{ ft.label }}</div>
+                      <div style="font-size:14px;color:#0B1F3A;font-weight:700;margin-top:2px">{{ ft.value }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="padding:22px 20px 0">
+                <h3 style="margin:0 0 8px;font-size:16px;font-weight:800;color:#001B4A">Etkinlik hakkında</h3>
+                <p style="margin:0;font-size:14.5px;line-height:1.68;color:#41586B;text-wrap:pretty">{{ det.desc }}</p>
+                <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ det.tags }}" as="t" hint-placeholder-count="3">
+                    <span style="font-size:12px;font-weight:600;color:#014576;background:#D2E7EC;padding:7px 11px;border-radius:8px">{{ t.l }}</span>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="padding:22px 20px 0">
+                <h3 style="margin:0 0 10px;font-size:16px;font-weight:800;color:#001B4A">Konuşmacı</h3>
+                <div style="display:flex;gap:12px;align-items:center;background:#fff;border:1px solid #E4EEF3;border-radius:14px;padding:14px">
+                  <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#014576,#0389BC);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">{{ det.speakerInitials }}</div>
+                  <div>
+                    <div style="font-size:14.5px;font-weight:700;color:#0B1F3A">{{ det.speaker }}</div>
+                    <div style="font-size:12.5px;color:#5B7185;margin-top:2px">{{ det.speakerRole }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="position:absolute;left:0;right:0;bottom:0;padding:14px 20px 30px;background:linear-gradient(180deg,rgba(244,249,251,0),#F4F9FB 24%);display:flex;gap:12px;align-items:center">
+              <div style="flex:1">
+                <div style="font-size:11.5px;color:#8FA3B5;font-weight:600">Kontenjan</div>
+                <div style="font-size:14px;font-weight:800;color:#001B4A">{{ det.spots }}</div>
+              </div>
+              <button onClick="{{ goForm }}" style="flex:1.3;background:linear-gradient(135deg,#014576,#0389BC);border:0;color:#fff;font:700 15.5px 'Plus Jakarta Sans',sans-serif;padding:16px 0;border-radius:13px;cursor:pointer;box-shadow:0 10px 22px rgba(3,137,188,.3)" style-hover="filter:brightness(1.08)" style-active="transform:translateY(1px)">Kayıt Ol</button>
+            </div>
+          </sc-if>
+
+          <!-- KAYIT FORMU -->
+          <sc-if value="{{ isForm }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:120px">
+              <div style="background:linear-gradient(140deg,#001B4A,#014576 90%);padding:60px 20px 20px;border-radius:0 0 20px 20px">
+                <button onClick="{{ back }}" style="width:36px;height:36px;border-radius:10px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;cursor:pointer" style-hover="background:rgba(255,255,255,.24)">‹</button>
+                <h2 style="margin:16px 0 4px;font-size:23px;font-weight:800;color:#fff;letter-spacing:-.4px">Etkinlik Kaydı</h2>
+                <div style="font-size:13px;color:#93CBDC">{{ det.title }}</div>
+              </div>
+              <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:18px">
+                <div>
+                  <label style="display:block;font-size:12.5px;font-weight:700;color:#41586B;margin-bottom:7px">Ad Soyad</label>
+                  <input value="{{ form.name }}" onChange="{{ setName }}" placeholder="Elif Yılmaz" style="width:100%;box-sizing:border-box;background:#fff;border:1.5px solid #E4EEF3;border-radius:12px;padding:15px 14px;font:500 15px 'Plus Jakarta Sans',sans-serif;color:#0B1F3A;outline:none" style-focus="border-color:#0389BC;box-shadow:0 0 0 3px rgba(3,137,188,.14)">
+                </div>
+                <div>
+                  <label style="display:block;font-size:12.5px;font-weight:700;color:#41586B;margin-bottom:7px">Öğrenci Numarası</label>
+                  <input value="{{ form.no }}" onChange="{{ setNo }}" inputMode="numeric" placeholder="21xxxxxxx" style="width:100%;box-sizing:border-box;background:#fff;border:1.5px solid {{ noBorder }};border-radius:12px;padding:15px 14px;font:500 15px 'Plus Jakarta Sans',sans-serif;color:#0B1F3A;outline:none;letter-spacing:.5px" style-focus="border-color:#0389BC;box-shadow:0 0 0 3px rgba(3,137,188,.14)">
+                  <sc-if value="{{ noError }}">
+                    <div style="margin-top:7px;font-size:12px;color:#C2453E;font-weight:600">Öğrenci numarası 9 haneli olmalı.</div>
+                  </sc-if>
+                </div>
+                <div>
+                  <label style="display:block;font-size:12.5px;font-weight:700;color:#41586B;margin-bottom:9px">Bölüm</label>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <sc-for list="{{ depts }}" as="d" hint-placeholder-count="4">
+                      <button onClick="{{ d.go }}" style="border:1.5px solid {{ d.bc }};background:{{ d.bg }};color:{{ d.fg }};font:600 13px 'Plus Jakarta Sans',sans-serif;padding:11px 14px;border-radius:11px;cursor:pointer;transition:all .15s">{{ d.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:12.5px;font-weight:700;color:#41586B;margin-bottom:9px">Sınıf</label>
+                  <div style="display:flex;background:#fff;border:1.5px solid #E4EEF3;border-radius:12px;padding:4px">
+                    <sc-for list="{{ years }}" as="y" hint-placeholder-count="5">
+                      <button onClick="{{ y.go }}" style="flex:1;border:0;cursor:pointer;padding:11px 0;border-radius:9px;font:700 13.5px 'Plus Jakarta Sans',sans-serif;background:{{ y.bg }};color:{{ y.fg }};transition:all .15s">{{ y.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <button onClick="{{ toggleKvkk }}" style="display:flex;gap:11px;align-items:flex-start;background:transparent;border:0;padding:2px 0;cursor:pointer;text-align:left">
+                  <span style="width:22px;height:22px;flex:none;border-radius:7px;border:1.5px solid {{ kvkkBorder }};background:{{ kvkkBg }};display:flex;align-items:center;justify-content:center;margin-top:1px">
+                    <sc-if value="{{ form.kvkk }}">
+                      <svg width="11" height="11" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="#fff" d="M6 1h2v1h-2z M5 2h1v1h-1z M4 3h1v1h-1z M3 4h1v1h-1z M2 5h1v1h-1z M1 4h1v1h-1z M0 3h1v1h-1z M1 5h1v1h-1z"></path></svg>
+                    </sc-if>
+                  </span>
+                  <span style="font-size:12.5px;line-height:1.5;color:#5B7185">Kayıt için verdiğim bilgilerin kulüp tarafından işlenmesini kabul ediyorum.</span>
+                </button>
+              </div>
+            </div>
+            <div style="position:absolute;left:0;right:0;bottom:0;padding:14px 20px 30px;background:linear-gradient(180deg,rgba(244,249,251,0),#F4F9FB 22%)">
+              <button onClick="{{ submit }}" style="width:100%;background:{{ submitBg }};border:0;color:{{ submitFg }};font:700 15.5px 'Plus Jakarta Sans',sans-serif;padding:17px 0;border-radius:13px;cursor:{{ submitCursor }};box-shadow:{{ submitShadow }};transition:all .2s" style-active="transform:translateY(1px)">{{ submitLabel }}</button>
+            </div>
+          </sc-if>
+
+          <!-- KAYIT BASARILI -->
+          <sc-if value="{{ isDone }}">
+            <div class="scr" style="height:874px;background:linear-gradient(165deg,#001B4A 0%,#014576 70%,#0389BC 140%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center">
+              <div style="position:absolute;top:120px;left:0;right:0;display:flex;justify-content:center;gap:26px">
+                <span style="width:12px;height:12px;background:#93CBDC;animation:pxspin 1.4s steps(1) infinite"></span>
+                <span style="width:12px;height:12px;background:#D2E7EC;animation:pxspin 1.4s steps(1) .35s infinite"></span>
+                <span style="width:12px;height:12px;background:#93CBDC;animation:pxspin 1.4s steps(1) .7s infinite"></span>
+                <span style="width:12px;height:12px;background:#D2E7EC;animation:pxspin 1.4s steps(1) 1.05s infinite"></span>
+              </div>
+              <svg width="104" height="104" viewBox="0 0 8 8" shape-rendering="crispEdges" style="animation:pop .4s ease both"><path fill="#93CBDC" d="M6 1h2v1h-2z M5 2h1v1h-1z M4 3h1v1h-1z M3 4h1v1h-1z M2 5h1v1h-1z M1 4h1v1h-1z M0 3h1v1h-1z M1 5h1v1h-1z"></path></svg>
+              <h2 style="margin:26px 0 8px;font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px">Kaydın alındı!</h2>
+              <p style="margin:0;font-size:14.5px;line-height:1.6;color:#93CBDC;text-wrap:pretty">{{ det.title }} için yerin ayrıldı. Etkinlikten 1 gün önce hatırlatma bildirimi göndereceğiz.</p>
+              <div style="margin-top:26px;background:rgba(255,255,255,.1);border:1px dashed rgba(147,203,220,.45);border-radius:14px;padding:16px 26px">
+                <div style="font-size:11px;color:#93CBDC;font-weight:600;letter-spacing:.4px">KAYIT KODU</div>
+                <div style="margin-top:8px;font-family:'Press Start 2P',monospace;font-size:15px;color:#fff;letter-spacing:1px">KYK-2431</div>
+              </div>
+              <div style="margin-top:32px;display:flex;flex-direction:column;gap:10px;width:100%">
+                <button onClick="{{ goHome }}" style="width:100%;background:#fff;border:0;color:#014576;font:700 15px 'Plus Jakarta Sans',sans-serif;padding:16px 0;border-radius:13px;cursor:pointer" style-hover="filter:brightness(.94)">Ana sayfaya dön</button>
+                <button onClick="{{ goCal }}" style="width:100%;background:transparent;border:1.5px solid rgba(147,203,220,.5);color:#D2E7EC;font:600 14.5px 'Plus Jakarta Sans',sans-serif;padding:15px 0;border-radius:13px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">Takvimime ekle</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ARSIV -->
+          <sc-if value="{{ isArchive }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:24px">
+              <div style="background:linear-gradient(140deg,#001B4A,#014576 85%,#0389BC 150%);border-radius:0 0 22px 22px;padding:62px 20px 16px">
+                <h2 style="margin:0;font-size:24px;font-weight:800;color:#fff;letter-spacing:-.5px">Etkinlik Arşivi</h2>
+                <div style="margin-top:4px;font-size:12.5px;color:#93CBDC">2023'ten bugüne 38 etkinlik · 412 fotoğraf</div>
+                <div style="height:6px;margin-top:12px;background-image:repeating-linear-gradient(90deg,rgba(147,203,220,.85) 0 6px,transparent 6px 14px)"></div>
+              </div>
+              <div class="nos" style="display:flex;gap:8px;width:402px;box-sizing:border-box;overflow-x:auto;padding:16px 20px 4px;scrollbar-width:none">
+                <sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+                  <button onClick="{{ c.go }}" style="flex:none;border:1.5px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};font:600 13px 'Plus Jakarta Sans',sans-serif;padding:9px 14px;border-radius:20px;cursor:pointer;transition:all .15s">{{ c.label }}</button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ archiveEmpty }}">
+                <div style="padding:56px 40px;text-align:center;display:flex;flex-direction:column;align-items:center">
+                  <img src="uploads/Asset%204@4x.png" alt="" style="width:132px;opacity:.5;filter:grayscale(.25)">
+                  <div style="margin-top:20px;font-size:16px;font-weight:800;color:#001B4A">Bu kategoride henüz arşiv yok</div>
+                  <p style="margin:8px 0 0;font-size:13.5px;line-height:1.6;color:#5B7185;text-wrap:pretty">İlk {{ activeCat }} etkinliğimiz bu dönem planlanıyor. Bildirimleri açarsan duyurulduğunda haber veririz.</p>
+                  <button onClick="{{ goNotifs }}" style="margin-top:20px;background:transparent;border:1.5px solid #0389BC;color:#0389BC;font:700 13.5px 'Plus Jakarta Sans',sans-serif;padding:12px 20px;border-radius:11px;cursor:pointer" style-hover="background:#D2E7EC">Bildirimleri aç</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ archiveHas }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:14px 20px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                  <sc-for list="{{ archive }}" as="a" hint-placeholder-count="6">
+                    <button onClick="{{ a.go }}" style="padding:0;border:0;background:#fff;border-radius:14px;overflow:hidden;cursor:pointer;text-align:left;box-shadow:0 4px 14px rgba(0,27,74,.07)" style-hover="transform:translateY(-2px)">
+                      <div style="position:relative;height:112px;background:linear-gradient(140deg,#014576,#93CBDC)">
+                        <image-slot id="{{ a.slot }}" shape="rect" fit="cover" placeholder="Foto"></image-slot>
+                        <span style="position:absolute;top:8px;left:8px;background:rgba(0,27,74,.72);color:#D2E7EC;font-family:'Press Start 2P',monospace;font-size:6px;padding:5px 6px;border-radius:5px;pointer-events:none">{{ a.year }}</span>
+                        <span style="position:absolute;bottom:8px;right:8px;background:rgba(0,27,74,.72);color:#fff;font:600 10px 'Plus Jakarta Sans',sans-serif;padding:4px 7px;border-radius:5px;pointer-events:none">{{ a.count }} foto</span>
+                      </div>
+                      <div style="padding:11px 12px 13px">
+                        <div style="font-size:13.5px;font-weight:700;color:#0B1F3A;line-height:1.3;letter-spacing:-.2px;text-wrap:pretty">{{ a.title }}</div>
+                        <div style="margin-top:5px;font-size:11.5px;color:#5B7185">{{ a.date }} · {{ a.cat }}</div>
+                      </div>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ hasLightbox }}">
+              <div style="position:absolute;inset:0;background:rgba(2,10,26,.94);z-index:80;display:flex;flex-direction:column;animation:fadein .2s ease both">
+                <div style="padding:58px 18px 12px;display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ closeLightbox }}" style="width:36px;height:36px;border-radius:11px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:14px;cursor:pointer" style-hover="background:rgba(255,255,255,.22)">✕</button>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lb.title }}</div>
+                    <div style="font-size:11.5px;color:#93CBDC">{{ lb.date }}</div>
+                  </div>
+                  <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#93CBDC">{{ lb.counter }}</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;padding:0 18px">
+                  <div style="width:100%;aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:linear-gradient(140deg,#014576,#0389BC);position:relative">
+                    <image-slot id="{{ lb.slot }}" shape="rect" fit="cover" placeholder="Arşiv fotoğrafı"></image-slot>
+                  </div>
+                </div>
+                <div style="padding:18px 18px 40px;display:flex;align-items:center;justify-content:center;gap:20px">
+                  <button onClick="{{ lbPrev }}" style="width:44px;height:44px;border-radius:14px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:17px;cursor:pointer" style-hover="background:rgba(255,255,255,.22)">‹</button>
+                  <div style="display:flex;gap:6px">
+                    <sc-for list="{{ lb.dots }}" as="d" hint-placeholder-count="4">
+                      <span style="width:{{ d.w }};height:6px;border-radius:3px;background:{{ d.bg }};transition:all .2s"></span>
+                    </sc-for>
+                  </div>
+                  <button onClick="{{ lbNext }}" style="width:44px;height:44px;border-radius:14px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:17px;cursor:pointer" style-hover="background:rgba(255,255,255,.22)">›</button>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <!-- BILDIRIM AYARLARI -->
+          <sc-if value="{{ isNotifs }}">
+            <div class="scr" style="min-height:874px;background:#F4F9FB;padding-bottom:24px">
+              <div style="background:linear-gradient(140deg,#001B4A,#014576 85%,#0389BC 150%);border-radius:0 0 22px 22px;padding:62px 20px 20px">
+                <h2 style="margin:0;font-size:24px;font-weight:800;color:#fff;letter-spacing:-.5px">Bildirim Ayarları</h2>
+                <div style="margin-top:4px;font-size:12.5px;color:#93CBDC">Neyin bildirimini alacağını sen seç</div>
+                <div style="height:6px;margin-top:12px;background-image:repeating-linear-gradient(90deg,rgba(147,203,220,.85) 0 6px,transparent 6px 14px)"></div>
+              </div>
+
+              <div style="padding:18px 20px 0">
+                <div style="background:linear-gradient(135deg,#001B4A,#0389BC);border-radius:16px;padding:16px;display:flex;align-items:center;gap:13px">
+                  <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center">
+                    <svg width="18" height="18" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="#D2E7EC" d="M3 0h2v1h-2z M2 1h4v4h-4z M1 5h6v1h-6z M3 6h2v1h-2z"></path></svg>
+                  </div>
+                  <div style="flex:1">
+                    <div style="font-size:14.5px;font-weight:700;color:#fff">Tüm bildirimler</div>
+                    <div style="font-size:11.5px;color:#93CBDC;margin-top:2px">{{ masterHint }}</div>
+                  </div>
+                  <button onClick="{{ toggleMaster }}" style="width:50px;height:29px;border-radius:16px;border:0;cursor:pointer;background:{{ masterTrack }};position:relative;transition:background .2s;padding:0">
+                    <span style="position:absolute;top:3px;left:{{ masterKnob }};width:23px;height:23px;border-radius:12px;background:#fff;transition:left .2s;box-shadow:0 2px 5px rgba(0,0,0,.25)"></span>
+                  </button>
+                </div>
+              </div>
+
+              <div style="padding:22px 20px 0">
+                <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:1px;margin-bottom:12px">KATEGORILER</div>
+                <div style="background:#fff;border:1px solid #E4EEF3;border-radius:16px;overflow:hidden">
+                  <sc-for list="{{ notifCats }}" as="n" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:13px;padding:15px 14px;border-bottom:1px solid #EEF4F7">
+                      <div style="width:36px;height:36px;flex:none;border-radius:11px;background:{{ n.tint }};display:flex;align-items:center;justify-content:center;color:#014576">
+                        <svg width="15" height="15" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="{{ n.icon }}"></path></svg>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:14.5px;font-weight:700;color:#0B1F3A">{{ n.label }}</div>
+                        <div style="font-size:12px;color:#5B7185;margin-top:2px;line-height:1.4">{{ n.desc }}</div>
+                      </div>
+                      <button onClick="{{ n.toggle }}" style="width:50px;height:29px;flex:none;border-radius:16px;border:0;cursor:pointer;background:{{ n.track }};position:relative;transition:background .2s;padding:0">
+                        <span style="position:absolute;top:3px;left:{{ n.knob }};width:23px;height:23px;border-radius:12px;background:#fff;transition:left .2s;box-shadow:0 2px 5px rgba(0,27,74,.22)"></span>
+                      </button>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="padding:22px 20px 0">
+                <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:1px;margin-bottom:12px">ZAMANLAMA</div>
+                <div style="background:#fff;border:1px solid #E4EEF3;border-radius:16px;padding:15px 14px">
+                  <div style="font-size:14.5px;font-weight:700;color:#0B1F3A">Hatırlatma zamanı</div>
+                  <div style="font-size:12px;color:#5B7185;margin-top:2px">Kayıtlı olduğun etkinlikler için</div>
+                  <div style="margin-top:12px;display:flex;background:#F4F9FB;border-radius:11px;padding:4px">
+                    <sc-for list="{{ reminders }}" as="r" hint-placeholder-count="3">
+                      <button onClick="{{ r.go }}" style="flex:1;border:0;cursor:pointer;padding:10px 0;border-radius:8px;font:700 12.5px 'Plus Jakarta Sans',sans-serif;background:{{ r.bg }};color:{{ r.fg }};transition:all .15s">{{ r.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <div>
+                      <div style="font-size:14.5px;font-weight:700;color:#0B1F3A">Sessiz saatler</div>
+                      <div style="font-size:12px;color:#5B7185;margin-top:2px">23:00 – 09:00 arası bildirim yok</div>
+                    </div>
+                    <button onClick="{{ toggleQuiet }}" style="width:50px;height:29px;flex:none;border-radius:16px;border:0;cursor:pointer;background:{{ quietTrack }};position:relative;transition:background .2s;padding:0">
+                      <span style="position:absolute;top:3px;left:{{ quietKnob }};width:23px;height:23px;border-radius:12px;background:#fff;transition:left .2s;box-shadow:0 2px 5px rgba(0,27,74,.22)"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- LOADING -->
+          <sc-if value="{{ loading }}">
+            <div style="position:absolute;inset:0;background:rgba(244,249,251,.88);z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+              <div style="display:flex;gap:5px">
+                <span style="width:10px;height:10px;background:#0389BC;animation:pxspin .9s steps(1) infinite"></span>
+                <span style="width:10px;height:10px;background:#0389BC;animation:pxspin .9s steps(1) .22s infinite"></span>
+                <span style="width:10px;height:10px;background:#0389BC;animation:pxspin .9s steps(1) .44s infinite"></span>
+                <span style="width:10px;height:10px;background:#0389BC;animation:pxspin .9s steps(1) .66s infinite"></span>
+              </div>
+              <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#014576;letter-spacing:1px">YUKLENIYOR</div>
+            </div>
+          </sc-if>
+
+        </div>
+
+        <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:none;display:flex;background:#fff;border-top:1px solid #E4EEF3;padding:9px 8px 26px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+              <button onClick="{{ t.go }}" style="flex:1;background:transparent;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;color:{{ t.color }};transition:color .15s">
+                <svg width="21" height="21" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="{{ t.icon }}"></path></svg>
+                <span style="font-size:10.5px;font-weight:{{ t.weight }};letter-spacing:.1px">{{ t.label }}</span>
+                <span style="display:flex;gap:3px;height:4px;opacity:{{ t.dotOpacity }}">
+                  <span style="width:4px;height:4px;background:#0389BC"></span>
+                  <span style="width:4px;height:4px;background:#0389BC"></span>
+                  <span style="width:4px;height:4px;background:#0389BC"></span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+    </x-import>
+
+    <div style="display:flex;gap:10px;align-items:center">
+      <button onClick="{{ restart }}" style="background:rgba(147,203,220,.12);border:1px solid rgba(147,203,220,.3);color:#D2E7EC;font:600 12px 'Plus Jakarta Sans',sans-serif;padding:9px 14px;border-radius:9px;cursor:pointer" style-hover="background:rgba(147,203,220,.22)">↻ Splash'tan başlat</button>
+      <span style="font-size:12px;color:#6f8fb0">Şu an: <b style="color:#93CBDC">{{ screenName }}</b></span>
+    </div>
+  </div>
+
+  <aside style="width:290px;flex:none;display:flex;flex-direction:column;gap:16px;color:#D2E7EC">
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">AKIŞLAR</div>
+      <div style="font-size:12.5px;line-height:1.7;color:#b8cfdd">
+        <div>Splash → Onboarding (3) → Ana sayfa</div>
+        <div>Öne çıkan kart → <b style="color:#fff">pixel loading</b> → Etkinlik detay</div>
+        <div>Detay → Kayıt formu → Doğrulama → Başarılı</div>
+        <div>Arşiv → kategori filtresi → foto carousel</div>
+        <div>Boş kategori → boş durum → bildirimler</div>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">PALET</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ palette }}" as="c" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:26px;height:26px;border-radius:7px;background:{{ c.hex }};border:1px solid rgba(255,255,255,.15)"></span>
+            <span style="font:600 11.5px ui-monospace,monospace;color:#fff">{{ c.hex }}</span>
+            <span style="font-size:11px;color:#7fa0bd">{{ c.use }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">MOBILE'A AKTARIM</div>
+      <div style="font-size:12.5px;line-height:1.65;color:#b8cfdd">
+        <div style="color:#fff;font-weight:700;margin-bottom:4px">1 · Kod paketi al</div>
+        Bu tasarımı <b style="color:#fff">Claude Code handoff paketi</b> olarak dışa aktarabilirim: ekran ekran spec, renk/tipografi token'ları ve component listesi. "Handoff paketi çıkar" de, hazırlayayım.
+        <div style="color:#fff;font-weight:700;margin:12px 0 4px">2 · Teknoloji seç</div>
+        Tek kod tabanıyla iOS + Android için <b style="color:#fff">React Native (Expo)</b> öneririm — burada kullanılan layout mantığı birebir karşılık buluyor. Expo Router = burada gördüğün tab + stack navigasyonu.
+        <div style="color:#fff;font-weight:700;margin:12px 0 4px">3 · Token'ları taşı</div>
+        5 renk + Plus Jakarta Sans + Press Start 2P (yalnız rozet/pixel) bir theme dosyasına; radius 8–16, spacing 4'ün katları.
+        <div style="color:#fff;font-weight:700;margin:12px 0 4px">4 · Backend</div>
+        Etkinlik/kayıt/bildirim için Firebase (Firestore + Cloud Messaging) en hızlısı; kayıt formu tek koleksiyon.
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,.045);border:1px solid rgba(147,203,220,.16);border-radius:12px;padding:16px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0389BC;letter-spacing:.5px;margin-bottom:10px">SIRADAKI ADIMLAR</div>
+      <ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:1.65;color:#b8cfdd">
+        <li>Arşiv görsellerini kartlara sürükle — gerçek fotoğraflarla görelim.</li>
+        <li>Karanlık tema varyantı ister misin?</li>
+        <li>Kayıt sonrası QR'lı katılım kartı ekleyelim mi?</li>
+        <li>Android (Material) versiyonunu da çıkarayım mı?</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:1000}}">
+const ICON = {
+  gift: "M1 2h6v1h-6z M2 3h4v5h-4z M3 0h1v2h-1z M4 1h1v1h-1z M0 2h1v1h-1z",
+  star: "M3 0h2v2h-2z M0 2h8v2h-8z M2 4h4v2h-4z M1 6h2v2h-2z M5 6h2v2h-2z",
+  clock: "M2 0h4v1h-4z M0 2h1v4h-1z M7 2h1v4h-1z M2 7h4v1h-4z M3 2h1v3h-1z M4 4h1v1h-1z",
+  cal: "M1 1h6v1h-6z M0 2h8v6h-8z M2 0h1v2h-1z M5 0h1v2h-1z",
+  pin: "M3 0h2v1h-2z M2 1h4v3h-4z M3 4h2v2h-2z M3 6h2v2h-2z",
+  home: "M3 0h2v1h-2z M1 1h6v1h-6z M0 2h8v1h-8z M1 3h6v5h-6z",
+  grid: "M0 0h3v3h-3z M5 0h3v3h-3z M0 5h3v3h-3z M5 5h3v3h-3z",
+  bell: "M3 0h2v1h-2z M2 1h4v4h-4z M1 5h6v1h-6z M3 6h2v1h-2z",
+  chat: "M0 0h8v5h-8z M1 5h2v2h-2z",
+  code: "M2 1h1v1h-1z M1 2h1v2h-1z M2 4h1v1h-1z M5 1h1v1h-1z M6 2h1v2h-1z M5 4h1v1h-1z"
+};
+
+const EVENTS = [
+  { id: "ev1", day: "12", mon: "MAR", wd: "Per", monthKey: "MART 2026", title: "Git & GitHub Atölyesi", time: "18:00 – 20:30 · B Blok 204", short: "12 Mart · B Blok 204", tag: "Atölye", soon: true, registered: false, badge: "SON GUN", spots: "12 / 60 yer kaldı",
+    desc: "Versiyon kontrolüne sıfırdan başlıyoruz. Kendi bilgisayarında repo açmaktan pull request göndermeye kadar tüm akışı birlikte yapacağız. Laptopunu getirmen yeterli — kurulumu birlikte hallediyoruz.", tags: ["Başlangıç seviye", "Laptop getir", "Sertifikalı"], speaker: "Mert Aydın", speakerRole: "3. sınıf · Kulüp teknik ekip", facts: [["cal", "Tarih", "12 Mart 2026, Perşembe"], ["clock", "Saat", "18:00 – 20:30"], ["pin", "Yer", "Müh. Fak. B Blok 204"]] },
+  { id: "ev2", day: "19", mon: "MAR", wd: "Per", monthKey: "MART 2026", title: "React ile Web Geliştirme", time: "18:00 – 21:00 · Bilgisayar Lab 3", short: "19 Mart · Lab 3", tag: "Atölye", soon: false, registered: true, badge: "ATOLYE", spots: "31 / 40 yer kaldı",
+    desc: "Component mantığı, state yönetimi ve küçük bir proje. Atölye sonunda kendi mini uygulamanı yayına almış olacaksın.", tags: ["Orta seviye", "3 saat", "Proje çıktılı"], speaker: "Zeynep Kara", speakerRole: "4. sınıf · Frontend", facts: [["cal", "Tarih", "19 Mart 2026, Perşembe"], ["clock", "Saat", "18:00 – 21:00"], ["pin", "Yer", "Bilgisayar Lab 3"]] },
+  { id: "ev3", day: "26", mon: "MAR", wd: "Per", monthKey: "MART 2026", title: "Kariyer Sohbetleri: İlk Staj", time: "19:00 – 20:30 · Konferans Salonu", short: "26 Mart · Konferans Salonu", tag: "Söyleşi", soon: false, registered: false, badge: "SOYLESI", spots: "180 kişilik salon",
+    desc: "İlk stajını yeni bitiren üç mezunumuz deneyimlerini anlatıyor: CV, mülakat ve ilk üç ay. Sonunda soru-cevap var.", tags: ["Herkese açık", "Kayıt gerekli", "Mezun konuk"], speaker: "Panel", speakerRole: "3 mezun konuşmacı", facts: [["cal", "Tarih", "26 Mart 2026, Perşembe"], ["clock", "Saat", "19:00 – 20:30"], ["pin", "Yer", "Konferans Salonu"]] },
+  { id: "ev4", day: "02", mon: "NİS", wd: "Per", monthKey: "NİSAN 2026", title: "KOÜ Hackathon Tanıtım Gecesi", time: "18:30 – 20:00 · Konferans Salonu", short: "2 Nisan · Konferans Salonu", tag: "Yarışma", soon: false, registered: false, badge: "YARISMA", spots: "Takımlar 4 kişilik",
+    desc: "48 saatlik hackathon'un kuralları, jüri, ödüller ve takım kurma oturumu. Takımın yoksa burada bulabilirsin.", tags: ["Takım kur", "Ödüllü", "48 saat"], speaker: "Organizasyon Ekibi", speakerRole: "Kulüp yönetim kurulu", facts: [["cal", "Tarih", "2 Nisan 2026, Perşembe"], ["clock", "Saat", "18:30 – 20:00"], ["pin", "Yer", "Konferans Salonu"]] }
+];
+
+const FEATURED = [
+  { id: "ev1", kicker: "CEKILIS", icon: ICON.gift, title: "Mechanical Keyboard Çekilişi", body: "Atölyeye kayıt olan herkes çekilişe otomatik katılıyor.", meta: "Son 3 gün", bg: "linear-gradient(140deg,#001B4A,#014576 70%,#0389BC 150%)", fg: "#ffffff", sub: "#93CBDC", badgeBg: "rgba(147,203,220,.22)", badgeFg: "#D2E7EC" },
+  { id: "ev3", kicker: "DUYURU", icon: ICON.star, title: "Bahar dönemi başvuruları açıldı", body: "Kulüp üyeliği ve ekip başvuruları 20 Mart'a kadar.", meta: "Yeni", bg: "#D2E7EC", fg: "#001B4A", sub: "#41586B", badgeBg: "#014576", badgeFg: "#D2E7EC" },
+  { id: "ev4", kicker: "SON GUN", icon: ICON.clock, title: "Hackathon takım kaydı bitiyor", body: "4 kişilik takımını kur, son başvuru 1 Nisan.", meta: "2 Nisan", bg: "#ffffff", fg: "#001B4A", sub: "#5B7185", badgeBg: "#D2E7EC", badgeFg: "#014576" }
+];
+
+const FEED = [
+  { id: "ev1", day: "12", mon: "MAR", tag: "Atölye", title: "Git & GitHub Atölyesi kontenjanı açıldı", meta: "48 / 60 kişi kayıtlı", isNew: true, tint: "#D2E7EC" },
+  { id: "ev2", day: "19", mon: "MAR", tag: "Atölye", title: "React atölyesi için ön hazırlık dokümanı", meta: "Kayıtlı olduğun etkinlik", isNew: false, tint: "#E4EEF3" },
+  { id: "ev3", day: "26", mon: "MAR", tag: "Söyleşi", title: "Kariyer Sohbetleri: İlk Staj deneyimi", meta: "3 mezun konuşmacı", isNew: true, tint: "#D2E7EC" },
+  { id: "ev4", day: "02", mon: "NİS", tag: "Yarışma", title: "Hackathon tanıtım gecesi tarihi belli oldu", meta: "Takım kurma oturumu var", isNew: false, tint: "#E4EEF3" }
+];
+
+const ARCHIVE = [
+  { title: "Kış Kampı: Backend 101", date: "Aralık 2025", cat: "Atölye", year: "2025", count: 24 },
+  { title: "Teknoloji Gecesi", date: "Kasım 2025", cat: "Söyleşi", year: "2025", count: 63 },
+  { title: "TÜBİTAK Teknopark Gezisi", date: "Ekim 2025", cat: "Teknik Gezi", year: "2025", count: 41 },
+  { title: "Oyun Geliştirme Atölyesi", date: "Mayıs 2025", cat: "Atölye", year: "2025", count: 18 },
+  { title: "Mezunlarla Buluşma", date: "Nisan 2025", cat: "Söyleşi", year: "2025", count: 37 },
+  { title: "Yazılım Zirvesi Ziyareti", date: "Mart 2024", cat: "Teknik Gezi", year: "2024", count: 52 }
+];
+
+const CATS = ["Tümü", "Atölye", "Söyleşi", "Teknik Gezi", "Yarışma"];
+const DEPTS = ["Yazılım Müh.", "Bilgisayar Müh.", "Elektronik", "Diğer"];
+const YEARS = ["Haz.", "1", "2", "3", "4"];
+
+const ONB = [
+  { kicker: "01 / 03", logo: true, title: "Kulüpten hiçbir şey kaçmasın", body: "Atölyeler, söyleşiler ve çekilişler tek akışta. Öne çıkanlar en üstte, gerisi zaman sırasıyla.", cta: "Devam", art: "" },
+  { kicker: "02 / 03", logo: false, title: "Tek dokunuşla kayıt ol", body: "Ad soyad, öğrenci no ve bölüm — 20 saniyede kaydın tamam. Kontenjan dolmadan yerini ayır.", cta: "Devam",
+    art: '<path fill="#D2E7EC" d="M4 1h14v15h-14z"></path><path fill="#0389BC" d="M6 3h10v2h-10z M6 7h10v1h-10z M6 10h10v1h-10z"></path><path fill="#001B4A" d="M6 13h6v2h-6z"></path><path fill="#93CBDC" d="M0 8h2v2h-2z M2 10h2v2h-2z"></path>' },
+  { kicker: "03 / 03", logo: false, title: "Sadece istediğin bildirim", body: "Atölye, söyleşi, çekiliş — kategori kategori aç kapa. Sessiz saatlerde rahatsız etmeyiz.", cta: "Başla",
+    art: '<path fill="#93CBDC" d="M9 1h4v1h-4z M7 2h8v9h-8z M5 11h12v2h-12z M9 13h4v2h-4z"></path><path fill="#0389BC" d="M8 3h6v7h-6z"></path><path fill="#D2E7EC" d="M17 2h2v2h-2z M19 0h2v2h-2z"></path>' }
+];
+
+const NOTIF_DEF = [
+  ["Atölye", ICON.code, "#D2E7EC", "Yeni atölye açıldığında ve kontenjan güncellendiğinde"],
+  ["Söyleşi", ICON.chat, "#E4EEF3", "Konuk konuşmacı ve panel duyuruları"],
+  ["Çekiliş", ICON.gift, "#D2E7EC", "Çekiliş başlangıcı ve sonuç açıklaması"],
+  ["Duyuru", ICON.star, "#E4EEF3", "Genel kulüp duyuruları ve başvuru dönemleri"],
+  ["Hatırlatma", ICON.clock, "#D2E7EC", "Kayıtlı olduğun etkinlikler için hatırlatma"]
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: "splash", onb: 0, detailId: "ev1", loading: false,
+    calView: "list", cat: "Tümü", lbIdx: -1, lbPhoto: 0,
+    form: { name: "", no: "", dept: "", year: "", kvkk: false },
+    master: true, quiet: true, reminder: "1 gün önce",
+    notifs: { "Atölye": true, "Söyleşi": true, "Çekiliş": true, "Duyuru": false, "Hatırlatma": true }
+  };
+
+  componentDidMount() { this.arm(); }
+  componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.t2); }
+  arm() { clearTimeout(this.t); this.t = setTimeout(() => { if (this.state.screen === "splash") this.setState({ screen: "onboard" }); }, 1900); }
+
+  go = (screen) => this.setState({ screen, lbIdx: -1 });
+  openEvent = (id) => {
+    this.setState({ loading: true });
+    clearTimeout(this.t2);
+    this.t2 = setTimeout(() => this.setState({ loading: false, screen: "detail", detailId: id }), 460);
+  };
+  sw = (on) => ({ track: on ? "#0389BC" : "#CBD9E1", knob: on ? "24px" : "3px" });
+
+  renderVals() {
+    const s = this.state, S = s.screen;
+    const det = EVENTS.find(e => e.id === s.detailId) || EVENTS[0];
+    const noOk = /^\d{9}$/.test(s.form.no);
+    const valid = s.form.name.trim().length > 2 && noOk && !!s.form.dept && !!s.form.year && s.form.kvkk;
+    const arch = ARCHIVE.map((a, i) => ({ ...a, i })).filter(a => s.cat === "Tümü" || a.cat === s.cat);
+    const names = { splash: "Splash", onboard: "Onboarding", home: "Ana sayfa", cal: "Etkinlik takvimi", detail: "Etkinlik detay", form: "Kayıt formu", done: "Kayıt başarılı", archive: "Etkinlik arşivi", notifs: "Bildirim ayarları" };
+    const onb = ONB[s.onb];
+    const lbItem = s.lbIdx >= 0 ? ARCHIVE[s.lbIdx] : null;
+    const master = s.master;
+
+    const months = ["MART 2026", "NİSAN 2026"].map(k => ({
+      label: k, items: EVENTS.filter(e => e.monthKey === k).map(e => ({ ...e, go: () => this.openEvent(e.id) }))
+    }));
+
+    const evDay = { 12: "ev1", 19: "ev2", 26: "ev3" };
+    const calDays = Array.from({ length: 35 }, (_, i) => {
+      const n = i - 5, inMonth = n >= 1 && n <= 31, id = inMonth ? evDay[n] : null;
+      return {
+        n: inMonth ? String(n) : "", dot: !!id, bg: id ? "#D2E7EC" : "transparent",
+        fg: inMonth ? (id ? "#001B4A" : "#5B7185") : "rgba(0,0,0,0)",
+        font: id ? "800" : "500", cursor: id ? "pointer" : "default",
+        go: id ? () => this.openEvent(id) : () => {}
+      };
+    });
+
+    const tabDef = [["home", "Ana Sayfa", ICON.home], ["cal", "Takvim", ICON.cal], ["archive", "Arşiv", ICON.grid], ["notifs", "Bildirim", ICON.bell]];
+
+    return {
+      screenIndex: [["Splash & Onboarding", "splash"], ["Ana sayfa", "home"], ["Etkinlik takvimi", "cal"], ["Etkinlik detay", "detail"], ["Kayıt formu", "form"], ["Etkinlik arşivi", "archive"], ["Bildirim ayarları", "notifs"]]
+        .map((x, i) => ({ n: String(i + 1).padStart(2, "0"), label: x[0], go: () => { if (x[1] === "splash") { this.setState({ screen: "splash", onb: 0 }); this.arm(); } else this.go(x[1]); } })),
+      palette: [{ hex: "#001B4A", use: "Zemin / header" }, { hex: "#014576", use: "İkincil yüzey" }, { hex: "#0389BC", use: "Vurgu / CTA" }, { hex: "#93CBDC", use: "Badge / ikincil" }, { hex: "#D2E7EC", use: "Kart zemini" }],
+      screenName: names[S] || S,
+      restart: () => { this.setState({ screen: "splash", onb: 0 }); this.arm(); },
+
+      isSplash: S === "splash", isOnboard: S === "onboard", isHome: S === "home", isCal: S === "cal",
+      isDetail: S === "detail", isForm: S === "form", isDone: S === "done", isArchive: S === "archive", isNotifs: S === "notifs",
+      loading: s.loading,
+      showTabs: ["home", "cal", "archive", "notifs"].indexOf(S) >= 0,
+
+      onbIsLogo: !!onb.logo, onbIsArt: !onb.logo, onbArt: { __html: onb.art },
+      onbKicker: onb.kicker, onbTitle: onb.title, onbBody: onb.body, onbCta: onb.cta,
+      onbDots: ONB.map((_, i) => ({ w: i === s.onb ? "22px" : "7px", bg: i === s.onb ? "#0389BC" : "#C8DCE6" })),
+      nextOnboard: () => s.onb < 2 ? this.setState({ onb: s.onb + 1 }) : this.go("home"),
+      skipOnboard: () => this.go("home"),
+
+      featured: FEATURED.map(f => ({ ...f, go: () => this.openEvent(f.id) })),
+      featIndicator: FEATURED.length + " kart",
+      feed: FEED.map(f => ({ ...f, go: () => this.openEvent(f.id) })),
+      events: EVENTS.map(e => ({ ...e, go: () => this.openEvent(e.id) })),
+      months, calDays,
+      weekdays: ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"].map(l => ({ l })),
+      calViews: [["list", "Liste"], ["grid", "Takvim"]].map(v => ({
+        label: v[1], go: () => this.setState({ calView: v[0] }),
+        bg: s.calView === v[0] ? "#ffffff" : "transparent", fg: s.calView === v[0] ? "#014576" : "#93CBDC"
+      })),
+      isListView: s.calView === "list", isGridView: s.calView === "grid",
+
+      det: {
+        title: det.title, badge: det.badge, desc: det.desc, spots: det.spots,
+        speaker: det.speaker, speakerRole: det.speakerRole,
+        speakerInitials: det.speaker.split(" ").map(w => w[0]).join("").slice(0, 2),
+        facts: det.facts.map(f => ({ icon: ICON[f[0]], label: f[1], value: f[2] })),
+        tags: det.tags.map(l => ({ l }))
+      },
+      back: () => this.go(S === "form" ? "detail" : "home"),
+      goForm: () => this.go("form"), goHome: () => this.go("home"), goCal: () => this.go("cal"), goNotifs: () => this.go("notifs"),
+
+      form: s.form,
+      setName: (e) => this.setState({ form: { ...s.form, name: e.target.value } }),
+      setNo: (e) => this.setState({ form: { ...s.form, no: e.target.value.replace(/\D/g, "").slice(0, 9) } }),
+      noError: s.form.no.length > 0 && !noOk,
+      noBorder: s.form.no.length > 0 && !noOk ? "#E2A6A2" : "#E4EEF3",
+      depts: DEPTS.map(d => ({
+        label: d, go: () => this.setState({ form: { ...s.form, dept: d } }),
+        bg: s.form.dept === d ? "#D2E7EC" : "#ffffff", bc: s.form.dept === d ? "#0389BC" : "#E4EEF3", fg: s.form.dept === d ? "#014576" : "#5B7185"
+      })),
+      years: YEARS.map(y => ({
+        label: y, go: () => this.setState({ form: { ...s.form, year: y } }),
+        bg: s.form.year === y ? "#0389BC" : "transparent", fg: s.form.year === y ? "#ffffff" : "#5B7185"
+      })),
+      toggleKvkk: () => this.setState({ form: { ...s.form, kvkk: !s.form.kvkk } }),
+      kvkkBorder: s.form.kvkk ? "#0389BC" : "#CBD9E1", kvkkBg: s.form.kvkk ? "#0389BC" : "#ffffff",
+      submitLabel: valid ? "Kaydımı Tamamla" : "Alanları doldur",
+      submitBg: valid ? "linear-gradient(135deg,#014576,#0389BC)" : "#DCE7ED",
+      submitFg: valid ? "#ffffff" : "#95A9B6",
+      submitCursor: valid ? "pointer" : "not-allowed",
+      submitShadow: valid ? "0 10px 22px rgba(3,137,188,.3)" : "none",
+      submit: () => { if (valid) this.go("done"); },
+
+      cats: CATS.map(c => ({
+        label: c, go: () => this.setState({ cat: c, lbIdx: -1 }),
+        bg: s.cat === c ? "#0389BC" : "#ffffff", bc: s.cat === c ? "#0389BC" : "#E4EEF3", fg: s.cat === c ? "#ffffff" : "#5B7185"
+      })),
+      activeCat: s.cat.toLocaleLowerCase("tr"),
+      archive: arch.map(a => ({ ...a, slot: "kyk-arch-" + a.i, go: () => this.setState({ lbIdx: a.i, lbPhoto: 0 }) })),
+      archiveEmpty: arch.length === 0, archiveHas: arch.length > 0,
+      hasLightbox: !!lbItem,
+      lb: lbItem ? {
+        title: lbItem.title, date: lbItem.date + " · " + lbItem.cat,
+        counter: (s.lbPhoto + 1) + " / 4", slot: "kyk-lb-" + s.lbIdx + "-" + s.lbPhoto,
+        dots: [0, 1, 2, 3].map(i => ({ w: i === s.lbPhoto ? "18px" : "6px", bg: i === s.lbPhoto ? "#93CBDC" : "rgba(147,203,220,.35)" }))
+      } : { title: "", date: "", counter: "", slot: "kyk-lb-none", dots: [] },
+      closeLightbox: () => this.setState({ lbIdx: -1 }),
+      lbPrev: () => this.setState({ lbPhoto: (s.lbPhoto + 3) % 4 }),
+      lbNext: () => this.setState({ lbPhoto: (s.lbPhoto + 1) % 4 }),
+
+      masterHint: master ? "Açık · kategorilere göre filtreleniyor" : "Kapalı · hiçbir bildirim gelmiyor",
+      masterTrack: this.sw(master).track, masterKnob: this.sw(master).knob,
+      toggleMaster: () => this.setState({ master: !master }),
+      notifCats: NOTIF_DEF.map(n => {
+        const on = master && s.notifs[n[0]];
+        return {
+          label: n[0], icon: n[1], tint: n[2], desc: n[3],
+          track: this.sw(on).track, knob: this.sw(on).knob,
+          toggle: () => this.setState({ master: true, notifs: { ...s.notifs, [n[0]]: !s.notifs[n[0]] } })
+        };
+      }),
+      reminders: ["1 saat önce", "1 gün önce", "3 gün önce"].map(r => ({
+        label: r, go: () => this.setState({ reminder: r }),
+        bg: s.reminder === r ? "#0389BC" : "transparent", fg: s.reminder === r ? "#ffffff" : "#5B7185"
+      })),
+      quietTrack: this.sw(s.quiet).track, quietKnob: this.sw(s.quiet).knob,
+      toggleQuiet: () => this.setState({ quiet: !s.quiet }),
+
+      tabs: tabDef.map(t => ({
+        label: t[1], icon: t[2], go: () => this.go(t[0]),
+        color: S === t[0] ? "#0389BC" : "#8FA3B5", weight: S === t[0] ? "700" : "500",
+        dotOpacity: S === t[0] ? "1" : "0"
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import { PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback } from 'react';
+import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { LoadingOverlay } from '../src/components/LoadingOverlay';
+import { ContentProvider } from '../src/content';
+import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
+import { AppStoreProvider, LoadingProvider, useLoading } from '../src/store';
+import { colors } from '../src/theme';
+
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Already hidden — nothing to do.
+});
+
+// `.env` is gitignored, so a fresh clone or an EAS build without environment
+// variables is the likeliest way Firebase breaks. Say so at startup rather than
+// letting it surface as a throw from somewhere deep in a screen.
+if (__DEV__ && !isFirebaseConfigured) {
+  console.warn(`[firebase] ${FIREBASE_SETUP_HINT}`);
+}
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+    PressStart2P_400Regular,
+  });
+
+  const onReady = useCallback(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  // A font failure should not black-hole the app; fall through to system fonts.
+  if (!fontsLoaded && !fontError) return null;
+
+  return (
+    <SafeAreaProvider onLayout={onReady}>
+      <AppStoreProvider>
+        <ContentProvider>
+          <LoadingProvider>
+            <StatusBar style="light" />
+            <RootStack />
+          </LoadingProvider>
+        </ContentProvider>
+      </AppStoreProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function RootStack() {
+  const { loading } = useLoading();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          animation: 'slide_from_right',
+        }}
+      >
+        <Stack.Screen name="index" options={{ animation: 'fade' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="etkinlik/[id]" />
+        <Stack.Screen name="kayit/[id]" />
+        <Stack.Screen
+          name="kayit-basarili"
+          // The confirmation is a terminal state — swiping back into the form
+          // after submitting would be nonsense.
+          options={{ animation: 'fade', gestureEnabled: false }}
+        />
+      </Stack>
+      {loading ? <LoadingOverlay /> : null}
+    </View>
+  );
+}

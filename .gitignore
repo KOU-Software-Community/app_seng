@@ -30,7 +30,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — Firebase config lives here, never commit it
+.env
 .env*.local
 
 # typescript
@@ -39,3 +40,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# EAS
+.eas/
+
+# Store credentials — never commit
+*.jks
+*.keystore
+play-store-key.json
+AuthKey_*.p8
