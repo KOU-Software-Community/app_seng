@@ -215,6 +215,44 @@ check(
 );
 
 check(
+  'her koleksiyonun bir kuralı var',
+  'Kuralı yazılmamış koleksiyon, sonundaki "eşleşmeyen her şey kapalı" bloğuna ' +
+    'düşer ve istemci "Missing or insufficient permissions" alır. Kod tarafında ' +
+    'hiçbir şey hata vermez; hata ancak uygulama çalışırken görünür. Bu kontrol ' +
+    'yayınlanıp yayınlanmadığını söyleyemez — onu yalnızca `npm run rules:deploy` ' +
+    'yapar — ama kuralın hiç yazılmamış olduğunu söyler.',
+  () => {
+    const rules = read('firestore.rules');
+    // COLLECTIONS'ın değerleri: `events: 'events',` gibi satırlar.
+    const block = read('src/firebase.ts').match(/COLLECTIONS = \{([\s\S]*?)\}/)?.[1] ?? '';
+    const names = [...block.matchAll(/:\s*'([^']+)'/g)].map((m) => m[1]);
+    if (names.length < 6) return `COLLECTIONS okunamadı (${names.length} isim bulundu)`;
+
+    const missing = names.filter((n) => !new RegExp(`match /${n}/`).test(rules));
+    return missing.length ? `firestore.rules kuralsız koleksiyon: ${missing.join(', ')}` : null;
+  },
+);
+
+check(
+  'kural yayınlama tek komut',
+  'Kurallar konsola elle yapıştırılıyordu. Kural her değiştiğinde yeniden ' +
+    'yapıştırmak gerekiyor ve yapıştırılanın depodakiyle aynı olduğunu hiçbir şey ' +
+    'garanti etmiyordu — çekiliş blokları eklendiğinde uygulama tam olarak bu ' +
+    'yüzden içerik okuyamadı.',
+  () => {
+    if (!pkg.scripts?.['rules:deploy']) return 'rules:deploy script’i yok';
+    const deploy = read('scripts/deploy-rules.mjs');
+    // Proje kimliği uygulamanınkiyle aynı kaynaktan gelmezse, kurallar doğru
+    // projede yayınlanmış ama uygulama başka projeye bakıyor olabilir.
+    if (!/EXPO_PUBLIC_FIREBASE_PROJECT_ID/.test(deploy)) {
+      return 'proje kimliği uygulamanın kullandığı değişkenden okunmuyor';
+    }
+    if (!json('firebase.json').firestore?.rules) return 'firebase.json firestore.rules’a işaret etmiyor';
+    return null;
+  },
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {
