@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { PixelLoader } from '../src/components/Pixel';
-import { PixelTxt, Txt } from '../src/components/ui';
+import { MissingEvent, PixelTxt, Txt } from '../src/components/ui';
 import { useEvent } from '../src/content';
 import { ICON } from '../src/icons';
 import { useAppStore } from '../src/store';
@@ -19,14 +19,6 @@ export default function RegistrationDoneRoute() {
   const event = useEvent(id);
   const { registrationFor, syncPending, notifications } = useAppStore();
 
-  const registration = registrationFor(event.id);
-  // The code is real and the club will get it — but saying "yerin ayrıldı"
-  // before the write lands would be a promise we have not kept yet.
-  const pending = !!registration && !registration.synced;
-  // Only promise the reminder we will actually schedule. Both switches gate it,
-  // and src/notifications.tsx reads exactly the same two.
-  const remindersOn = notifications.master && notifications.categories['Hatırlatma'] !== false;
-
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -36,6 +28,17 @@ export default function RegistrationDoneRoute() {
       Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
   }, [scale, opacity]);
+
+  // After every hook, so the early return cannot change the hook order.
+  if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
+
+  const registration = registrationFor(event.id);
+  // The code is real and the club will get it — but saying "yerin ayrıldı"
+  // before the write lands would be a promise we have not kept yet.
+  const pending = !!registration && !registration.synced;
+  // Only promise the reminder we will actually schedule. Both switches gate it,
+  // and src/notifications.tsx reads exactly the same two.
+  const remindersOn = notifications.master && notifications.categories['Hatırlatma'] !== false;
 
   return (
     <LinearGradient

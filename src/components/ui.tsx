@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
+  Image,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -553,6 +554,91 @@ export function GlassButton({
         </Txt>
       )}
     </Pressable>
+  );
+}
+
+/**
+ * Shared empty state — mascot, a heading, an explanation and an optional action.
+ *
+ * The club's calendar is empty between terms, so this is a normal screen rather
+ * than an error: it says what is missing and what happens next, and never blames
+ * the user or implies something broke.
+ */
+export function EmptyState({
+  title,
+  body,
+  ctaLabel,
+  onPress,
+  style,
+}: {
+  title: string;
+  body: string;
+  ctaLabel?: string;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[emptyStyles.root, style]}>
+      <Image
+        source={require('../../assets/brand/mascot.png')}
+        style={emptyStyles.art}
+        resizeMode="contain"
+      />
+      <Txt weight="extrabold" size={16} color={colors.navy900} style={{ marginTop: 20 }}>
+        {title}
+      </Txt>
+      <Txt size={13.5} leading={1.6} color={colors.muted} style={emptyStyles.body}>
+        {body}
+      </Txt>
+
+      {ctaLabel && onPress ? (
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          style={({ pressed }) => [emptyStyles.cta, pressed && { backgroundColor: colors.blue100 }]}
+        >
+          <Txt weight="bold" size={13.5} color={colors.blue500}>
+            {ctaLabel}
+          </Txt>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  root: { paddingHorizontal: 40, paddingVertical: 56, alignItems: 'center' },
+  art: { width: 132, height: 116, opacity: 0.5 },
+  body: { marginTop: 8, textAlign: 'center' },
+  cta: {
+    marginTop: 20,
+    borderWidth: 1.5,
+    borderColor: colors.blue500,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 11,
+  },
+});
+
+/**
+ * Shown by the event detail and registration routes when the id in the URL
+ * matches nothing — a deep link to an event that has been removed, a stale push
+ * notification, or simply no calendar yet.
+ *
+ * `useContent().getEvent` used to return the first event instead of undefined,
+ * which meant those cases silently displayed the wrong event. This is what that
+ * fallback was hiding.
+ */
+export function MissingEvent({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={[styles.screen, { justifyContent: 'center' }]}>
+      <EmptyState
+        title="Etkinlik bulunamadı"
+        body="Bu etkinlik kaldırılmış ya da bağlantı eskimiş olabilir. Yeni program açıklandığında takvimde görünecek."
+        ctaLabel="Takvime dön"
+        onPress={onBack}
+      />
+    </View>
   );
 }
 

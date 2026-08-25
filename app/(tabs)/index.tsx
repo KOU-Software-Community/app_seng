@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PixelIcon } from '../../src/components/Pixel';
 import {
   DottedRule,
+  EmptyState,
   PixelBadge,
   SectionTitle,
   Txt,
@@ -72,36 +73,50 @@ export default function HomeRoute() {
         <DottedRule style={{ marginTop: 16 }} />
       </LinearGradient>
 
-      <SectionTitle
-        icon="grid"
-        trailing={
-          <Txt weight="semibold" size={12} color={colors.blue500}>
-            {FEATURED.length} kart
-          </Txt>
-        }
-      >
-        Öne Çıkanlar
-      </SectionTitle>
+      {/* Both lists are editorial content about upcoming events, so between
+          terms they empty out together. One empty state beats two headings with
+          nothing underneath them. */}
+      {FEATURED.length === 0 && FEED.length === 0 ? (
+        <EmptyState
+          title="Yeni dönem hazırlanıyor"
+          body="Kulübün yaklaşan etkinlikleri henüz açıklanmadı. Bildirimleri açarsan program belli olduğunda haber veririz."
+          ctaLabel="Bildirimleri aç"
+          onPress={() => router.navigate('/(tabs)/bildirim')}
+        />
+      ) : (
+        <>
+          <SectionTitle
+            icon="grid"
+            trailing={
+              <Txt weight="semibold" size={12} color={colors.blue500}>
+                {FEATURED.length} kart
+              </Txt>
+            }
+          >
+            Öne Çıkanlar
+          </SectionTitle>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_WIDTH + CARD_GAP}
-        decelerationRate="fast"
-        contentContainerStyle={styles.carousel}
-      >
-        {FEATURED.map((card) => (
-          <FeaturedTile key={card.kicker} card={card} onPress={() => openEvent(card.id)} />
-        ))}
-      </ScrollView>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_WIDTH + CARD_GAP}
+            decelerationRate="fast"
+            contentContainerStyle={styles.carousel}
+          >
+            {FEATURED.map((card) => (
+              <FeaturedTile key={card.kicker} card={card} onPress={() => openEvent(card.id)} />
+            ))}
+          </ScrollView>
 
-      <SectionTitle icon="lines">Akış</SectionTitle>
+          <SectionTitle icon="lines">Akış</SectionTitle>
 
-      <View style={styles.feed}>
-        {FEED.map((item) => (
-          <FeedRow key={item.title} item={item} onPress={() => openEvent(item.id)} />
-        ))}
-      </View>
+          <View style={styles.feed}>
+            {FEED.map((item) => (
+              <FeedRow key={item.title} item={item} onPress={() => openEvent(item.id)} />
+            ))}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }

@@ -21,7 +21,8 @@ type ContentValue = {
   /** Why we fell back, if we did. Null when Firestore answered. */
   error: string | null;
   refresh: () => void;
-  getEvent: (id?: string | string[]) => ClubEvent;
+  /** Undefined when nothing matches — every caller has to handle that. */
+  getEvent: (id?: string | string[]) => ClubEvent | undefined;
 };
 
 const Ctx = createContext<ContentValue | null>(null);
@@ -92,7 +93,10 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       refresh: () => setNonce((n) => n + 1),
       getEvent: (id) => {
         const key = Array.isArray(id) ? id[0] : id;
-        return events.find((e) => e.id === key) ?? events[0] ?? EVENTS[0];
+        // No falling back to the first event. That turned "this id does not
+        // exist" into "here is some other event", which is a harder bug to spot
+        // than a missing-event screen.
+        return events.find((e) => e.id === key);
       },
     }),
     [events, archive, source, loading, error],

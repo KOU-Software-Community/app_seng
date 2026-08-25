@@ -12,7 +12,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PixelIcon } from '../../src/components/Pixel';
-import { GlassButton, GradientHeader, PrimaryButton, Segmented, Txt } from '../../src/components/ui';
+import {
+  GlassButton,
+  GradientHeader,
+  MissingEvent,
+  PrimaryButton,
+  Segmented,
+  Txt,
+} from '../../src/components/ui';
 import { useEvent } from '../../src/content';
 import { DEPARTMENTS, YEARS } from '../../src/data';
 import { useAppStore } from '../../src/store';
@@ -33,6 +40,9 @@ export default function RegistrationRoute() {
   const [year, setYear] = useState('');
   const [kvkk, setKvkk] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
+
+  // After every hook, so the early return cannot change the hook order.
+  if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
   const noValid = new RegExp(`^\\d{${STUDENT_NO_LENGTH}}$`).test(studentNo);
   // Only complain once they have started typing.

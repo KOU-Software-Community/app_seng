@@ -30,110 +30,26 @@ export type ClubEvent = {
   facts: EventFact[];
 };
 
-export const EVENTS: ClubEvent[] = [
-  {
-    id: 'ev1',
-    startsAt: '2026-03-12T18:00:00+03:00',
-    day: '12',
-    mon: 'MAR',
-    wd: 'Per',
-    monthKey: 'MART 2026',
-    title: 'Git & GitHub Atölyesi',
-    time: '18:00 – 20:30 · B Blok 204',
-    short: '12 Mart · B Blok 204',
-    tag: 'Atölye',
-    soon: true,
-    badge: 'SON GUN',
-    spots: '12 / 60 yer kaldı',
-    desc: 'Versiyon kontrolüne sıfırdan başlıyoruz. Kendi bilgisayarında repo açmaktan pull request göndermeye kadar tüm akışı birlikte yapacağız. Laptopunu getirmen yeterli — kurulumu birlikte hallediyoruz.',
-    tags: ['Başlangıç seviye', 'Laptop getir', 'Sertifikalı'],
-    speaker: 'Mert Aydın',
-    speakerRole: '3. sınıf · Kulüp teknik ekip',
-    facts: [
-      { icon: 'cal', label: 'Tarih', value: '12 Mart 2026, Perşembe' },
-      { icon: 'clock', label: 'Saat', value: '18:00 – 20:30' },
-      { icon: 'pin', label: 'Yer', value: 'Müh. Fak. B Blok 204' },
-    ],
-  },
-  {
-    id: 'ev2',
-    startsAt: '2026-03-19T18:00:00+03:00',
-    day: '19',
-    mon: 'MAR',
-    wd: 'Per',
-    monthKey: 'MART 2026',
-    title: 'React ile Web Geliştirme',
-    time: '18:00 – 21:00 · Bilgisayar Lab 3',
-    short: '19 Mart · Lab 3',
-    tag: 'Atölye',
-    soon: false,
-    badge: 'ATOLYE',
-    spots: '31 / 40 yer kaldı',
-    desc: 'Component mantığı, state yönetimi ve küçük bir proje. Atölye sonunda kendi mini uygulamanı yayına almış olacaksın.',
-    tags: ['Orta seviye', '3 saat', 'Proje çıktılı'],
-    speaker: 'Zeynep Kara',
-    speakerRole: '4. sınıf · Frontend',
-    facts: [
-      { icon: 'cal', label: 'Tarih', value: '19 Mart 2026, Perşembe' },
-      { icon: 'clock', label: 'Saat', value: '18:00 – 21:00' },
-      { icon: 'pin', label: 'Yer', value: 'Bilgisayar Lab 3' },
-    ],
-  },
-  {
-    id: 'ev3',
-    startsAt: '2026-03-26T19:00:00+03:00',
-    day: '26',
-    mon: 'MAR',
-    wd: 'Per',
-    monthKey: 'MART 2026',
-    title: 'Kariyer Sohbetleri: İlk Staj',
-    time: '19:00 – 20:30 · Konferans Salonu',
-    short: '26 Mart · Konferans Salonu',
-    tag: 'Söyleşi',
-    soon: false,
-    badge: 'SOYLESI',
-    spots: '180 kişilik salon',
-    desc: 'İlk stajını yeni bitiren üç mezunumuz deneyimlerini anlatıyor: CV, mülakat ve ilk üç ay. Sonunda soru-cevap var.',
-    tags: ['Herkese açık', 'Kayıt gerekli', 'Mezun konuk'],
-    speaker: 'Panel',
-    speakerRole: '3 mezun konuşmacı',
-    facts: [
-      { icon: 'cal', label: 'Tarih', value: '26 Mart 2026, Perşembe' },
-      { icon: 'clock', label: 'Saat', value: '19:00 – 20:30' },
-      { icon: 'pin', label: 'Yer', value: 'Konferans Salonu' },
-    ],
-  },
-  {
-    id: 'ev4',
-    startsAt: '2026-04-02T18:30:00+03:00',
-    day: '02',
-    mon: 'NİS',
-    wd: 'Per',
-    monthKey: 'NİSAN 2026',
-    title: 'KOÜ Hackathon Tanıtım Gecesi',
-    time: '18:30 – 20:00 · Konferans Salonu',
-    short: '2 Nisan · Konferans Salonu',
-    tag: 'Yarışma',
-    soon: false,
-    badge: 'YARISMA',
-    spots: 'Takımlar 4 kişilik',
-    desc: "48 saatlik hackathon'un kuralları, jüri, ödüller ve takım kurma oturumu. Takımın yoksa burada bulabilirsin.",
-    tags: ['Takım kur', 'Ödüllü', '48 saat'],
-    speaker: 'Organizasyon Ekibi',
-    speakerRole: 'Kulüp yönetim kurulu',
-    facts: [
-      { icon: 'cal', label: 'Tarih', value: '2 Nisan 2026, Perşembe' },
-      { icon: 'clock', label: 'Saat', value: '18:30 – 20:00' },
-      { icon: 'pin', label: 'Yer', value: 'Konferans Salonu' },
-    ],
-  },
-];
+/**
+ * Upcoming events.
+ *
+ * Empty on purpose: the club has no confirmed calendar right now. This used to
+ * hold four March–April 2026 events which, months later, were still being shown
+ * as "upcoming" — a stale calendar is worse than an honest empty one, and it also
+ * meant no reminder could ever be scheduled.
+ *
+ * Fill this in (or seed Firestore, which takes precedence) when the real
+ * calendar exists. `MONTH_ORDER` groups the calendar list and must list the
+ * `monthKey` values actually in use.
+ */
+export const EVENTS: ClubEvent[] = [];
 
-export const MONTH_ORDER = ['MART 2026', 'NİSAN 2026'] as const;
+export const MONTH_ORDER: readonly string[] = [];
 
-export const getEvent = (id?: string | string[]) => {
+/** Undefined when the id matches nothing — callers must handle a missing event. */
+export const getEvent = (id?: string | string[]): ClubEvent | undefined => {
   const key = Array.isArray(id) ? id[0] : id;
-  return EVENTS.find((e) => e.id === key) ?? EVENTS[0];
+  return EVENTS.find((e) => e.id === key);
 };
 
 /** Highlight cards on the home carousel. Each one deep-links into an event. */
@@ -152,47 +68,7 @@ export type FeaturedCard = {
   badgeFg: string;
 };
 
-export const FEATURED: FeaturedCard[] = [
-  {
-    id: 'ev1',
-    kicker: 'CEKILIS',
-    icon: 'gift',
-    title: 'Mechanical Keyboard Çekilişi',
-    body: 'Atölyeye kayıt olan herkes çekilişe otomatik katılıyor.',
-    meta: 'Son 3 gün',
-    bg: gradients.featured,
-    fg: '#FFFFFF',
-    sub: '#93CBDC',
-    badgeBg: 'rgba(147,203,220,0.22)',
-    badgeFg: '#D2E7EC',
-  },
-  {
-    id: 'ev3',
-    kicker: 'DUYURU',
-    icon: 'star',
-    title: 'Bahar dönemi başvuruları açıldı',
-    body: "Kulüp üyeliği ve ekip başvuruları 20 Mart'a kadar.",
-    meta: 'Yeni',
-    bg: '#D2E7EC',
-    fg: '#001B4A',
-    sub: '#41586B',
-    badgeBg: '#014576',
-    badgeFg: '#D2E7EC',
-  },
-  {
-    id: 'ev4',
-    kicker: 'SON GUN',
-    icon: 'clock',
-    title: 'Hackathon takım kaydı bitiyor',
-    body: '4 kişilik takımını kur, son başvuru 1 Nisan.',
-    meta: '2 Nisan',
-    bg: '#FFFFFF',
-    fg: '#001B4A',
-    sub: '#5B7185',
-    badgeBg: '#D2E7EC',
-    badgeFg: '#014576',
-  },
-];
+export const FEATURED: FeaturedCard[] = [];
 
 export type FeedItem = {
   id: string;
@@ -205,48 +81,7 @@ export type FeedItem = {
   tint: string;
 };
 
-export const FEED: FeedItem[] = [
-  {
-    id: 'ev1',
-    day: '12',
-    mon: 'MAR',
-    tag: 'Atölye',
-    title: 'Git & GitHub Atölyesi kontenjanı açıldı',
-    meta: '48 / 60 kişi kayıtlı',
-    isNew: true,
-    tint: '#D2E7EC',
-  },
-  {
-    id: 'ev2',
-    day: '19',
-    mon: 'MAR',
-    tag: 'Atölye',
-    title: 'React atölyesi için ön hazırlık dokümanı',
-    meta: 'Kayıtlı olduğun etkinlik',
-    isNew: false,
-    tint: '#E4EEF3',
-  },
-  {
-    id: 'ev3',
-    day: '26',
-    mon: 'MAR',
-    tag: 'Söyleşi',
-    title: 'Kariyer Sohbetleri: İlk Staj deneyimi',
-    meta: '3 mezun konuşmacı',
-    isNew: true,
-    tint: '#D2E7EC',
-  },
-  {
-    id: 'ev4',
-    day: '02',
-    mon: 'NİS',
-    tag: 'Yarışma',
-    title: 'Hackathon tanıtım gecesi tarihi belli oldu',
-    meta: 'Takım kurma oturumu var',
-    isNew: false,
-    tint: '#E4EEF3',
-  },
-];
+export const FEED: FeedItem[] = [];
 
 export type ArchiveEntry = {
   title: string;
@@ -369,5 +204,5 @@ export const MARCH_2026 = {
   leadingBlanks: 6,
   days: 31,
   /** Day number → event id, for the dotted "has an event" markers. */
-  eventByDay: { 12: 'ev1', 19: 'ev2', 26: 'ev3' } as Record<number, string>,
+  eventByDay: {} as Record<number, string>,
 };
