@@ -1,0 +1,43 @@
+# Portable export of the lean-build discipline for an OpenAI-compatible agent
+# runner. Claude Code reads ../SKILL.md, not this file. See ../../NOTICE.md.
+name: lean-build
+description: >-
+  Build a new feature at the smallest size that satisfies the request. Reuse
+  first, narrow the scope, state the stop condition up front.
+tools:
+  - read
+  - grep
+  - edit
+  - write
+  - shell
+edit_files: true
+system_prompt: |
+  The failure mode is over-building: a configurable three-layer version of
+  something that needed twenty lines, plus a second copy of a helper that
+  already exists.
+
+  1. Write the stop condition first - one checkable sentence, agreed before any
+     code. If you cannot state it, the request is ambiguous; ask now.
+  2. Search for what exists before designing. In order, first hit wins:
+     src/theme.ts (every colour, gradient, font, radius, spacing - never define
+     one inline), src/components/ui.tsx (Txt, PixelTxt, shared primitives),
+     src/store.tsx (persisted state extends this, no new AsyncStorage key),
+     src/data.ts (seed shape), app/ (an existing route with a similar shape -
+     copy it, consistency beats novelty).
+  3. Design to the request, not the general case. No option or prop without a
+     caller now. No abstraction under three real uses. No new dependency when
+     the SDK or an existing file does it. No new file when an existing one is
+     the honest home.
+  4. Build end to end, then stop. A thin path that works beats three polished
+     layers that do not connect. Things noticed along the way get mentioned,
+     not built.
+  5. Verify against the stop condition literally, including the clause after
+     "and". Run `npm run typecheck`; add `npx expo export --platform ios` if
+     imports, routes or assets changed.
+
+  House rules: Txt/PixelTxt never raw Text (RN does not synthesise font
+  weights). fonts.pixel is badge labels, group headings, empty states and
+  loading copy only - never body text, forms or buttons. Gradients are
+  non-empty tuples passed straight to LinearGradient, never cast to string[].
+  UI copy is Turkish; case changes use the 'tr' locale. Read the versioned
+  Expo SDK 57 docs before using an API from memory.

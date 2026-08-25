@@ -26,3 +26,97 @@ https://docs.expo.dev/versions/v57.0.0/ before writing any code — Expo has cha
 
 `npm run typecheck` must pass. `npx expo export --platform ios` catches bundling and
 import errors without needing Xcode.
+
+## Agent setup
+
+Three layers, and only one of them lives in this repo:
+
+- **MCP servers** — account level (claude.ai → Customize → Connectors). Nothing to copy;
+  they are just there. On 21st.dev: `search` and all listing/metadata calls are free and
+  unlimited, but **`get_component` is metered — 2 code pulls per day on the free tier**.
+  Search widely, spend a pull only on a component actually being built. `get_theme`
+  returns CSS free, but treat pulled themes as structural reference only, never as a
+  palette source — the palette is `src/theme.ts`.
+- **Account skills** — `~/.claude/skills/synced/`. Downloaded per container. Do not copy
+  them here.
+- **This repo** — `.claude/`, below. This is the part that is version controlled.
+
+```
+.claude/
+├── settings.json              registers the SessionStart hook
+├── hooks/session-start.sh     restores graphify (must stay executable)
+└── skills/
+    ├── NOTICE.md              provenance and licence boundary — read before citing it
+    ├── native-core.md         standing directive, loaded every session
+    ├── investigate-first/     diagnose before editing
+    ├── lean-build/            new feature, smallest correct size
+    ├── surgical-patch/        bug fix, narrowest responsible layer
+    └── verify-and-stop/       prove the acceptance conditions, then stop
+```
+
+Repo-level skills load automatically — no install step, no network call, which is why
+they are committed rather than installed. The hook exists because the cloud container is
+rebuilt every session and graphify is the one thing it does not keep.
+
+`graphify` maps an unfamiliar codebase into a queryable graph instead of re-reading it.
+It is installed but has never been run here — this codebase was written from scratch, so
+there was nothing foreign to map. **If `graphify-out/` ever exists, questions about
+architecture, file relationships or project content are graph queries first, file scans
+second.**
+
+## Working rules
+
+- **Do not open subagents** unless the task is large and genuinely parallel. They re-read
+  everything and burn tokens.
+- **Do not run workflows or deep research** unless asked for by name.
+- **Do not publish artifacts.**
+- **Do not work around the environment's network policy.** If something is unreachable,
+  say it is unreachable. Never assert an outcome you did not observe.
+- **Keys:** only publishable/anon keys reach the app; service-role keys never do. Secrets
+  go in gitignored `.env.local`; values that are public by design go in the committed
+  `.env`.
+- **An assertion that cannot fail is worse than no assertion** — it reports green. When
+  you add a check, break the thing it guards and watch it go red before trusting it.
+- Add `check:*` scripts to `package.json` when the first regression appears, not before,
+  and start with the assertion that catches that regression.
+
+## Load-bearing decisions — the why log
+
+When a non-obvious bug is fixed, the **reason** goes here next to the rule, not just the
+fix. The test: would a session with no memory of this one make the same mistake? If yes,
+it belongs here. **A mistake made twice has earned a line in this file.**
+
+- The graphify package is `graphifyy` — **two y's** — while the command is `graphify`,
+  one y. Get it wrong and `uv tool install` fails silently and `/graphify` never appears.
+- `graphify install` is a **separate step** from installing the package. The package
+  provides the binary; that command is what registers the skill with the session.
+- `$HOME/.local/bin` must be on `PATH` or the install succeeds and the command is still
+  not found. The hook appends it to `CLAUDE_ENV_FILE` so later shells inherit it.
+
+### From the 1.1.0 release
+
+- `ios.deploymentTarget` is a **minimum**, not a maximum. It was once set to `18.7.8`
+  under a commit titled "lower iOS deployment target", which would have limited the App
+  Store listing to devices running 18.7.8 or newer. Leave it unset unless there is a
+  specific reason; the SDK default is the right answer.
+- **A comment describing behaviour is not behaviour.** `Registration.synced` carried
+  "`syncPending()` retries these" for months. `syncPending` had never been written —
+  grep found the name in that one comment and nowhere else, and offline registrations
+  were silently lost. When a comment names a function, check that it exists.
+- Taking demo data out of `defaultState` does **not** take it off anyone's device. It is
+  already in AsyncStorage on every install that ran the old build, so removing seeded
+  state needs a migration in the hydration path too.
+- `npx expo prebuild` rewrites `package.json` scripts to `expo run:android` / `expo
+  run:ios` **every time it runs**. This project builds on EAS, not locally — revert
+  those two lines after any prebuild.
+- `android.blockedPermissions` does not delete the permission from the generated
+  manifest; it adds `tools:node="remove"` and the Android manifest merger drops it at
+  build time. Grepping the source manifest will show the permission still present and
+  look like a failure. Check for the marker, not the absence of the line.
+- `eas` commands act on the directory you are standing in. `eas project:info` prints the
+  EAS project, not the bundle identifier — the identifier lives in `app.json` and is
+  never configured in EAS. Confirm the project before any command that writes state;
+  running one in the wrong repo targets a different app entirely.
+- A notification icon renders at 24dp. The full three-line club wordmark turns to grey
+  mush at that size; only the `KOÜ` line survives. Generate candidates and downscale
+  them before choosing — this is not judgeable at full resolution.

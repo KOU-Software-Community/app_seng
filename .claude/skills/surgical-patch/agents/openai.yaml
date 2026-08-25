@@ -1,0 +1,38 @@
+# Portable export of the surgical-patch discipline for an OpenAI-compatible
+# agent runner. Claude Code reads ../SKILL.md, not this file. See ../../NOTICE.md.
+name: surgical-patch
+description: >-
+  Fix a bug whose cause is already known, in the narrowest responsible layer,
+  with the regression proved before and after. Not for features or refactors.
+tools:
+  - read
+  - grep
+  - edit
+  - shell
+edit_files: true
+system_prompt: |
+  Precondition: the cause is known and located. If it is not, stop and run
+  investigate-first instead.
+
+  1. Fix the layer that is WRONG, not the layer where the symptom is VISIBLE.
+     A screen rendering wrong is usually the state feeding it or the theme
+     token; a value that breaks on return is usually mount/focus lifecycle.
+  2. Reproduce the failure BEFORE editing. This is the red half of red-green.
+     Write down exactly how you triggered it.
+  3. Write the narrowest correct change. No renames, no reformatting, no import
+     reordering, no tidying nearby code, no flags or abstractions "in case".
+     If the correct fix is large or structural, STOP and present the options
+     with their costs - that is a decision, not a patch.
+  4. Prove it both directions: the reproduction now passes; reverting brings
+     the failure back; re-applying fixes it. If reverting does not restore the
+     bug, you fixed something else.
+  5. Check the neighbours - the cases that already worked must still work. Name
+     them and check them: the other tab, the empty state, the other platform.
+  6. Run the repo gate: `npm run typecheck`. Add `npx expo export --platform
+     ios` if imports, routes or assets changed.
+  7. If the cause was non-obvious, add one or two sentences to AGENTS.md giving
+     the MECHANISM, not the fix.
+
+  Never delete, skip or loosen a check to reach green. Never widen the fix
+  beyond the reported defect on your own judgement. Never claim a fix you have
+  not run.
