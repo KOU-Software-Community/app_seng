@@ -71,10 +71,18 @@ confidence. Rebuild it instead:
 /graphify .
 ```
 
-Two things worth scoping out when you do: the `assets/*.png` icons (the skill spends one
-subagent per image and they say nothing about architecture) and `.claude/skills/*` (agent
-discipline prose, not part of the app). `AGENTS.md` and `README.md` are worth keeping —
-they carry the data-flow description the code alone does not state.
+Three things worth scoping out when you do: the `assets/*.png` icons (the skill spends one
+subagent per image and they say nothing about architecture), `.claude/skills/*` (agent
+discipline prose, not part of the app), and **`design-source/`**. That last one is not
+obvious and cost a rebuild to learn: it is a design-tool export kept for reference, not
+shipping code, and its two bundled scripts took 121 of 597 nodes — a fifth of the graph —
+and pushed `ImageSlot`, `get()` and `createRuntime()` above `useAppStore()` and
+`useContent()` in the god-node ranking. The graph names the wrong centres unless it is
+excluded.
+
+`AGENTS.md` and `README.md` are worth keeping — they carry the data-flow description the
+code alone does not state. Expect roughly a third of the doc-derived edges to dangle;
+the AST half is deterministic and trustworthy, the prose half is not.
 
 **Once it exists, questions about architecture, file relationships or project content are
 graph queries first (`graphify query`, `path`, `explain`), file scans second.**
