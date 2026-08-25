@@ -26,7 +26,7 @@ import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import type { ClubEvent } from '../src/data';
-import { buildEvent, toInput, type EventInput } from '../src/eventSchema';
+import { buildEvent, joinLocal, splitLocal, toInput, type EventInput } from '../src/eventSchema';
 import {
   csvColumns,
   DEFAULT_FIELDS,
@@ -134,11 +134,26 @@ app.use(requireAuth);
 
 // ------------------------------------------------------------- etkinlikler
 
+/**
+ * Tarih ve saat formdan ayrı ayrı geliyor (`<input type="date">` +
+ * `<input type="time">`). Saat dilimi hiç sorulmuyor; `joinLocal` +03:00 ile
+ * ISO'yu kuruyor. Elle ISO yazılan hâlde en sık yapılan hata saat dilimini
+ * unutmaktı ve o dizge her okuyanın kendi saat dilimine göre başka bir an
+ * demek — artık yapılabilir bir hata değil.
+ */
+function formDateTime(body: Record<string, unknown>): { date: string; time: string } {
+  return {
+    date: String(body.startsAtDate ?? '').trim(),
+    time: String(body.startsAtTime ?? '').trim(),
+  };
+}
+
 function formToInput(body: Record<string, unknown>): EventInput {
   const s = (k: string) => String(body[k] ?? '').trim();
+  const { date, time } = formDateTime(body);
   return {
     id: s('id'),
-    startsAt: s('startsAt'),
+    startsAt: joinLocal(date, time),
     endsAt: s('endsAt'),
     venue: s('venue'),
     venueShort: s('venueShort'),
@@ -154,9 +169,25 @@ function formToInput(body: Record<string, unknown>): EventInput {
   };
 }
 
-/** Formda gösterilecek hâli — `tags` dizisi virgüllü metne döner. */
-function inputToForm(input: EventInput): Record<string, unknown> {
-  return { ...input, tags: input.tags.join(', ') };
+/**
+ * Formda gösterilecek hâli — `tags` dizisi virgüllü metne, `startsAt` tarih ve
+ * saat seçicilerine ayrılır.
+ *
+ * `raw` doğrulama hatasından sonra veriliyor: kişi tarihi seçip saati boş
+ * bıraktıysa `startsAt` boş kalır, dolayısıyla ondan türetilen tarih de boş
+ * gelirdi ve form seçilmiş tarihi silerdi.
+ */
+function inputToForm(
+  input: EventInput,
+  raw?: { date: string; time: string },
+): Record<string, unknown> {
+  const split = splitLocal(input.startsAt);
+  return {
+    ...input,
+    tags: input.tags.join(', '),
+    startsAtDate: raw?.date || split.date,
+    startsAtTime: raw?.time || split.time,
+  };
 }
 
 app.get('/', async (_req, res) => {
@@ -209,7 +240,10 @@ app.post('/events/new', async (req, res) => {
   const built = buildEvent(input);
 
   if (!built.ok) {
-    return res.status(400).type('html').send(eventForm(inputToForm(input), built.errors, { editing: false }));
+    return res
+      .status(400)
+      .type('html')
+      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: false }));
   }
 
   const ref = db.collection('events').doc(built.event.id);
@@ -218,7 +252,11 @@ app.post('/events/new', async (req, res) => {
       .status(409)
       .type('html')
       .send(
-        eventForm(inputToForm(input), { id: 'Bu kimlik zaten kullanılıyor.' }, { editing: false }),
+        eventForm(
+          inputToForm(input, formDateTime(req.body)),
+          { id: 'Bu kimlik zaten kullanılıyor.' },
+          { editing: false },
+        ),
       );
   }
 
@@ -241,7 +279,10 @@ app.post('/events/:id', async (req, res) => {
   const built = buildEvent(input);
 
   if (!built.ok) {
-    return res.status(400).type('html').send(eventForm(inputToForm(input), built.errors, { editing: true }));
+    return res
+      .status(400)
+      .type('html')
+      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: true }));
   }
 
   const { id, ...rest } = built.event;

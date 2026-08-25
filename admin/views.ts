@@ -6,6 +6,7 @@
  * HTML'e girmez.** Etkinlik başlıkları ve öğrenci adları serbest metin; kaçış
  * atlanırsa panel kendi kendine XSS taşır.
  */
+import { EVENT_CATEGORIES } from '../src/eventSchema';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -46,7 +47,10 @@ main { max-width: 920px; margin: 28px auto; padding: 0 20px; }
 }
 h2 { font-size: 19px; margin: 0 0 16px; }
 label { display: block; margin-bottom: 14px; font-weight: 600; font-size: 13.5px; }
-input[type=text], input[type=password], textarea, select {
+/* Tip tip saymak yerine onay kutusunu dışarıda bırakmak: date, time ve number
+   alanları listede yoktu ve tarayıcı varsayılan boyutunda, diğerlerinden ayrı
+   duruyorlardı. */
+input:not([type=checkbox]), textarea, select {
   width: 100%; margin-top: 6px; padding: 10px 12px; font: inherit;
   border: 1.5px solid var(--border); border-radius: 8px; background: #fff;
 }
@@ -268,6 +272,25 @@ export function winnersForm(
   );
 }
 
+/**
+ * Kategori seçenekleri. Kayıtlı değer listede yoksa başa ekleniyor: panelin
+ * menüsü değişti diye var olan bir etkinliğin kategorisi sessizce başka bir şeye
+ * dönmemeli.
+ */
+function categoryOptions(current: string): string {
+  const list =
+    !current || EVENT_CATEGORIES.includes(current)
+      ? EVENT_CATEGORIES
+      : [current, ...EVENT_CATEGORIES];
+
+  return [
+    `<option value="" disabled${current ? '' : ' selected'}>Seçin…</option>`,
+    ...list.map(
+      (c) => `<option value="${esc(c)}"${c === current ? ' selected' : ''}>${esc(c)}</option>`,
+    ),
+  ].join('');
+}
+
 export function eventForm(
   values: Record<string, unknown>,
   errors: FieldError,
@@ -289,7 +312,7 @@ export function eventForm(
             ${e('id')}
           </label>
           <label>Kategori
-            <input type="text" name="tag" value="${v('tag')}" placeholder="Atölye" required>
+            <select name="tag" required>${categoryOptions(String(values.tag ?? ''))}</select>
             ${e('tag')}
           </label>
         </div>
@@ -300,15 +323,21 @@ export function eventForm(
         </label>
 
         <div class="row">
-          <label>Başlangıç <span class="hint">(saat dilimiyle birlikte)</span>
-            <input type="text" name="startsAt" value="${v('startsAt')}" placeholder="2026-03-12T18:00:00+03:00" required>
+          <label>Tarih
+            <input type="date" name="startsAtDate" value="${v('startsAtDate')}" required>
             ${e('startsAt')}
           </label>
+          <label>Başlangıç saati
+            <input type="time" name="startsAtTime" value="${v('startsAtTime')}" required>
+          </label>
           <label>Bitiş saati
-            <input type="text" name="endsAt" value="${v('endsAt')}" placeholder="20:30" required>
+            <input type="time" name="endsAt" value="${v('endsAt')}" required>
             ${e('endsAt')}
           </label>
         </div>
+        <p class="hint" style="margin:-6px 0 16px">
+          Saat dilimi sorulmuyor — hepsi Türkiye saati (UTC+03:00) olarak kaydedilir.
+        </p>
 
         <div class="row">
           <label>Yer <span class="hint">(künyede tam hâli)</span>
