@@ -642,6 +642,76 @@ export function MissingEvent({ onBack }: { onBack: () => void }) {
   );
 }
 
+/**
+ * Shown when Firestore could not be reached and the screen is therefore showing
+ * whatever it already had.
+ *
+ * `useContent` produced `source`, `error` and `refresh` from the start and no
+ * screen consumed any of them, so a failed fetch looked identical to an empty
+ * calendar — and once the bundled events were removed, identical to a working
+ * app with nothing scheduled. The user had no way to tell and no way to retry
+ * short of killing the app.
+ */
+export function ContentNotice({
+  onRetry,
+  retrying,
+  style,
+}: {
+  onRetry: () => void;
+  retrying: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[noticeStyles.root, style]}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt weight="bold" size={13} color={colors.navy900}>
+          Güncel içeriğe ulaşılamadı
+        </Txt>
+        <Txt size={12} leading={1.45} color={colors.muted} style={{ marginTop: 2 }}>
+          Bağlantını kontrol edip tekrar dene. Gördüklerin son bilinen hâli.
+        </Txt>
+      </View>
+
+      <Pressable
+        onPress={onRetry}
+        disabled={retrying}
+        accessibilityRole="button"
+        accessibilityLabel="İçeriği yeniden yükle"
+        style={({ pressed }) => [
+          noticeStyles.retry,
+          (pressed || retrying) && { opacity: 0.55 },
+        ]}
+      >
+        <Txt weight="bold" size={12.5} color={colors.blue500}>
+          {retrying ? 'Deneniyor…' : 'Yenile'}
+        </Txt>
+      </Pressable>
+    </View>
+  );
+}
+
+const noticeStyles = StyleSheet.create({
+  root: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: radius.md,
+    backgroundColor: colors.blue100,
+    borderWidth: 1,
+    borderColor: colors.blue200,
+  },
+  retry: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.blue500,
+  },
+});
+
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

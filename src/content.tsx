@@ -18,7 +18,11 @@ type ContentValue = {
   archive: ArchiveEntry[];
   source: ContentSource;
   loading: boolean;
-  /** Why we fell back, if we did. Null when Firestore answered. */
+  /**
+   * Set only when Firestore could not be reached at all. An empty collection is
+   * not an error — it is the club having nothing scheduled, and reporting that
+   * as a failure sent users looking for a connection problem that did not exist.
+   */
   error: string | null;
   refresh: () => void;
   /** Undefined when nothing matches — every caller has to handle that. */
@@ -50,15 +54,13 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       .then(({ events: remoteEvents, archive: remoteArchive }) => {
         if (cancelled) return;
 
-        // An empty collection almost always means "not seeded yet" rather than
-        // "the club has no events", so keep the bundled copy on screen.
-        if (!remoteEvents.length) {
-          setError('Firestore boş — `npm run seed` çalıştırın.');
-          setSource('local');
-          console.log('[content] Firestore boş, yerel içerik gösteriliyor. `npm run seed` ile doldurun.');
-          return;
-        }
-
+        // Reaching Firestore and finding it empty is an answer, not a failure:
+        // between terms the club genuinely has no upcoming events.
+        //
+        // This used to set an error and claim the bundled copy was in use, which
+        // made sense while src/data.ts still shipped four events. It no longer
+        // does, so there was nothing to fall back to and an ordinary empty
+        // calendar was being reported to the user as a connection problem.
         setEvents(remoteEvents);
         if (remoteArchive.length) setArchive(sortArchive(remoteArchive));
         setSource('firestore');

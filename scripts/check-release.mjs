@@ -155,6 +155,33 @@ check(
 );
 
 check(
+  'içerik durumu ekranlara bağlı',
+  'useContent() `source`, `error`, `loading` ve `refresh` üretiyordu ve hiçbir ekran ' +
+    'hiçbirini tüketmiyordu. Firestore erişilemezken kullanıcı boş bir uygulama ' +
+    'görüyor, sebebini öğrenemiyor ve uygulamayı kapatmaktan başka bir şey ' +
+    'yapamıyordu.',
+  () => {
+    // Aranan şey JSX'te gerçekten render edilmesi. Sadece isim aramak yetmiyor:
+    // import satırı tek başına eşleşiyor, yani bileşen import edilip hiç
+    // kullanılmasa da kontrol yeşil verirdi.
+    const missing = ['app/(tabs)/takvim.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/arsiv.tsx']
+      .filter((f) => {
+        const src = read(f);
+        return !/<ContentNotice\b/.test(src) || !/<RefreshControl\b/.test(src);
+      });
+    return missing.length ? `bağlı değil: ${missing.join(', ')}` : null;
+  },
+);
+
+check(
+  'boş Firestore hata sayılmıyor',
+  'Boş koleksiyon `error`’a geliştirici mesajı yazıyordu ("`npm run seed` çalıştırın"). ' +
+    'src/data.ts artık boş olduğu için düşülecek yerel içerik de yok — sıradan bir boş ' +
+    'takvim kullanıcıya bağlantı sorunu gibi görünüyordu.',
+  () => (/npm run seed/.test(read('src/content.tsx')) ? 'content.tsx hâlâ seed mesajını hata olarak yazıyor' : null),
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {
