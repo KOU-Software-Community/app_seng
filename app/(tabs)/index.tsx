@@ -43,7 +43,7 @@ export default function HomeRoute() {
           <Image source={require('../../assets/brand/logo.png')} style={styles.avatar} />
           <View style={{ flex: 1 }}>
             <Txt weight="semibold" size={11.5} color={colors.blue200} tracking={0.3}>
-              Merhaba Elif 👋
+              Hoş geldin 👋
             </Txt>
             <Txt weight="bold" size={16.5} color="#fff" tracking={-0.3}>
               KOÜ Yazılım Kulübü

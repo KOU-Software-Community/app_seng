@@ -55,19 +55,11 @@ const defaultNotifications: NotificationPrefs = {
 
 const defaultState: PersistedState = {
   onboardingSeen: false,
-  // Elif is already signed up for the React workshop — this is what makes the
-  // "Kayıtlısın" badge and the "2 kaydın var" counter real on first launch.
-  registrations: [
-    {
-      eventId: 'ev2',
-      code: 'KYK-2431',
-      name: 'Elif Yılmaz',
-      studentNo: '210101045',
-      department: 'Yazılım Müh.',
-      year: '3',
-      synced: true,
-    },
-  ],
+  // Empty on purpose. This used to hold a demo registration ("Elif Yılmaz"),
+  // which shipped to every install and showed a brand-new user someone else's
+  // registration on the badge and the counter. The app collects real
+  // applications, so a fresh install starts with none.
+  registrations: [],
   notifications: defaultNotifications,
 };
 
