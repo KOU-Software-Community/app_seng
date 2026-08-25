@@ -168,17 +168,60 @@ eas env:create --environment production --name EXPO_PUBLIC_FIREBASE_API_KEY --va
 Diğer altı değişken için de aynısını tekrarlayın. Tanımlanmazsa uygulama açılışta
 `[firebase] ...` uyarısı verir ve `getDb()` hata fırlatır.
 
+## Bildirimler
+
+İki ayrı mekanizma, tek ayar ekranı (`app/(tabs)/bildirim.tsx`). Dört tercihin
+dördü de artık gerçekten bir şey yapıyor.
+
+**Hatırlatmalar — cihazda, sunucusuz.** Kayıtlı olduğun etkinliğin `startsAt`
+değerinden geri sayılarak `expo-notifications` ile yerel olarak zamanlanır.
+Sunucu, ağ, token gerekmez. Kullanıcının seçtiği süreyi (`1 saat` / `1 gün` /
+`3 gün önce`) kullanır, sessiz saatler açıksa 23:00–08:00'e denk gelen
+hatırlatmayı sabah 08:00'e kaydırır, kaydırınca etkinliğin kendisinden sonraya
+düşüyorsa hiç kurmaz. Kayıt, tercih veya etkinlik listesi değiştiğinde tüm
+program iptal edilip yeniden kurulur.
+
+**Duyurular — push, kulüpten.** Cihaz `devices/{token}` dokümanına push token'ını
+ve tercihlerini yazar; gönderim `npm run push` ile yapılır.
+
+```bash
+npm run push -- --category Duyuru --title "Başlık" --body "Metin"
+npm run push -- --category Atölye --title "..." --body "..." --event ev2 --dry
+```
+
+`--event` bildirime dokununca açılacak etkinliği belirler, `--dry` kimseye
+göndermeden kaç cihaza gideceğini gösterir. Script `master` kapalı olanları,
+kategoriyi kapatmış olanları ve sessiz saatlerdekileri atlar; kaç cihazın hangi
+sebeple elendiğini yazar. `DeviceNotRegistered` dönen token'ları (uygulamayı
+kaldırmış kullanıcılar) koleksiyondan siler.
+
+### Gerekenler
+
+**Servis hesabı anahtarı** (sadece gönderici script için, uygulamaya girmez).
+`devices` koleksiyonu istemciye kapalı — token listesi sızarsa herkes herkese
+bildirim gönderebilir. Bu yüzden script Admin SDK kullanıyor. `.env.example`'daki
+`FIREBASE_SERVICE_ACCOUNT` satırına bakın. **Bu anahtar güvenlik kurallarını
+tamamen bypass eder; asla commit etmeyin, asla uygulamaya koymayın.**
+
+**Mağaza kimlik bilgileri** — bunlar olmadan push cihaza ulaşmaz:
+
+```bash
+eas credentials   # Android: FCM V1 service account JSON
+                  # iOS: APNs key (.p8) — EAS otomatik üretebilir
+```
+
+Push, Expo Go'da çalışmaz; development build veya production build gerekir.
+Yerel hatırlatmalar Expo Go'da da çalışır.
+
 ## Kalan işler
 
 1. **Fotoğraflar** — `src/components/PhotoSlot.tsx` bir `uri` prop'u alıyor. Arşiv
    görselleri Storage'a yüklenip URL'ler `archive` dokümanlarına eklendiğinde
    placeholder kendiliğinden devre dışı kalır.
-2. **Bildirimler** — ayar ekranı tercihleri cihazda tutuyor; gerçek gönderim için
-   `expo-notifications` + FCM ve tercihlerin sunucuya yazılması gerekiyor.
-3. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
+2. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
    okunamıyor (doğru olan bu). Kulüp yönetimi kayıtları Firebase Console'dan görür;
    liste/CSV isteniyorsa Admin SDK ile küçük bir araç gerekir.
-4. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
+3. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
    bunlar da Firestore'a taşınabilir.
 
 ## Mağazaya çıkarma
@@ -238,11 +281,34 @@ kalkar.
 `eas submit` iOS tarafı bilerek yapılandırılmadı; Apple bilgilerini komut interaktif
 olarak soracak.
 
-### İkonlar
+### İkonlar ve mağaza görselleri
 
 `assets/icon.png`, `assets/android-icon-*.png`, `assets/splash-icon.png` kulüp rozetinden
-üretildi. Rozet değişirse `assets/brand/logo.png` dosyasını değiştirip ikonları yeniden
-üretmek yeterli.
+üretildi.
+
+Türetilmiş olanlar `scripts/make-icons.py` ile yeniden üretilebilir — rozet değişirse
+`assets/brand/logo.png` dosyasını değiştirip script'i çalıştırmak yeterli:
+
+```bash
+pip install pillow          # ya da: uv pip install pillow
+python3 scripts/make-icons.py
+```
+
+| Dosya | Boyut | Nerede kullanılıyor |
+|---|---|---|
+| `assets/notification-icon.png` | 96×96 | Android bildirim ikonu (`app.json`'dan bağlı) |
+| `assets/store/play-icon-512.png` | 512×512 | Play Console mağaza ikonu |
+| `assets/store/play-feature-graphic.png` | 1024×500 | Play Console feature graphic |
+
+Pillow bilerek `package.json`'a eklenmedi; bu script derleme adımı değil, rozet
+değişmediği sürece hiç çalıştırılmaz.
+
+Bildirim ikonu kelime işaretinin tamamını değil **sadece "KOÜ" satırını** taşıyor.
+Sebebi ölçüldü: bildirim ikonu durum çubuğunda 24dp görünür, üç satırın tamamı o
+boyutta gri bir lekeye dönüşüyor. İki aday üretilip 24dp'ye küçültülerek
+karşılaştırıldı; tek satır kalın harf okunur kalan tek seçenek.
+
+Play'e yüklenecek ekran görüntüleri repoda yok, yayın sırasında alınacak.
 
 ## Yerelde native derleme (opsiyonel)
 

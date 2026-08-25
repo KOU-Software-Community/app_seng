@@ -23,8 +23,12 @@
     },
     "android": {
       "package": "com.akadirr1.sengkou",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#001B4A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -46,6 +50,13 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#001B4A"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0389BC"
         }
       ]
     ],

@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingOverlay } from '../src/components/LoadingOverlay';
 import { ContentProvider } from '../src/content';
 import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
+import { NotificationSync } from '../src/notifications';
 import { AppStoreProvider, LoadingProvider, useLoading } from '../src/store';
 import { colors } from '../src/theme';
 
@@ -54,6 +55,9 @@ export default function RootLayout() {
         <ContentProvider>
           <LoadingProvider>
             <StatusBar style="light" />
+            {/* Inside both providers: it needs events, registrations and prefs
+                together to keep the reminder schedule current. Renders nothing. */}
+            <NotificationSync />
             <RootStack />
           </LoadingProvider>
         </ContentProvider>

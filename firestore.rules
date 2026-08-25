@@ -47,6 +47,34 @@ service cloud.firestore {
         && request.resource.data.year is string;
     }
 
+    // Cihazlar: push token'ı ve bildirim tercihleri. `npm run push` kimin neyi
+    // istediğini buradan okur.
+    //
+    // Doküman kimliği push token'ın kendisi. Giriş olmadığı için "bu senin
+    // dokümanın mı" diye soran bir kural yazılamıyor; elde olan koruma token'ın
+    // tahmin edilemez olması — bir cihaz ancak zaten sahip olduğu token'ın
+    // üzerine yazabilir. Okuma istemciye tamamen kapalı: token listesi
+    // sızarsa herkes herkese bildirim gönderebilir. Gönderici script Admin
+    // SDK kullanıyor, bu kuralları hiç görmüyor.
+    match /devices/{token} {
+      allow read: if false;
+      allow delete: if false;
+
+      allow create, update: if
+        request.resource.data.keys().hasOnly(
+          ['token', 'platform', 'master', 'categories', 'reminder', 'quietHours', 'updatedAt']
+        )
+        // Başka bir cihazın kaydının üzerine yazılamasın.
+        && request.resource.data.token == token
+        && request.resource.data.platform in ['ios', 'android']
+        && request.resource.data.master is bool
+        && request.resource.data.categories is map
+        && request.resource.data.categories.size() <= 20
+        && request.resource.data.reminder is string
+        && request.resource.data.reminder.size() <= 40
+        && request.resource.data.quietHours is bool;
+    }
+
     // Yukarıda eşleşmeyen her şey kapalı.
     match /{document=**} {
       allow read, write: if false;

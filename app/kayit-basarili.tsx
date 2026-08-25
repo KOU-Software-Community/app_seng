@@ -17,12 +17,15 @@ export default function RegistrationDoneRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
-  const { registrationFor, syncPending } = useAppStore();
+  const { registrationFor, syncPending, notifications } = useAppStore();
 
   const registration = registrationFor(event.id);
   // The code is real and the club will get it — but saying "yerin ayrıldı"
   // before the write lands would be a promise we have not kept yet.
   const pending = !!registration && !registration.synced;
+  // Only promise the reminder we will actually schedule. Both switches gate it,
+  // and src/notifications.tsx reads exactly the same two.
+  const remindersOn = notifications.master && notifications.categories['Hatırlatma'] !== false;
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -62,7 +65,9 @@ export default function RegistrationDoneRoute() {
       <Txt size={14.5} leading={1.6} color={colors.blue200} style={styles.body}>
         {pending
           ? `${event.title} için kaydın telefonunda duruyor ama kulübe henüz ulaşmadı. Bağlantı gelir gelmez otomatik gönderilecek; kodunu saklaman yeterli.`
-          : `${event.title} için yerin ayrıldı. Etkinlikten 1 gün önce hatırlatma bildirimi göndereceğiz.`}
+          : remindersOn
+            ? `${event.title} için yerin ayrıldı. Etkinlikten ${notifications.reminder} hatırlatacağız.`
+            : `${event.title} için yerin ayrıldı. Hatırlatma almak istersen bildirim ayarlarından açabilirsin.`}
       </Txt>
 
       <View style={styles.codeBox}>

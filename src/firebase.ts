@@ -3,11 +3,13 @@ import {
   Firestore,
   addDoc,
   collection,
+  doc,
   getDocs,
   getFirestore,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 
 import type { ArchiveEntry, ClubEvent } from './data';
@@ -46,6 +48,7 @@ export const COLLECTIONS = {
   events: 'events',
   registrations: 'registrations',
   archive: 'archive',
+  devices: 'devices',
 } as const;
 
 /** Firestore retries an unreachable backend forever, so reads get a deadline. */
@@ -95,6 +98,36 @@ export async function pushRegistration(payload: RegistrationPayload): Promise<st
     'registration',
   );
   return ref.id;
+}
+
+export type DeviceRecord = {
+  /** Expo push token. Also the document id — see the note below. */
+  token: string;
+  platform: string;
+  master: boolean;
+  categories: Record<string, boolean>;
+  reminder: string;
+  quietHours: boolean;
+};
+
+/**
+ * Stores this device's push token and notification preferences so `npm run push`
+ * knows who wants what.
+ *
+ * The token doubles as the document id, which is deliberate: there is no login,
+ * so a rule cannot check "is this your document". An unguessable id is the
+ * protection available — a device can only overwrite a token it already holds.
+ * Reads stay closed to clients; the sender script uses the Admin SDK.
+ */
+export async function upsertDevice(record: DeviceRecord): Promise<void> {
+  const db = getDb();
+  await withTimeout(
+    setDoc(doc(db, COLLECTIONS.devices, record.token), {
+      ...record,
+      updatedAt: serverTimestamp(),
+    }),
+    'device',
+  );
 }
 
 export { isFirebaseConfigured };
