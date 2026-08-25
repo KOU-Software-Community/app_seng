@@ -213,24 +213,15 @@ eas credentials   # Android: FCM V1 service account JSON
 Push, Expo Go'da çalışmaz; development build veya production build gerekir.
 Yerel hatırlatmalar Expo Go'da da çalışır.
 
-### Bilinen eksik
-
-Android bildirim ikonu tanımlı değil (`app.json` → `expo-notifications` yalnızca
-`color` taşıyor). Android bu durumda launcher ikonundan siluet üretir; bizimki
-tam opak bir kare olduğu için beyaz bir kare görünür. 96×96, beyaz-üzeri-şeffaf
-bir monokrom ikon gerekiyor.
-
 ## Kalan işler
 
 1. **Fotoğraflar** — `src/components/PhotoSlot.tsx` bir `uri` prop'u alıyor. Arşiv
    görselleri Storage'a yüklenip URL'ler `archive` dokümanlarına eklendiğinde
    placeholder kendiliğinden devre dışı kalır.
-2. **Bildirim ikonu** — Android için 96×96 beyaz-üzeri-şeffaf monokrom ikon.
-   Yukarıdaki "Bildirimler" bölümüne bakın. Bildirimlerin kendisi çalışıyor.
-3. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
+2. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
    okunamıyor (doğru olan bu). Kulüp yönetimi kayıtları Firebase Console'dan görür;
    liste/CSV isteniyorsa Admin SDK ile küçük bir araç gerekir.
-4. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
+3. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
    bunlar da Firestore'a taşınabilir.
 
 ## Mağazaya çıkarma
@@ -290,11 +281,34 @@ kalkar.
 `eas submit` iOS tarafı bilerek yapılandırılmadı; Apple bilgilerini komut interaktif
 olarak soracak.
 
-### İkonlar
+### İkonlar ve mağaza görselleri
 
 `assets/icon.png`, `assets/android-icon-*.png`, `assets/splash-icon.png` kulüp rozetinden
-üretildi. Rozet değişirse `assets/brand/logo.png` dosyasını değiştirip ikonları yeniden
-üretmek yeterli.
+üretildi.
+
+Türetilmiş olanlar `scripts/make-icons.py` ile yeniden üretilebilir — rozet değişirse
+`assets/brand/logo.png` dosyasını değiştirip script'i çalıştırmak yeterli:
+
+```bash
+pip install pillow          # ya da: uv pip install pillow
+python3 scripts/make-icons.py
+```
+
+| Dosya | Boyut | Nerede kullanılıyor |
+|---|---|---|
+| `assets/notification-icon.png` | 96×96 | Android bildirim ikonu (`app.json`'dan bağlı) |
+| `assets/store/play-icon-512.png` | 512×512 | Play Console mağaza ikonu |
+| `assets/store/play-feature-graphic.png` | 1024×500 | Play Console feature graphic |
+
+Pillow bilerek `package.json`'a eklenmedi; bu script derleme adımı değil, rozet
+değişmediği sürece hiç çalıştırılmaz.
+
+Bildirim ikonu kelime işaretinin tamamını değil **sadece "KOÜ" satırını** taşıyor.
+Sebebi ölçüldü: bildirim ikonu durum çubuğunda 24dp görünür, üç satırın tamamı o
+boyutta gri bir lekeye dönüşüyor. İki aday üretilip 24dp'ye küçültülerek
+karşılaştırıldı; tek satır kalın harf okunur kalan tek seçenek.
+
+Play'e yüklenecek ekran görüntüleri repoda yok, yayın sırasında alınacak.
 
 ## Yerelde native derleme (opsiyonel)
 
