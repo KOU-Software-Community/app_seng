@@ -46,6 +46,23 @@ Tip kontrolü:
 npm run typecheck
 ```
 
+Yayın öncesi regresyon kontrolü:
+
+```bash
+npm run check:release
+```
+
+`scripts/check-release.mjs` sekiz şeyi doğruluyor ve **her biri bir kez gerçekten
+başarısız olduğu için** orada: demo kaydının geri sızmaması, ana ekranda sabit isim
+olmaması, `deploymentTarget` override'ının geri gelmemesi, iki dosyadaki sürümün
+aynı kalması, uygulama kimliğinin değişmemesi, sürüm sayaçlarının `app.json`'a geri
+kopyalanmaması, `syncPending`'in tanımlı ve bağlı olması, ve servis hesabı
+anahtarlarının gitignore'lu kalması.
+
+Spekülatif kural eklemeyin. Bir regresyon kaçtığında onu yakalayan kontrolü ekleyin
+ve **eklemeden önce kontrolün kırmızı olduğunu görün** — boş geçen bir assertion,
+olmayan assertion'dan beterdir çünkü yeşil rapor verir.
+
 ## Proje yapısı
 
 ```

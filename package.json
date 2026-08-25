@@ -42,6 +42,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "check:release": "node scripts/check-release.mjs",
     "lint": "expo lint",
     "seed": "tsx scripts/seed-firestore.ts"
   },
