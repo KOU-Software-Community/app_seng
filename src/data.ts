@@ -145,6 +145,13 @@ export const DEPARTMENTS = ['Yazılım Müh.', 'Bilgisayar Müh.', 'Elektronik',
 export const YEARS = ['Haz.', '1', '2', '3', '4'];
 export const REMINDER_OPTIONS = ['1 saat önce', '1 gün önce', '3 gün önce'];
 
+/**
+ * Gizlilik politikası ve KVKK aydınlatma metni. Kayıt formundaki onay satırının
+ * altından açılır, ve iki mağazanın gizlilik alanına da bu adres yazılır.
+ */
+export const PRIVACY_POLICY_URL =
+  'https://kou-yazilim-kulubu-gizlilik.akadirr41.chatgpt.site';
+
 export type OnboardingPage = {
   kicker: string;
   title: string;

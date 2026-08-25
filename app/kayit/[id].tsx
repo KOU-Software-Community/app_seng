@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -21,7 +22,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { useEvent } from '../../src/content';
-import { DEPARTMENTS, YEARS } from '../../src/data';
+import { DEPARTMENTS, PRIVACY_POLICY_URL, YEARS } from '../../src/data';
 import { useAppStore } from '../../src/store';
 import { colors, fonts, gradients, radius } from '../../src/theme';
 
@@ -174,6 +175,23 @@ export default function RegistrationRoute() {
               Kayıt için verdiğim bilgilerin kulüp tarafından işlenmesini kabul ediyorum.
             </Txt>
           </Pressable>
+
+          {/* Its own Pressable rather than a link inside the consent row: nested
+              inside it, tapping the link would also toggle the checkbox. */}
+          <Pressable
+            onPress={() => {
+              Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
+                // No browser, or the link is unreachable. Nothing useful to do
+                // beyond not crashing the form.
+              });
+            }}
+            accessibilityRole="link"
+            style={({ pressed }) => [styles.policyLink, pressed && { opacity: 0.6 }]}
+          >
+            <Txt weight="semibold" size={12.5} color={colors.blue500}>
+              Gizlilik politikası ve KVKK aydınlatma metni
+            </Txt>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -226,6 +244,7 @@ const styles = StyleSheet.create({
   },
 
   consent: { flexDirection: 'row', gap: 11, alignItems: 'flex-start', paddingVertical: 2 },
+  policyLink: { paddingLeft: 33, paddingTop: 2, paddingBottom: 4 },
   checkbox: {
     width: 22,
     height: 22,
