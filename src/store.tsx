@@ -89,8 +89,33 @@ type AppStore = PersistedState & {
 
 const Ctx = createContext<AppStore | null>(null);
 
-/** Mirrors the KYK-#### format shown on the confirmation screen. */
-const makeCode = () => `KYK-${Math.floor(1000 + Math.random() * 9000)}`;
+/**
+ * Registration code — shown to the student and read back at check-in.
+ *
+ * This was four digits: 9000 possibilities, drawn at random, with no uniqueness
+ * check anywhere. Measured over 400 simulated runs, that collides 11% of the
+ * time at 50 registrations and 100% of the time at 500. Nothing would have
+ * caught it either — the club would simply find two people holding the same
+ * code at a door.
+ *
+ * Six symbols from a 32-character alphabet is 1.07e9 combinations. Same
+ * simulation: no collision at 500 registrations, 0.25% at 2000. A uniqueness
+ * check is still impossible without reading the collection, which clients are
+ * not allowed to do, so the size of the space is the whole defence.
+ *
+ * The alphabet drops 0/O and 1/I so a code read aloud or copied off a screen
+ * cannot be mistyped into somebody else's.
+ */
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_LENGTH = 6;
+
+const makeCode = () => {
+  let code = '';
+  for (let i = 0; i < CODE_LENGTH; i += 1) {
+    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return `KYK-${code}`;
+};
 
 /**
  * 1.0.x shipped a demo registration inside the default state, so every device

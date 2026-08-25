@@ -213,15 +213,29 @@ eas credentials   # Android: FCM V1 service account JSON
 Push, Expo Go'da çalışmaz; development build veya production build gerekir.
 Yerel hatırlatmalar Expo Go'da da çalışır.
 
+## Yoklama listesi — kayıtları CSV'ye çıkarma
+
+```bash
+npm run export                        # tüm kayıtlar, ekrana
+npm run export -- --event ev2         # tek etkinlik
+npm run export -- --out yoklama.csv   # dosyaya
+```
+
+`registrations` koleksiyonu `firestore.rules` gereği istemciye kapalı — kimse
+başkasının başvurusunu okuyamamalı. Bu yüzden script `npm run push` ile aynı
+servis hesabı anahtarını kullanıyor (`.env.example` içindeki
+`FIREBASE_SERVICE_ACCOUNT`).
+
+Çıktı öğrenci numarasına göre sıralı; yoklamada aranan alan o. Dosyaya yazarken
+başa BOM konuyor, yoksa Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri
+bozuyor.
+
 ## Kalan işler
 
 1. **Fotoğraflar** — `src/components/PhotoSlot.tsx` bir `uri` prop'u alıyor. Arşiv
    görselleri Storage'a yüklenip URL'ler `archive` dokümanlarına eklendiğinde
    placeholder kendiliğinden devre dışı kalır.
-2. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
-   okunamıyor (doğru olan bu). Kulüp yönetimi kayıtları Firebase Console'dan görür;
-   liste/CSV isteniyorsa Admin SDK ile küçük bir araç gerekir.
-3. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
+2. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
    bunlar da Firestore'a taşınabilir.
 
 ## Mağazaya çıkarma
@@ -235,8 +249,10 @@ Yerel hatırlatmalar Expo Go'da da çalışır.
   ve Play Console'da bu kimlikle kayıtlı. **İlk yayından sonra değiştirilemez** —
   değiştirmek yeni bir uygulama açmak, kullanıcıları ve yorumları sıfırlamak demektir.
 - Apple Developer ($99/yıl) ve Google Play Console ($25 tek seferlik) hesapları.
-- Gizlilik politikası URL'si. Uygulama ad, öğrenci numarası, bölüm ve sınıf topluyor;
-  her iki mağaza da erişilebilir bir politika URL'si olmadan gönderim kabul etmez.
+- Gizlilik politikası URL'si — her iki mağazanın gizlilik alanına da bu yazılacak:
+  https://kou-yazilim-kulubu-gizlilik.akadirr41.chatgpt.site
+  Uygulamada `src/data.ts` içindeki `PRIVACY_POLICY_URL` sabitinde duruyor ve kayıt
+  formundaki onay satırının altından açılıyor. Adres değişirse iki yeri de güncelleyin.
 
 ```bash
 npm install -g eas-cli && eas login && eas build:configure
