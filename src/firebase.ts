@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 
 import type { ArchiveEntry, ClubEvent } from './data';
+import type { Raffle } from './raffleSchema';
 
 import { FIREBASE_SETUP_HINT, firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 
@@ -49,6 +50,8 @@ export const COLLECTIONS = {
   registrations: 'registrations',
   archive: 'archive',
   devices: 'devices',
+  raffles: 'raffles',
+  raffleEntries: 'raffleEntries',
 } as const;
 
 /** Firestore retries an unreachable backend forever, so reads get a deadline. */
@@ -67,18 +70,47 @@ function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
  * Reads the club's content. Callers reach this through a dynamic import so the
  * Firestore SDK stays out of the startup bundle.
  */
-export async function fetchContent(): Promise<{ events: ClubEvent[]; archive: ArchiveEntry[] }> {
+export async function fetchContent(): Promise<{
+  events: ClubEvent[];
+  archive: ArchiveEntry[];
+  raffles: Raffle[];
+}> {
   const db = getDb();
 
-  const [eventsSnap, archiveSnap] = await Promise.all([
+  const [eventsSnap, archiveSnap, rafflesSnap] = await Promise.all([
     withTimeout(getDocs(query(collection(db, COLLECTIONS.events), orderBy('startsAt'))), 'events'),
     withTimeout(getDocs(collection(db, COLLECTIONS.archive)), 'archive'),
+    withTimeout(getDocs(collection(db, COLLECTIONS.raffles)), 'raffles'),
   ]);
 
   return {
     events: eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as ClubEvent),
     archive: archiveSnap.docs.map((d) => d.data() as ArchiveEntry),
+    raffles: rafflesSnap.docs.map((d) => ({ eventId: d.id, ...d.data() }) as Raffle),
   };
+}
+
+/**
+ * Bir çekiliş katılımını yazar.
+ *
+ * Doküman kimliği `entryId` — kayıtlardaki `addDoc` yerine `setDoc`, çünkü aynı
+ * katılım iki kez gönderilirse (yazma başarılı olup bayrak diske yazılmadan
+ * uygulama ölürse) ikinci yazma kopya üretmek yerine aynı dokümanın üzerine
+ * gelir. Kayıtlarda bilinen açık olarak duran şey burada baştan kapalı.
+ */
+export async function pushRaffleEntry(entry: {
+  entryId: string;
+  eventId: string;
+  values: Record<string, string>;
+}): Promise<void> {
+  const db = getDb();
+  await withTimeout(
+    setDoc(doc(db, COLLECTIONS.raffleEntries, entry.entryId), {
+      ...entry,
+      createdAt: serverTimestamp(),
+    }),
+    'raffleEntry',
+  );
 }
 
 export type RegistrationPayload = {

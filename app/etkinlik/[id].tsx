@@ -15,7 +15,8 @@ import {
   Tag,
   Txt,
 } from '../../src/components/ui';
-import { useEvent } from '../../src/content';
+import { useContent, useEvent } from '../../src/content';
+import { entriesOpen } from '../../src/raffleSchema';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius } from '../../src/theme';
 
@@ -24,11 +25,16 @@ export default function EventDetailRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
-  const { registrationFor } = useAppStore();
+  const { getRaffle } = useContent();
+  const { registrationFor, raffleEntryFor } = useAppStore();
 
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
   const registration = registrationFor(event.id);
+  // A raffle is an ordinary event with a definition attached. The tag is only a
+  // label; what decides whether this screen collects entries is the definition.
+  const raffle = getRaffle(event.id);
+  const raffleEntry = raffleEntryFor(event.id);
 
   return (
     <View style={styles.screen}>
@@ -134,6 +140,33 @@ export default function EventDetailRoute() {
               </Txt>
             </View>
           </Card>
+
+          {raffle?.winners.length ? (
+            <Card style={{ padding: 18, marginTop: 14 }}>
+              <Txt weight="extrabold" size={16} color={colors.navy900}>
+                Kazananlar
+              </Txt>
+              <Txt size={12.5} leading={1.5} color={colors.muted} style={{ marginTop: 4 }}>
+                {/* Names are masked: publishing them in full would expose the
+                    winners to everyone who opens the app, and the shortened form
+                    is enough for a winner to recognise themselves. */}
+                İsimler kısaltılmış olarak yayınlanıyor. Kendini görüyorsan kulüple iletişime geç.
+              </Txt>
+
+              <View style={{ marginTop: 14, gap: 8 }}>
+                {raffle.winners.map((winner, i) => (
+                  <View key={`${winner}-${i}`} style={styles.winnerRow}>
+                    <Txt weight="bold" size={12} color={colors.blue500}>
+                      {i + 1}
+                    </Txt>
+                    <Txt weight="semibold" size={14.5} color={colors.text}>
+                      {winner}
+                    </Txt>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -144,14 +177,40 @@ export default function EventDetailRoute() {
       >
         <View style={{ flex: 1 }}>
           <Txt weight="semibold" size={11.5} color={colors.faint}>
-            {registration ? 'Kayıt kodun' : 'Kontenjan'}
+            {raffle ? 'Çekiliş' : registration ? 'Kayıt kodun' : 'Kontenjan'}
           </Txt>
           <Txt weight="extrabold" size={14} color={colors.navy900}>
-            {registration ? registration.code : event.spots}
+            {raffle
+              ? raffle.drawnAt
+                ? 'Sonuçlandı'
+                : `${raffle.winnerCount} kişi kazanacak`
+              : registration
+                ? registration.code
+                : event.spots}
           </Txt>
         </View>
 
-        {registration ? (
+        {raffle ? (
+          raffleEntry ? (
+            <View style={styles.registered}>
+              <Txt weight="bold" size={15.5} color={colors.blue500}>
+                {raffleEntry.synced ? 'Katıldın' : 'Gönderiliyor…'}
+              </Txt>
+            </View>
+          ) : entriesOpen(raffle) ? (
+            <PrimaryButton
+              label="Çekilişe Katıl"
+              onPress={() => router.push(`/cekilis/${event.id}`)}
+              style={{ flex: 1.3 }}
+            />
+          ) : (
+            <View style={styles.registered}>
+              <Txt weight="bold" size={15.5} color={colors.muted}>
+                Katılım kapandı
+              </Txt>
+            </View>
+          )
+        ) : registration ? (
           <View style={styles.registered}>
             <Txt weight="bold" size={15.5} color={colors.blue500}>
               {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor…'}
@@ -180,6 +239,15 @@ function initials(name: string) {
 }
 
 const styles = StyleSheet.create({
+  winnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.blue100,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
   screen: { flex: 1, backgroundColor: colors.bg },
 
   hero: { height: 280 },

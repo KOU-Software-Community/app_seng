@@ -41,9 +41,24 @@ export type NotificationPrefs = {
   quietHours: boolean;
 };
 
+/**
+ * Çekiliş katılımı. Kayıtlardan farkı alanların sabit olmaması: hangi soruların
+ * sorulacağı çekiliş tanımından geliyor, dolayısıyla cevaplar da anahtar-değer.
+ */
+export type RaffleEntry = {
+  entryId: string;
+  eventId: string;
+  values: Record<string, string>;
+  /** ISO — cihazda oluşturulduğu an. Firestore'daki `createdAt` sunucu saati. */
+  createdAt: string;
+  /** Kayıtlardaki `synced` ile aynı anlam ve aynı yeniden deneme yolu. */
+  synced?: boolean;
+};
+
 type PersistedState = {
   onboardingSeen: boolean;
   registrations: Registration[];
+  raffleEntries: RaffleEntry[];
   notifications: NotificationPrefs;
 };
 
@@ -65,6 +80,7 @@ const defaultState: PersistedState = {
   // registration on the badge and the counter. The app collects real
   // applications, so a fresh install starts with none.
   registrations: [],
+  raffleEntries: [],
   notifications: defaultNotifications,
 };
 
@@ -73,6 +89,10 @@ type AppStore = PersistedState & {
   hydrated: boolean;
   registrationFor: (eventId: string) => Registration | undefined;
   register: (input: Omit<Registration, 'code'>) => Registration;
+  /** Bu etkinliğin çekilişine katılım, varsa. */
+  raffleEntryFor: (eventId: string) => RaffleEntry | undefined;
+  /** Katılımı önce cihaza yazar, gönderimi `syncPending` üstlenir. */
+  enterRaffle: (eventId: string, values: Record<string, string>) => RaffleEntry;
   /**
    * Retries every registration that has not reached Firestore. Safe to call at
    * any time: it is a no-op when nothing is pending and it will not overlap
@@ -118,6 +138,20 @@ const makeCode = () => {
 };
 
 /**
+ * Çekiliş katılımının kimliği — Firestore doküman kimliği de bu.
+ *
+ * Kayıt kodundan uzun, çünkü bu kod kimseye gösterilmiyor: okunabilir olması
+ * gerekmiyor, çakışmaması gerekiyor. 16 sembol, 32'lik alfabeden.
+ */
+const makeEntryId = () => {
+  let id = '';
+  for (let i = 0; i < 16; i += 1) {
+    id += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return id;
+};
+
+/**
  * 1.0.x shipped a demo registration inside the default state, so every device
  * that opened one of those builds has it sitting in AsyncStorage. Taking it out
  * of the defaults does not take it off their device — this does.
@@ -146,6 +180,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             registrations: (saved.registrations ?? defaultState.registrations).filter(
               (r) => !isDemoRegistration(r),
             ),
+            raffleEntries: saved.raffleEntries ?? defaultState.raffleEntries,
             notifications: {
               ...defaultNotifications,
               ...saved.notifications,
@@ -183,6 +218,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     registrationsRef.current = state.registrations;
   }, [state.registrations]);
 
+  const raffleEntriesRef = useRef(state.raffleEntries);
+  useEffect(() => {
+    raffleEntriesRef.current = state.raffleEntries;
+  }, [state.raffleEntries]);
+
   // One run at a time. Two overlapping runs would push the same registration
   // twice and leave the club with duplicate documents.
   const syncing = useRef(false);
@@ -200,7 +240,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const pending = registrationsRef.current.filter((r) => !r.synced);
-    if (!pending.length) return;
+    const pendingEntries = raffleEntriesRef.current.filter((e) => !e.synced);
+    if (!pending.length && !pendingEntries.length) return;
 
     syncing.current = true;
     void (async () => {
@@ -233,6 +274,30 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             break;
           }
         }
+        // Çekiliş katılımları aynı çalışmada, aynı bekçilerin altında.
+        // Ayrı bir senkron mekanizması ikinci bir "yeniden deneme unutuldu"
+        // hatası için ikinci bir yer demek olurdu.
+        const { pushRaffleEntry } = await import('./firebase');
+        for (const entry of pendingEntries) {
+          try {
+            await pushRaffleEntry({
+              entryId: entry.entryId,
+              eventId: entry.eventId,
+              values: entry.values,
+            });
+            setState((s) => ({
+              ...s,
+              raffleEntries: s.raffleEntries.map((e) =>
+                e.entryId === entry.entryId ? { ...e, synced: true } : e,
+              ),
+            }));
+            console.log(`[çekiliş] ${entry.entryId} Firestore'a yazıldı.`);
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.log(`[çekiliş] ${entry.entryId} gönderilemedi, beklemede: ${message}`);
+            break;
+          }
+        }
       } catch (err: unknown) {
         // The dynamic import itself failed — nothing to retry right now.
         console.log(`[kayit] senkronizasyon başlatılamadı: ${String(err)}`);
@@ -256,9 +321,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   // and again whenever a registration is added.
   useEffect(() => {
     if (!hydrated) return;
-    if (!state.registrations.some((r) => !r.synced)) return;
+    const pending =
+      state.registrations.some((r) => !r.synced) || state.raffleEntries.some((e) => !e.synced);
+    if (!pending) return;
     syncPending();
-  }, [hydrated, state.registrations, syncPending]);
+  }, [hydrated, state.registrations, state.raffleEntries, syncPending]);
 
   // Returning to the foreground is the cheapest reliable retry point: the phone
   // was just unlocked, so a connection that was missing at submit time is
@@ -296,6 +363,29 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         // and keeps retrying until it does.
         const entry: Registration = { ...input, code: makeCode(), synced: false };
         setState((s) => ({ ...s, registrations: [...s.registrations, entry] }));
+        return entry;
+      },
+
+      raffleEntryFor: (eventId: string) =>
+        state.raffleEntries.find((e) => e.eventId === eventId),
+
+      enterRaffle: (eventId, values) => {
+        const existing = state.raffleEntries.find((e) => e.eventId === eventId);
+        if (existing) {
+          // Aynı çekilişe ikinci katılım yok. Gönderilememişse tekrar denenir —
+          // kayıtlardaki mantığın aynısı.
+          if (!existing.synced) syncPending();
+          return existing;
+        }
+
+        const entry: RaffleEntry = {
+          entryId: makeEntryId(),
+          eventId,
+          values,
+          createdAt: new Date().toISOString(),
+          synced: false,
+        };
+        setState((s) => ({ ...s, raffleEntries: [...s.raffleEntries, entry] }));
         return entry;
       },
 

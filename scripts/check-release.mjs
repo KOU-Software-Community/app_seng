@@ -182,6 +182,18 @@ check(
 );
 
 check(
+  'panel yığın izi sızdırmıyor',
+  'Hata yakalayıcı olmadan express varsayılanına düşüp tarayıcıya tam yığın izini ' +
+    'basıyordu — mutlak dosya yolları, paket sürümleri, Firestore hata ayrıntıları. ' +
+    'Panel açık bir sunucuda çalışıyor.',
+  () => {
+    const server = read('admin/server.ts');
+    if (!/app\.use\(\(err: unknown/.test(server)) return 'admin/server.ts hata yakalayıcı taşımıyor';
+    return null;
+  },
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {
