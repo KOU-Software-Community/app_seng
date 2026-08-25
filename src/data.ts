@@ -1,5 +1,4 @@
-import { ICON, IconName } from './icons';
-import { gradients, type GradientStops } from './theme';
+import { IconName } from './icons';
 
 export type EventFact = { icon: IconName; label: string; value: string };
 
@@ -51,36 +50,12 @@ export const getEvent = (id?: string | string[]): ClubEvent | undefined => {
   return EVENTS.find((e) => e.id === key);
 };
 
-/** Highlight cards on the home carousel. Each one deep-links into an event. */
-export type FeaturedCard = {
-  id: string;
-  kicker: string;
-  icon: IconName;
-  title: string;
-  body: string;
-  meta: string;
-  /** Solid fill, or a gradient stop list for the navy card. */
-  bg: string | GradientStops;
-  fg: string;
-  sub: string;
-  badgeBg: string;
-  badgeFg: string;
-};
-
-export const FEATURED: FeaturedCard[] = [];
-
-export type FeedItem = {
-  id: string;
-  day: string;
-  mon: string;
-  tag: string;
-  title: string;
-  meta: string;
-  isNew: boolean;
-  tint: string;
-};
-
-export const FEED: FeedItem[] = [];
+/*
+ * FEATURED and FEED used to live here: editorial cards for the home carousel and
+ * feed. They were removed with the home screen that rendered them — it now shows
+ * real upcoming events and announcements from the club's site instead of a
+ * hand-curated list that nobody had maintained since the design was adapted.
+ */
 
 export type ArchiveEntry = {
   title: string;
