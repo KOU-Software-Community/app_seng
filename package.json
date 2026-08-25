@@ -49,7 +49,8 @@
     "lint": "expo lint",
     "seed": "tsx scripts/seed-firestore.ts",
     "push": "tsx scripts/send-push.ts",
-    "export": "tsx scripts/export-registrations.ts"
+    "export": "tsx scripts/export-registrations.ts",
+    "check:schema": "tsx scripts/check-event-schema.ts"
   },
   "private": true
 }

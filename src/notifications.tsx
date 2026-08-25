@@ -57,7 +57,12 @@ async function ensureAndroidChannel() {
  * credentials. Callers treat null as "push is unavailable", not as an error.
  */
 export async function requestPushToken(): Promise<string | null> {
-  if (!Device.isDevice) return null;
+  // The iOS Simulator has no APNs, so a token can never be issued there and
+  // asking only produces a confusing error. An Android emulator with Play
+  // Services does receive FCM, so it is worth trying — the catch below handles
+  // the ones that cannot. Blocking every emulator, as this used to, ruled out
+  // the only way to test push without a physical device.
+  if (!Device.isDevice && Platform.OS === 'ios') return null;
 
   const existing = await Notifications.getPermissionsAsync();
   let granted = existing.granted;

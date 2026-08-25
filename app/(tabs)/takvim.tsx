@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -13,7 +13,8 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { useContent } from '../../src/content';
-import { ClubEvent, MARCH_2026, MONTH_ORDER, WEEKDAYS } from '../../src/data';
+import { ClubEvent, WEEKDAYS } from '../../src/data';
+import { monthGrids, monthOrder, type MonthGrid } from '../../src/eventSchema';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
@@ -78,9 +79,13 @@ export default function TakvimRoute() {
 
 function ListView({ onOpen }: { onOpen: (id: string) => void }) {
   const { events } = useContent();
+  // Derived from the events themselves. A hand-maintained MONTH_ORDER meant an
+  // event in a month nobody had listed simply never appeared.
+  const months = useMemo(() => monthOrder(events), [events]);
+
   return (
     <View style={styles.list}>
-      {MONTH_ORDER.map((month) => {
+      {months.map((month) => {
         const items = events.filter((e) => e.monthKey === month);
         if (!items.length) return null;
         return (
@@ -157,73 +162,16 @@ function EventRow({ event, onPress }: { event: ClubEvent; onPress: () => void })
 
 function GridView({ onOpen }: { onOpen: (id: string) => void }) {
   const { events } = useContent();
-  // Leading blanks push the 1st into the correct weekday column.
-  const cells: (number | null)[] = [
-    ...Array.from({ length: MARCH_2026.leadingBlanks }, () => null),
-    ...Array.from({ length: MARCH_2026.days }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  // One card per month that actually has events, instead of a constant pinned to
+  // March 2026 that would have shown the wrong month the moment a real calendar
+  // existed.
+  const grids = useMemo(() => monthGrids(events), [events]);
 
   return (
-    <View style={{ padding: 20 }}>
-      <Card style={{ padding: 16 }}>
-        <View style={styles.monthBar}>
-          <Txt weight="extrabold" size={15} color={colors.navy900}>
-            {MARCH_2026.label}
-          </Txt>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <View style={styles.monthNav}>
-              <Txt size={13} color={colors.muted}>
-                ‹
-              </Txt>
-            </View>
-            <View style={styles.monthNav}>
-              <Txt size={13} color={colors.muted}>
-                ›
-              </Txt>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.weekRow}>
-          {WEEKDAYS.map((w) => (
-            <View key={w} style={styles.weekCell}>
-              <Txt weight="bold" size={10} color={colors.faint}>
-                {w}
-              </Txt>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.grid}>
-          {cells.map((day, i) => {
-            const eventId = day ? MARCH_2026.eventByDay[day] : undefined;
-            return (
-              <Pressable
-                key={i}
-                disabled={!eventId}
-                onPress={() => eventId && onOpen(eventId)}
-                accessibilityRole={eventId ? 'button' : undefined}
-                accessibilityLabel={eventId ? `${day} Mart etkinliği` : undefined}
-                style={styles.dayCell}
-              >
-                <View
-                  style={[styles.dayInner, eventId ? { backgroundColor: colors.blue100 } : null]}
-                >
-                  <Txt
-                    weight={eventId ? 'extrabold' : 'medium'}
-                    size={13}
-                    color={day ? (eventId ? colors.navy900 : colors.muted) : 'transparent'}
-                  >
-                    {day ?? ''}
-                  </Txt>
-                  {eventId ? <View style={styles.dayDot} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
+    <View style={{ padding: 20, gap: 16 }}>
+      {grids.map((grid) => (
+        <MonthCard key={grid.key} grid={grid} onOpen={onOpen} />
+      ))}
 
       <View style={{ marginTop: 16, gap: 10 }}>
         {events.map((e) => (
@@ -252,6 +200,65 @@ function GridView({ onOpen }: { onOpen: (id: string) => void }) {
         ))}
       </View>
     </View>
+  );
+}
+
+function MonthCard({ grid, onOpen }: { grid: MonthGrid; onOpen: (id: string) => void }) {
+  // Leading blanks push the 1st into the correct weekday column.
+  const cells: (number | null)[] = [
+    ...Array.from({ length: grid.leadingBlanks }, () => null),
+    ...Array.from({ length: grid.days }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // The month name without the year, for the day cell's accessibility label.
+  const monthName = grid.label.split(' ')[0];
+
+  return (
+    <Card style={{ padding: 16 }}>
+      <View style={styles.monthBar}>
+        <Txt weight="extrabold" size={15} color={colors.navy900}>
+          {grid.label}
+        </Txt>
+      </View>
+
+      <View style={styles.weekRow}>
+        {WEEKDAYS.map((w) => (
+          <View key={w} style={styles.weekCell}>
+            <Txt weight="bold" size={10} color={colors.faint}>
+              {w}
+            </Txt>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.grid}>
+        {cells.map((day, i) => {
+          const eventId = day ? grid.eventByDay[day] : undefined;
+          return (
+            <Pressable
+              key={i}
+              disabled={!eventId}
+              onPress={() => eventId && onOpen(eventId)}
+              accessibilityRole={eventId ? 'button' : undefined}
+              accessibilityLabel={eventId ? `${day} ${monthName} etkinliği` : undefined}
+              style={styles.dayCell}
+            >
+              <View style={[styles.dayInner, eventId ? { backgroundColor: colors.blue100 } : null]}>
+                <Txt
+                  weight={eventId ? 'extrabold' : 'medium'}
+                  size={13}
+                  color={day ? (eventId ? colors.navy900 : colors.muted) : 'transparent'}
+                >
+                  {day ?? ''}
+                </Txt>
+                {eventId ? <View style={styles.dayDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Card>
   );
 }
 
