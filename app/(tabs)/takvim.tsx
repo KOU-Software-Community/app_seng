@@ -79,7 +79,8 @@ function ListView({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 function EventRow({ event, onPress }: { event: ClubEvent; onPress: () => void }) {
-  const { isRegistered } = useAppStore();
+  const { registrationFor } = useAppStore();
+  const registration = registrationFor(event.id);
 
   return (
     <Pressable
@@ -121,10 +122,10 @@ function EventRow({ event, onPress }: { event: ClubEvent; onPress: () => void })
             <PixelBadge icon="clock" label="SON GUN" bg={colors.blue500} fg="#fff" size={6} />
           ) : null}
 
-          {isRegistered(event.id) ? (
+          {registration ? (
             <View style={styles.registeredPill}>
               <Txt weight="bold" size={10.5} color={colors.blue500}>
-                Kayıtlısın
+                {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor'}
               </Txt>
             </View>
           ) : null}
