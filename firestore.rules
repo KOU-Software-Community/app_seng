@@ -75,6 +75,35 @@ service cloud.firestore {
         && request.resource.data.quietHours is bool;
     }
 
+    // Çekiliş tanımı: hangi alanların sorulacağı, kaç kazanan, kazananlar.
+    // Uygulama formu bu tanımdan çizdiği için okuma açık; yazma yalnızca
+    // yönetim panelinden (Admin SDK, bu kuralları görmez).
+    match /raffles/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Çekiliş katılımları. Kayıtlarla aynı mantık: öğrenci kendi katılımını
+    // oluşturabilir, kimse kimseninkini okuyamaz veya değiştiremez. Kulüp
+    // katılımları panelden CSV olarak indirir.
+    match /raffleEntries/{entryId} {
+      allow read: if false;
+      allow update, delete: if false;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(['entryId', 'eventId', 'values', 'createdAt'])
+        && request.resource.data.entryId == entryId
+        // Var olmayan bir çekilişe katılım yazılamasın.
+        && request.resource.data.eventId is string
+        && exists(/databases/$(database)/documents/raffles/$(request.resource.data.eventId))
+        // Alanlar tanıma göre değiştiği için burada tek tek doğrulanamıyor;
+        // kuralların işi kötüye kullanımı engellemek — dev doküman yazmak,
+        // beklenmedik anahtar eklemek. Alan bazlı doğrulama şemada.
+        && request.resource.data.values is map
+        && request.resource.data.values.size() > 0
+        && request.resource.data.values.size() <= 12;
+    }
+
     // Yukarıda eşleşmeyen her şey kapalı.
     match /{document=**} {
       allow read, write: if false;

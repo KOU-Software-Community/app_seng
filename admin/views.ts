@@ -6,6 +6,7 @@
  * HTML'e girmez.** Etkinlik başlıkları ve öğrenci adları serbest metin; kaçış
  * atlanırsa panel kendi kendine XSS taşır.
  */
+import { EVENT_CATEGORIES } from '../src/eventSchema';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -46,7 +47,10 @@ main { max-width: 920px; margin: 28px auto; padding: 0 20px; }
 }
 h2 { font-size: 19px; margin: 0 0 16px; }
 label { display: block; margin-bottom: 14px; font-weight: 600; font-size: 13.5px; }
-input[type=text], input[type=password], textarea, select {
+/* Tip tip saymak yerine onay kutusunu dışarıda bırakmak: date, time ve number
+   alanları listede yoktu ve tarayıcı varsayılan boyutunda, diğerlerinden ayrı
+   duruyorlardı. */
+input:not([type=checkbox]), textarea, select {
   width: 100%; margin-top: 6px; padding: 10px 12px; font: inherit;
   border: 1.5px solid var(--border); border-radius: 8px; background: #fff;
 }
@@ -82,6 +86,7 @@ export function page(title: string, body: string, opts: { nav?: boolean } = {}):
     ? ''
     : `<nav>
          <a href="/">Etkinlikler</a>
+         <a href="/raffles">Çekilişler</a>
          <a href="/registrations">Kayıtlar</a>
          <form method="post" action="/logout" style="margin:0">
            <button class="btn-ghost" style="padding:6px 12px;font-size:13px">Çıkış</button>
@@ -124,6 +129,168 @@ export function loginPage(error?: string): string {
 export type FieldError = Record<string, string>;
 
 /** Etkinlik formu. `values` düzenlemede dolu, yeni kayıtta boş gelir. */
+const FIELD_TYPES: [string, string][] = [
+  ['text', 'Metin'],
+  ['studentNo', 'Öğrenci No (9 hane)'],
+  ['email', 'E-posta'],
+  ['phone', 'Telefon'],
+  ['select', 'Seçim listesi'],
+];
+
+/**
+ * Çekiliş tanımı formu.
+ *
+ * Alan satırları istemci JS'i olmadan yönetiliyor: var olanlar + üç boş satır
+ * basılıyor, kaydedince yeniden üç boş satır geliyor. Anahtarı boş bırakılan
+ * satır yok sayılıyor, dolayısıyla silmek de anahtarı temizlemek demek.
+ */
+export function raffleForm(
+  values: {
+    eventId: string;
+    eventTitle: string;
+    winnerCount?: unknown;
+    entriesCloseDate?: unknown;
+    entriesCloseTime?: unknown;
+    fields?: { key: string; label: string; type: string; required: boolean; options?: string[] }[];
+  },
+  errors: FieldError,
+  entryCount: number,
+): string {
+  const rows = [...(values.fields ?? []), ...Array.from({ length: 3 }, () => null)];
+
+  const fieldRows = rows
+    .map((field, i) => {
+      const v = (k: 'key' | 'label') => esc(field ? (field as never)[k] : '');
+      const type = field?.type ?? 'text';
+      const options = esc(field?.options?.join(', ') ?? '');
+      const err = field?.key && errors[field.key] ? `<div class="err">${esc(errors[field.key])}</div>` : '';
+
+      return `<tr>
+        <td><input type="text" name="key_${i}" value="${v('key')}" placeholder="phone"></td>
+        <td><input type="text" name="label_${i}" value="${v('label')}" placeholder="Telefon"></td>
+        <td>
+          <select name="type_${i}">
+            ${FIELD_TYPES.map(
+              ([value, label]) =>
+                `<option value="${value}"${value === type ? ' selected' : ''}>${label}</option>`,
+            ).join('')}
+          </select>
+        </td>
+        <td style="text-align:center">
+          <input type="checkbox" name="required_${i}" value="1"${field?.required ? ' checked' : ''} style="width:auto">
+        </td>
+        <td><input type="text" name="options_${i}" value="${options}" placeholder="virgülle"></td>
+        <td>${err}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return page(
+    'Çekiliş',
+    `<div class="card">
+      <h2>Çekiliş — ${esc(values.eventTitle)}</h2>
+      ${errors.fields ? `<div class="banner">${esc(errors.fields)}</div>` : ''}
+      ${
+        Object.keys(errors).length && !errors.fields
+          ? '<div class="banner">Kaydedilmedi — alan tanımlarını düzeltin.</div>'
+          : ''
+      }
+
+      <form method="post">
+        <div class="row">
+          <label>Kaç kişi kazanacak
+            <input type="number" name="winnerCount" min="1" max="999" value="${esc(values.winnerCount ?? 1)}" required>
+            ${errors.winnerCount ? `<div class="err">${esc(errors.winnerCount)}</div>` : ''}
+          </label>
+          <label>Son katılım tarihi
+            <input type="date" name="entriesCloseDate" value="${esc(values.entriesCloseDate ?? '')}" required>
+          </label>
+          <label>Son katılım saati
+            <input type="time" name="entriesCloseTime" value="${esc(values.entriesCloseTime ?? '23:59')}" required>
+          </label>
+        </div>
+        ${errors.entriesCloseAt ? `<div class="err" style="margin-bottom:12px">${esc(errors.entriesCloseAt)}</div>` : ''}
+
+        <h2 style="font-size:15px;margin-top:22px">Sorulacak alanlar</h2>
+        <p class="hint" style="margin:0 0 12px">
+          Anahtar CSV sütun adı olur — küçük harf, rakam, alt çizgi. Anahtarı boş
+          bırakılan satır yok sayılır; silmek için anahtarı temizleyin.
+        </p>
+
+        <table>
+          <thead><tr><th>Anahtar</th><th>Etiket</th><th>Tip</th><th>Zorunlu</th><th>Seçenekler</th><th></th></tr></thead>
+          <tbody>${fieldRows}</tbody>
+        </table>
+
+        <div class="actions">
+          <button type="submit">Kaydet</button>
+          <a class="btn btn-ghost" href="/raffles">Vazgeç</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:15px">Katılımlar</h2>
+      <p class="hint">${entryCount} katılım kayıtlı.</p>
+      <div class="actions">
+        <a class="btn btn-ghost" href="/raffles/${esc(values.eventId)}/entries">Katılımları gör</a>
+        <a class="btn btn-ghost" href="/raffles/${esc(values.eventId)}/entries.csv">CSV indir</a>
+        <a class="btn btn-ghost" href="/raffles/${esc(values.eventId)}/winners">Kazananları gir</a>
+      </div>
+    </div>`,
+  );
+}
+
+/** Kazanan girme formu — çekiliş dışarıda yapıldıktan sonra. */
+export function winnersForm(
+  eventId: string,
+  eventTitle: string,
+  winners: string[],
+  drawnAt: string,
+): string {
+  return page(
+    'Kazananlar',
+    `<div class="card">
+      <h2>Kazananlar — ${esc(eventTitle)}</h2>
+      <p class="hint" style="margin-top:0">
+        Her satıra bir ad soyad yazın. Uygulamada <strong>kısaltılmış</strong> olarak
+        görünecekler ("Elif Yılmaz" → "Elif Y."), böylece kazanan kendini tanır ama
+        tam ad herkese açılmaz. Kaydettiğiniz anda uygulamada yayınlanır.
+      </p>
+      ${drawnAt ? `<div class="banner ok">Sonuçlar ${esc(drawnAt.slice(0, 10))} tarihinde yayınlandı.</div>` : ''}
+
+      <form method="post">
+        <label>Kazananlar
+          <textarea name="winners" rows="8" placeholder="Elif Yılmaz&#10;Ahmet Demir">${esc(winners.join('\n'))}</textarea>
+        </label>
+        <div class="actions">
+          <button type="submit">Yayınla</button>
+          <a class="btn btn-ghost" href="/raffles/${esc(eventId)}">Geri</a>
+        </div>
+      </form>
+    </div>`,
+  );
+}
+
+/**
+ * Kategori seçenekleri. Kayıtlı değer listede yoksa başa ekleniyor: panelin
+ * menüsü değişti diye var olan bir etkinliğin kategorisi sessizce başka bir şeye
+ * dönmemeli.
+ */
+function categoryOptions(current: string): string {
+  const list =
+    !current || EVENT_CATEGORIES.includes(current)
+      ? EVENT_CATEGORIES
+      : [current, ...EVENT_CATEGORIES];
+
+  return [
+    `<option value="" disabled${current ? '' : ' selected'}>Seçin…</option>`,
+    ...list.map(
+      (c) => `<option value="${esc(c)}"${c === current ? ' selected' : ''}>${esc(c)}</option>`,
+    ),
+  ].join('');
+}
+
 export function eventForm(
   values: Record<string, unknown>,
   errors: FieldError,
@@ -145,7 +312,7 @@ export function eventForm(
             ${e('id')}
           </label>
           <label>Kategori
-            <input type="text" name="tag" value="${v('tag')}" placeholder="Atölye" required>
+            <select name="tag" required>${categoryOptions(String(values.tag ?? ''))}</select>
             ${e('tag')}
           </label>
         </div>
@@ -156,15 +323,21 @@ export function eventForm(
         </label>
 
         <div class="row">
-          <label>Başlangıç <span class="hint">(saat dilimiyle birlikte)</span>
-            <input type="text" name="startsAt" value="${v('startsAt')}" placeholder="2026-03-12T18:00:00+03:00" required>
+          <label>Tarih
+            <input type="date" name="startsAtDate" value="${v('startsAtDate')}" required>
             ${e('startsAt')}
           </label>
+          <label>Başlangıç saati
+            <input type="time" name="startsAtTime" value="${v('startsAtTime')}" required>
+          </label>
           <label>Bitiş saati
-            <input type="text" name="endsAt" value="${v('endsAt')}" placeholder="20:30" required>
+            <input type="time" name="endsAt" value="${v('endsAt')}" required>
             ${e('endsAt')}
           </label>
         </div>
+        <p class="hint" style="margin:-6px 0 16px">
+          Saat dilimi sorulmuyor — hepsi Türkiye saati (UTC+03:00) olarak kaydedilir.
+        </p>
 
         <div class="row">
           <label>Yer <span class="hint">(künyede tam hâli)</span>

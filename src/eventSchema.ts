@@ -154,6 +154,73 @@ function pad(n: number): string {
 }
 
 /**
+ * Turkey has been permanently UTC+3 since 2016 — no DST, no second offset to
+ * pick between. So the panel never asks for a timezone: it shows a date picker
+ * and a time picker and stamps the offset itself, which is what makes a
+ * malformed `startsAt` impossible to type.
+ */
+export const LOCAL_OFFSET = '+03:00';
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `2026-03-12` + `18:00` → `2026-03-12T18:00:00+03:00`.
+ *
+ * Returns an empty string when either half is missing or malformed, so the
+ * caller lands on `buildEvent`'s ordinary date error rather than on a
+ * half-built string that happens to parse as something else. `<input
+ * type="date">` already normalises what a person picks; this is what stops a
+ * hand-rolled POST from getting further.
+ */
+export function joinLocal(date: string, time: string): string {
+  const d = (date ?? '').trim();
+  const t = (time ?? '').trim();
+  if (!DATE_ONLY.test(d) || !HHMM.test(t)) return '';
+  return `${d}T${t}:00${LOCAL_OFFSET}`;
+}
+
+/**
+ * The inverse, for filling the pickers when an event is edited.
+ *
+ * The wall-clock fields are read literally — exactly as `parseIso` reads them —
+ * and a stored offset other than +03:00 is deliberately *not* converted. Every
+ * string the app shows is derived from those literal fields, so they are what
+ * the event is as far as anyone reading the calendar is concerned; a form
+ * showing a converted time would disagree with the row the operator just
+ * clicked on.
+ *
+ * Saving then re-stamps the value as +03:00, which lines the machine-readable
+ * instant back up with the time on screen. Nothing visible moves; what changes
+ * is that the reminder for such an event stops firing at the wrong moment.
+ *
+ * Anything unparseable comes back empty rather than guessed.
+ */
+export function splitLocal(startsAt: string): { date: string; time: string } {
+  const m = ISO_WITH_OFFSET.exec((startsAt ?? '').trim());
+  if (!m) return { date: '', time: '' };
+
+  const [, y, mo, d, h, mi] = m;
+  return { date: `${y}-${mo}-${d}`, time: `${h}:${mi}` };
+}
+
+/**
+ * What the panel offers in the category dropdown.
+ *
+ * It used to be a free-text box, and free text means one person types "atölye"
+ * and the calendar shows a differently-cased chip next to "Söyleşi". An event
+ * already stored with something off this list keeps it — this is the panel's
+ * menu, not a rule the data model enforces.
+ */
+export const EVENT_CATEGORIES = [
+  'Atölye',
+  'Söyleşi',
+  'Çekiliş',
+  'Teknik Gezi',
+  'Yarışma',
+  'Duyuru',
+];
+
+/**
  * Validates and derives. Every message is aimed at whoever is filling the form,
  * so it says what to do rather than what failed.
  */
@@ -167,8 +234,10 @@ export function buildEvent(input: EventInput): BuildResult {
 
   const parsed = parseIso(input.startsAt ?? '');
   if (!parsed) {
-    errors.startsAt =
-      'Tarih 2026-03-12T18:00:00+03:00 biçiminde olmalı. Saat dilimi (+03:00) zorunlu.';
+    // Panelde tarih ve saat seçiciyle giriliyor, dolayısıyla buraya ancak
+    // seçilmemiş ya da imkânsız bir tarih düşer. Biçim ayrıntısı EventInput'un
+    // tip yorumunda; mesaj formu dolduran kişiye göre yazılmış.
+    errors.startsAt = 'Geçerli bir tarih ve başlangıç saati seçin.';
   }
 
   if (!HHMM.test(text(input.endsAt))) {

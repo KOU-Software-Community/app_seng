@@ -143,3 +143,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
 - A notification icon renders at 24dp. The full three-line club wordmark turns to grey
   mush at that size; only the `KOÜ` line survives. Generate candidates and downscale
   them before choosing — this is not judgeable at full resolution.
+- **In `startsAt` the wall-clock fields are the meaning; the offset is only carried.**
+  `buildEvent` reads `2026-03-12T18:00` literally and derives every visible string from
+  it, so the offset never reaches the screen. When the admin form became date + time
+  pickers, `splitLocal` first *converted* a stored `…T15:00:00Z` to its +03:00 instant —
+  which looks obviously right and silently changed the time the calendar showed. Split
+  literally, restamp `+03:00` on save: nothing visible moves and the reminder stops
+  firing at a different moment than the one on screen. The check that catches this is
+  "değiştirmeden kaydet oynatmıyor" in `check:schema` — it builds an event, splits it,
+  rebuilds it and compares every derived field.
+- The panel's form CSS listed input types by hand (`input[type=text], input[type=password]`),
+  so `date`, `time` and `number` fell through to browser defaults and sat visibly smaller
+  than everything around them. It is now `input:not([type=checkbox])` — enumerate the
+  exception, not the members.

@@ -26,8 +26,17 @@ import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import type { ClubEvent } from '../src/data';
-import { buildEvent, toInput, type EventInput } from '../src/eventSchema';
-import { esc, eventForm, loginPage, page } from './views';
+import { buildEvent, joinLocal, splitLocal, toInput, type EventInput } from '../src/eventSchema';
+import {
+  csvColumns,
+  DEFAULT_FIELDS,
+  maskName,
+  validateFields,
+  type Raffle,
+  type RaffleField,
+  type RaffleFieldType,
+} from '../src/raffleSchema';
+import { esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
 const PORT = Number(process.env.ADMIN_PORT ?? 4000);
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
@@ -125,11 +134,26 @@ app.use(requireAuth);
 
 // ------------------------------------------------------------- etkinlikler
 
+/**
+ * Tarih ve saat formdan ayrı ayrı geliyor (`<input type="date">` +
+ * `<input type="time">`). Saat dilimi hiç sorulmuyor; `joinLocal` +03:00 ile
+ * ISO'yu kuruyor. Elle ISO yazılan hâlde en sık yapılan hata saat dilimini
+ * unutmaktı ve o dizge her okuyanın kendi saat dilimine göre başka bir an
+ * demek — artık yapılabilir bir hata değil.
+ */
+function formDateTime(body: Record<string, unknown>): { date: string; time: string } {
+  return {
+    date: String(body.startsAtDate ?? '').trim(),
+    time: String(body.startsAtTime ?? '').trim(),
+  };
+}
+
 function formToInput(body: Record<string, unknown>): EventInput {
   const s = (k: string) => String(body[k] ?? '').trim();
+  const { date, time } = formDateTime(body);
   return {
     id: s('id'),
-    startsAt: s('startsAt'),
+    startsAt: joinLocal(date, time),
     endsAt: s('endsAt'),
     venue: s('venue'),
     venueShort: s('venueShort'),
@@ -145,9 +169,25 @@ function formToInput(body: Record<string, unknown>): EventInput {
   };
 }
 
-/** Formda gösterilecek hâli — `tags` dizisi virgüllü metne döner. */
-function inputToForm(input: EventInput): Record<string, unknown> {
-  return { ...input, tags: input.tags.join(', ') };
+/**
+ * Formda gösterilecek hâli — `tags` dizisi virgüllü metne, `startsAt` tarih ve
+ * saat seçicilerine ayrılır.
+ *
+ * `raw` doğrulama hatasından sonra veriliyor: kişi tarihi seçip saati boş
+ * bıraktıysa `startsAt` boş kalır, dolayısıyla ondan türetilen tarih de boş
+ * gelirdi ve form seçilmiş tarihi silerdi.
+ */
+function inputToForm(
+  input: EventInput,
+  raw?: { date: string; time: string },
+): Record<string, unknown> {
+  const split = splitLocal(input.startsAt);
+  return {
+    ...input,
+    tags: input.tags.join(', '),
+    startsAtDate: raw?.date || split.date,
+    startsAtTime: raw?.time || split.time,
+  };
 }
 
 app.get('/', async (_req, res) => {
@@ -200,7 +240,10 @@ app.post('/events/new', async (req, res) => {
   const built = buildEvent(input);
 
   if (!built.ok) {
-    return res.status(400).type('html').send(eventForm(inputToForm(input), built.errors, { editing: false }));
+    return res
+      .status(400)
+      .type('html')
+      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: false }));
   }
 
   const ref = db.collection('events').doc(built.event.id);
@@ -209,7 +252,11 @@ app.post('/events/new', async (req, res) => {
       .status(409)
       .type('html')
       .send(
-        eventForm(inputToForm(input), { id: 'Bu kimlik zaten kullanılıyor.' }, { editing: false }),
+        eventForm(
+          inputToForm(input, formDateTime(req.body)),
+          { id: 'Bu kimlik zaten kullanılıyor.' },
+          { editing: false },
+        ),
       );
   }
 
@@ -232,7 +279,10 @@ app.post('/events/:id', async (req, res) => {
   const built = buildEvent(input);
 
   if (!built.ok) {
-    return res.status(400).type('html').send(eventForm(inputToForm(input), built.errors, { editing: true }));
+    return res
+      .status(400)
+      .type('html')
+      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: true }));
   }
 
   const { id, ...rest } = built.event;
@@ -354,6 +404,278 @@ app.get('/registrations.csv', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
   // BOM olmadan Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri bozuyor.
   res.send('﻿' + [columns.join(','), body].filter(Boolean).join('\r\n'));
+});
+
+// ---------------------------------------------------------------- çekilişler
+
+/** Formdaki satırlardan alan tanımlarını toplar; anahtarı boş olan satır atlanır. */
+function formToFields(body: Record<string, unknown>): RaffleField[] {
+  const fields: RaffleField[] = [];
+  for (let i = 0; i < 40; i += 1) {
+    const key = String(body[`key_${i}`] ?? '').trim();
+    if (!key) continue;
+    const type = String(body[`type_${i}`] ?? 'text') as RaffleFieldType;
+    const options = String(body[`options_${i}`] ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+    fields.push({
+      key,
+      label: String(body[`label_${i}`] ?? '').trim(),
+      type,
+      required: !!body[`required_${i}`],
+      ...(type === 'select' ? { options } : {}),
+    });
+  }
+  return fields;
+}
+
+async function loadRaffle(eventId: string): Promise<Raffle | null> {
+  const doc = await db.collection('raffles').doc(eventId).get();
+  if (!doc.exists) return null;
+  return { eventId: doc.id, ...(doc.data() as Omit<Raffle, 'eventId'>) };
+}
+
+async function loadEventTitle(eventId: string): Promise<string | null> {
+  const doc = await db.collection('events').doc(eventId).get();
+  if (!doc.exists) return null;
+  return String((doc.data() as { title?: unknown }).title ?? eventId);
+}
+
+async function countEntries(eventId: string): Promise<number> {
+  const snap = await db.collection('raffleEntries').where('eventId', '==', eventId).get();
+  return snap.size;
+}
+
+app.get('/raffles', async (_req, res) => {
+  const [eventsSnap, rafflesSnap] = await Promise.all([
+    db.collection('events').get(),
+    db.collection('raffles').get(),
+  ]);
+  const hasRaffle = new Set(rafflesSnap.docs.map((d) => d.id));
+
+  const rows = eventsSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as { title?: unknown; tag?: unknown }) }))
+    .map((e) => {
+      const defined = hasRaffle.has(e.id);
+      return `<tr>
+        <td><strong>${esc(e.title)}</strong><br><span class="hint">${esc(e.tag)}</span></td>
+        <td>${defined ? 'Tanımlı' : '<span class="hint">Tanımsız</span>'}</td>
+        <td style="white-space:nowrap">
+          <a class="btn btn-ghost" style="padding:6px 12px;font-size:13px" href="/raffles/${encodeURIComponent(e.id)}">
+            ${defined ? 'Düzenle' : 'Çekiliş yap'}
+          </a>
+        </td>
+      </tr>`;
+    })
+    .join('');
+
+  res.type('html').send(
+    page(
+      'Çekilişler',
+      `<div class="card">
+         <h2>Çekilişler</h2>
+         <p class="hint">
+           Çekiliş ayrı bir kayıt değil, bir etkinliğin üstüne eklenen tanım.
+           Aşağıdan bir etkinlik seçip hangi bilgilerin sorulacağını belirleyin.
+         </p>
+         ${
+           eventsSnap.size
+             ? `<table><thead><tr><th>Etkinlik</th><th>Durum</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+             : '<p class="empty">Önce bir etkinlik oluşturun.</p>'
+         }
+       </div>`,
+    ),
+  );
+});
+
+app.get('/raffles/:eventId', async (req, res) => {
+  const eventId = req.params.eventId;
+  const [title, raffle, entryCount] = await Promise.all([
+    loadEventTitle(eventId),
+    loadRaffle(eventId),
+    countEntries(eventId),
+  ]);
+  if (!title) return res.status(404).type('html').send(page('Bulunamadı', '<div class="card">Etkinlik bulunamadı.</div>'));
+
+  // Yeni çekiliş varsayılan alanlarla başlıyor; kulübün her seferinde sorduğu dörtlü.
+  const closes = raffle?.entriesCloseAt ?? '';
+  res.type('html').send(
+    raffleForm(
+      {
+        eventId,
+        eventTitle: title,
+        winnerCount: raffle?.winnerCount ?? 1,
+        entriesCloseDate: closes.slice(0, 10),
+        entriesCloseTime: closes.slice(11, 16) || '23:59',
+        fields: raffle?.fields ?? DEFAULT_FIELDS,
+      },
+      {},
+      entryCount,
+    ),
+  );
+});
+
+app.post('/raffles/:eventId', async (req, res) => {
+  const eventId = req.params.eventId;
+  const title = (await loadEventTitle(eventId)) ?? eventId;
+  const fields = formToFields(req.body);
+  const errors = validateFields(fields);
+
+  const winnerCount = Number(req.body.winnerCount);
+  if (!Number.isInteger(winnerCount) || winnerCount < 1) {
+    errors.winnerCount = 'En az 1 olmalı.';
+  }
+
+  const date = String(req.body.entriesCloseDate ?? '');
+  const time = String(req.body.entriesCloseTime ?? '');
+  // Saat dilimi kullanıcıdan istenmiyor; kulüp Türkiye'de ve Türkiye kalıcı
+  // olarak UTC+3. Biçim hatası yapması imkânsız hâle geliyor.
+  const entriesCloseAt = date && time ? `${date}T${time}:00+03:00` : '';
+  if (!entriesCloseAt) errors.entriesCloseAt = 'Son katılım tarihi ve saati gerekli.';
+
+  if (Object.keys(errors).length) {
+    return res.status(400).type('html').send(
+      raffleForm(
+        { eventId, eventTitle: title, winnerCount, entriesCloseDate: date, entriesCloseTime: time, fields },
+        errors,
+        await countEntries(eventId),
+      ),
+    );
+  }
+
+  const existing = await loadRaffle(eventId);
+  await db.collection('raffles').doc(eventId).set({
+    fields,
+    winnerCount,
+    entriesCloseAt,
+    // Kazananlar ayrı ekrandan giriliyor; tanımı kaydetmek onları silmemeli.
+    winners: existing?.winners ?? [],
+    drawnAt: existing?.drawnAt ?? '',
+  });
+  res.redirect('/raffles');
+});
+
+async function loadEntries(eventId: string) {
+  const snap = await db.collection('raffleEntries').where('eventId', '==', eventId).get();
+  return snap.docs
+    .map((d) => d.data() as { entryId?: string; values?: Record<string, string>; createdAt?: { toDate?: () => Date } })
+    .sort((a, b) => String(a.entryId).localeCompare(String(b.entryId)));
+}
+
+app.get('/raffles/:eventId/entries', async (req, res) => {
+  const eventId = req.params.eventId;
+  const [raffle, entries, title] = await Promise.all([
+    loadRaffle(eventId),
+    loadEntries(eventId),
+    loadEventTitle(eventId),
+  ]);
+  if (!raffle) return res.redirect(`/raffles/${encodeURIComponent(eventId)}`);
+
+  const head = raffle.fields.map((f) => `<th>${esc(f.label)}</th>`).join('');
+  const rows = entries
+    .map(
+      (e) =>
+        `<tr>${raffle.fields.map((f) => `<td>${esc(e.values?.[f.key] ?? '')}</td>`).join('')}</tr>`,
+    )
+    .join('');
+
+  res.type('html').send(
+    page(
+      'Katılımlar',
+      `<div class="card">
+         <div style="display:flex;align-items:center;margin-bottom:16px">
+           <h2 style="margin:0">${esc(title ?? eventId)} — katılımlar</h2>
+           <a class="btn" style="margin-left:auto" href="/raffles/${encodeURIComponent(eventId)}/entries.csv">CSV indir</a>
+         </div>
+         ${
+           entries.length
+             ? `<p class="hint">${entries.length} katılım.</p><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`
+             : '<p class="empty">Henüz katılım yok.</p>'
+         }
+       </div>`,
+    ),
+  );
+});
+
+app.get('/raffles/:eventId/entries.csv', async (req, res) => {
+  const eventId = req.params.eventId;
+  const [raffle, entries] = await Promise.all([loadRaffle(eventId), loadEntries(eventId)]);
+  if (!raffle) return res.redirect(`/raffles/${encodeURIComponent(eventId)}`);
+
+  const cell = (v: unknown) => {
+    if (v === null || v === undefined) return '';
+    const t = String(v);
+    return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+
+  const columns = csvColumns(raffle.fields);
+  const body = entries
+    .map((e) => {
+      const created = e.createdAt?.toDate ? e.createdAt.toDate().toISOString() : '';
+      return [
+        cell(e.entryId),
+        cell(eventId),
+        ...raffle.fields.map((f) => cell(e.values?.[f.key] ?? '')),
+        cell(created),
+      ].join(',');
+    })
+    .join('\r\n');
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="cekilis-${eventId}.csv"`);
+  // BOM olmadan Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri bozuyor.
+  res.send('\ufeff' + [columns.join(','), body].filter(Boolean).join('\r\n'));
+});
+
+app.get('/raffles/:eventId/winners', async (req, res) => {
+  const eventId = req.params.eventId;
+  const [raffle, title] = await Promise.all([loadRaffle(eventId), loadEventTitle(eventId)]);
+  if (!raffle) return res.redirect(`/raffles/${encodeURIComponent(eventId)}`);
+  res.type('html').send(winnersForm(eventId, title ?? eventId, raffle.winners ?? [], raffle.drawnAt ?? ''));
+});
+
+app.post('/raffles/:eventId/winners', async (req, res) => {
+  const eventId = req.params.eventId;
+  // Maskeleme burada, yazma anında yapılıyor: uygulamaya tam ad hiç ulaşmıyor,
+  // dolayısıyla bir ekranın yanlışlıkla tam adı göstermesi mümkün değil.
+  const winners = String(req.body.winners ?? '')
+    .split('\n')
+    .map((line) => maskName(line))
+    .filter(Boolean);
+
+  await db.collection('raffles').doc(eventId).set(
+    { winners, drawnAt: winners.length ? new Date().toISOString() : '' },
+    { merge: true },
+  );
+  res.redirect(`/raffles/${encodeURIComponent(eventId)}`);
+});
+
+/**
+ * Son çare hata yakalayıcı.
+ *
+ * Bu olmadan express varsayılan davranışına düşüyor ve tarayıcıya tam yığın
+ * izini basıyor: mutlak dosya yolları, paket sürümleri, Firestore hata
+ * ayrıntıları. Panel açık bir sunucuda çalışacağı için bunların hepsi keşif
+ * bilgisi. Ayrıntı sunucu günlüğüne gidiyor, kullanıcı sade bir sayfa görüyor.
+ */
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[panel] istek başarısız:', err);
+  if (res.headersSent) return;
+  res.status(500).type('html').send(
+    page(
+      'Hata',
+      `<div class="card">
+         <h2>Bir şeyler ters gitti</h2>
+         <p class="hint">
+           İstek tamamlanamadı. Ayrıntı sunucu günlüğünde; genellikle sebebi
+           Firestore'a ulaşılamaması ya da servis hesabı anahtarının geçersiz
+           olması oluyor.
+         </p>
+         <div class="actions"><a class="btn btn-ghost" href="/">Etkinliklere dön</a></div>
+       </div>`,
+    ),
+  );
 });
 
 app.listen(PORT, () => {

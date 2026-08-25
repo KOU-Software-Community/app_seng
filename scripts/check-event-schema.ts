@@ -7,7 +7,15 @@
  * yazılmış gerçek bir etkinliğe (1.0.x'teki `ev1`) karşı alan alan
  * karşılaştırılıyor.
  */
-import { buildEvent, monthGrids, monthOrder, toInput, type EventInput } from '../src/eventSchema';
+import {
+  buildEvent,
+  joinLocal,
+  monthGrids,
+  monthOrder,
+  splitLocal,
+  toInput,
+  type EventInput,
+} from '../src/eventSchema';
 import type { ClubEvent } from '../src/data';
 
 /** 1.0.x'te elle yazılmış hâli — referans bu. */
@@ -129,6 +137,73 @@ if (mart.ok && nisan.ok) {
 // 6. Bozuk tarih taşıyan etkinlik ızgarayı çökertmemeli, sadece atlanmalı.
 const broken = { ...EV1, startsAt: 'bozuk' } as ClubEvent;
 assert('bozuk tarih atlanıyor', monthGrids([broken]).length === 0);
+
+// 7. Panel tarih ve saati ayrı seçicilerden alıyor; ISO'yu joinLocal kuruyor ve
+//    düzenlemede splitLocal geri ayırıyor. Bu ikisi birbirinin tersi olmazsa
+//    bir etkinliği açıp hiçbir şey değiştirmeden kaydetmek onu oynatır.
+assert(
+  'seçicilerden ISO',
+  joinLocal('2026-03-12', '18:00') === '2026-03-12T18:00:00+03:00',
+  joinLocal('2026-03-12', '18:00'),
+);
+assert('tarih yoksa boş', joinLocal('', '18:00') === '');
+assert('saat yoksa boş', joinLocal('2026-03-12', '') === '');
+// Tarayıcı seçici bunları üretmez; elle atılan bir POST üretir.
+assert('bozuk tarih reddediliyor', joinLocal('12.03.2026', '18:00') === '');
+assert('bozuk saat reddediliyor', joinLocal('2026-03-12', '18.00') === '');
+assert('25:00 reddediliyor', joinLocal('2026-03-12', '25:00') === '');
+
+const split = splitLocal('2026-03-12T18:00:00+03:00');
+assert('geri ayırma tarihi', split.date === '2026-03-12', split.date);
+assert('geri ayırma saati', split.time === '18:00', split.time);
+assert(
+  'gidiş-dönüş',
+  joinLocal(split.date, split.time) === EV1.startsAt,
+  joinLocal(split.date, split.time),
+);
+
+// Farklı offset'le kaydedilmiş bir etkinlik: duvar saati olduğu gibi okunuyor.
+// Uygulamanın gösterdiği her metin bu alanlardan türüyor, dolayısıyla formun
+// çevrilmiş bir saat göstermesi tıklanan satırla çelişmek olurdu.
+const utc = splitLocal('2026-03-12T15:00:00Z');
+assert('duvar saati olduğu gibi', utc.date === '2026-03-12' && utc.time === '15:00',
+  `${utc.date} ${utc.time}`);
+const west = splitLocal('2026-03-12T08:00:00-05:00');
+assert('negatif offset de olduğu gibi', west.time === '08:00', west.time);
+
+// Asıl güvence bu: bir etkinliği açıp hiçbir şeye dokunmadan kaydetmek takvimde
+// görünen hiçbir şeyi değiştirmemeli. Kaydedilen offset +03:00'a dönüyor —
+// değişen tek şey hatırlatmanın artık ekrandaki saatte çalması.
+const visible = (e: ClubEvent) =>
+  JSON.stringify([e.day, e.mon, e.wd, e.monthKey, e.time, e.short, e.facts]);
+
+for (const iso of [
+  '2026-03-12T18:00:00+03:00',
+  '2026-03-12T15:00:00Z',
+  '2026-03-12T08:00:00-05:00',
+]) {
+  const first = buildEvent({ ...EV1_INPUT, startsAt: iso });
+  if (!first.ok) {
+    assert(`kurulabiliyor: ${iso}`, false);
+    continue;
+  }
+  const shown = splitLocal(toInput(first.event).startsAt);
+  const again = buildEvent({ ...toInput(first.event), startsAt: joinLocal(shown.date, shown.time) });
+  assert(
+    `değiştirmeden kaydet oynatmıyor: ${iso}`,
+    again.ok && visible(again.event) === visible(first.event),
+    again.ok ? visible(again.event) : 'kurulamadı',
+  );
+  assert(
+    `kaydedilen offset +03:00: ${iso}`,
+    again.ok && again.event.startsAt.endsWith('+03:00'),
+    again.ok ? again.event.startsAt : 'kurulamadı',
+  );
+}
+
+// Ayrıştırılamayan değer tahmin edilmiyor; form boş geliyor ve buildEvent zaten
+// reddediyor.
+assert('bozuk startsAt boş dönüyor', splitLocal('bozuk').date === '' && splitLocal('bozuk').time === '');
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

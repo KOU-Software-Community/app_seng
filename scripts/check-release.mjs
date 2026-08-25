@@ -182,6 +182,39 @@ check(
 );
 
 check(
+  'panel yığın izi sızdırmıyor',
+  'Hata yakalayıcı olmadan express varsayılanına düşüp tarayıcıya tam yığın izini ' +
+    'basıyordu — mutlak dosya yolları, paket sürümleri, Firestore hata ayrıntıları. ' +
+    'Panel açık bir sunucuda çalışıyor.',
+  () => {
+    const server = read('admin/server.ts');
+    if (!/app\.use\(\(err: unknown/.test(server)) return 'admin/server.ts hata yakalayıcı taşımıyor';
+    return null;
+  },
+);
+
+check(
+  'panelde tarih elle yazılmıyor',
+  'Başlangıç serbest metindi ve saat dilimiyle birlikte tam ISO isteniyordu. Saat ' +
+    'dilimi unutulmuş bir dizge her okuyanın kendi diliminde başka bir an demek — ' +
+    've hatırlatmalar o değere göre kuruluyor. Panelde yapılabilecek en pahalı ' +
+    'yazım hatasıydı; artık yazılmıyor, seçiliyor.',
+  () => {
+    const views = read('admin/views.ts');
+    if (/name="startsAt"/.test(views)) return 'form hâlâ tek parça startsAt alanı taşıyor';
+    if (!/type="date" name="startsAtDate"/.test(views)) return 'başlangıç tarihi seçici değil';
+    if (!/type="time" name="startsAtTime"/.test(views)) return 'başlangıç saati seçici değil';
+    if (!/type="time" name="endsAt"/.test(views)) return 'bitiş saati seçici değil';
+    // Seçicinin kendisi yetmez: ISO'yu sunucu kurmazsa saat dilimi yine forma
+    // düşer.
+    if (!/joinLocal\(date, time\)/.test(read('admin/server.ts'))) {
+      return 'sunucu ISO’yu joinLocal ile kurmuyor';
+    }
+    return null;
+  },
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {

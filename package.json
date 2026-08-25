@@ -54,7 +54,9 @@
     "export": "tsx scripts/export-registrations.ts",
     "check:schema": "tsx scripts/check-event-schema.ts",
     "admin": "tsx admin/server.ts",
-    "check:html": "tsx scripts/check-html.ts"
+    "check:html": "tsx scripts/check-html.ts",
+    "check:raffle": "tsx scripts/check-raffle.ts",
+    "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle"
   },
   "private": true
 }

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 
 import { ARCHIVE, ArchiveEntry, ClubEvent, EVENTS, sortArchive } from './data';
 import { isFirebaseConfigured } from './firebaseConfig';
+import type { Raffle } from './raffleSchema';
 
 /**
  * Events and archive entries — from Firestore when it is reachable, and from the
@@ -16,6 +17,13 @@ export type ContentSource = 'firestore' | 'local';
 type ContentValue = {
   events: ClubEvent[];
   archive: ArchiveEntry[];
+  /**
+   * Çekiliş tanımları, etkinlik kimliğine göre. Bir etkinliğin çekiliş olup
+   * olmadığı `tag`'inden değil buradan anlaşılıyor: kategori sadece bir etiket,
+   * formu çizen şey tanımın kendisi.
+   */
+  raffles: Raffle[];
+  getRaffle: (eventId?: string) => Raffle | undefined;
   source: ContentSource;
   loading: boolean;
   /**
@@ -34,6 +42,7 @@ const Ctx = createContext<ContentValue | null>(null);
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [events, setEvents] = useState<ClubEvent[]>(EVENTS);
   const [archive, setArchive] = useState<ArchiveEntry[]>(() => sortArchive(ARCHIVE));
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [source, setSource] = useState<ContentSource>('local');
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +60,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     // Dynamic import keeps the Firestore SDK out of the startup bundle.
     import('./firebase')
       .then(({ fetchContent }) => fetchContent())
-      .then(({ events: remoteEvents, archive: remoteArchive }) => {
+      .then(({ events: remoteEvents, archive: remoteArchive, raffles: remoteRaffles }) => {
         if (cancelled) return;
 
         // Reaching Firestore and finding it empty is an answer, not a failure:
@@ -63,6 +72,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         // calendar was being reported to the user as a connection problem.
         setEvents(remoteEvents);
         if (remoteArchive.length) setArchive(sortArchive(remoteArchive));
+        setRaffles(remoteRaffles);
         setSource('firestore');
         setError(null);
         console.log(
@@ -89,6 +99,8 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     () => ({
       events,
       archive,
+      raffles,
+      getRaffle: (eventId) => raffles.find((r) => r.eventId === eventId),
       source,
       loading,
       error,
@@ -101,7 +113,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return events.find((e) => e.id === key);
       },
     }),
-    [events, archive, source, loading, error],
+    [events, archive, raffles, source, loading, error],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
