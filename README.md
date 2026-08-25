@@ -213,6 +213,44 @@ eas credentials   # Android: FCM V1 service account JSON
 Push, Expo Go'da çalışmaz; development build veya production build gerekir.
 Yerel hatırlatmalar Expo Go'da da çalışır.
 
+## Yönetim paneli
+
+Etkinlik girmek ve kayıtları görmek için küçük bir web paneli.
+
+```bash
+ADMIN_PASSWORD=uzun-ve-rastgele-bir-sey npm run admin
+# http://localhost:4000
+```
+
+Parolayı `.env`'e koyabilirsiniz. **Tanımlı değilse panel başlamaz** — kayıtlara
+erişiyor ve açık bir sunucuda çalışacak, varsayılan parolayla açılması doğru
+olmaz. Servis hesabı anahtarı `npm run push` ile aynı.
+
+### Neden var
+
+Bir `ClubEvent` on yedi alan taşıyor ve bunların yarısı `startsAt` ile yerden
+türeyen görüntü metinleri: tarih tilesi, hafta günü, ay başlığı, saat–yer satırı,
+üç künye satırı. Firebase Console'dan elle girildiğinde ilk etkinlik
+ertelendiğinde tarih bir alanda değişip diğer beşinde kalıyor — ve hiçbir yerde
+hata çıkmıyor, sadece uygulamada yanlış tarih görünüyor.
+
+Panel hiçbir şeyi iki kez sormuyor: tarih, bitiş saati ve yer alınıp gerisi
+`src/eventSchema.ts` içindeki `buildEvent` ile türetiliyor. Aynı fonksiyon
+doğrulamayı da yapıyor, dolayısıyla Firestore'a ulaşan her etkinlik uygulamanın
+beklediği şekilde.
+
+Reddedilen girdiler: saat dilimi olmayan tarih (`2026-03-12T18:00:00`), olmayan
+gün (31 Şubat), başlangıçtan önceki bitiş saati, boş başlık, boşluk içeren
+kimlik. `npm run check:schema` bunları ve türetilen metinlerin doğruluğunu
+sınıyor.
+
+### Sunucuya koyarken
+
+Panel HTTP konuşuyor; parola ve kayıtlar açık ağdan geçmemeli. Bir reverse proxy
+arkasına koyup TLS'i orada sonlandırın, ya da yalnızca yerel ağdan erişilebilir
+bırakın. Oturum çerezi `HttpOnly` ve `SameSite=Strict`; oturumlar bellekte
+tutuluyor, yani yeniden başlatınca herkes düşer.
+
 ## Yoklama listesi — kayıtları CSV'ye çıkarma
 
 ```bash

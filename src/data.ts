@@ -39,12 +39,11 @@ export type ClubEvent = {
  * meant no reminder could ever be scheduled.
  *
  * Fill this in (or seed Firestore, which takes precedence) when the real
- * calendar exists. `MONTH_ORDER` groups the calendar list and must list the
- * `monthKey` values actually in use.
+ * calendar exists. Build entries with `buildEvent` from src/eventSchema.ts
+ * rather than by hand — half these fields are derived from `startsAt` and drift
+ * the moment they are typed twice.
  */
 export const EVENTS: ClubEvent[] = [];
-
-export const MONTH_ORDER: readonly string[] = [];
 
 /** Undefined when the id matches nothing — callers must handle a missing event. */
 export const getEvent = (id?: string | string[]): ClubEvent | undefined => {
@@ -202,14 +201,3 @@ export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
 
 export const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'];
 
-/**
- * March 2026 grid. The 1st lands on a Sunday, so the month starts in the last
- * column of the first row — hence the six leading blanks.
- */
-export const MARCH_2026 = {
-  label: 'Mart 2026',
-  leadingBlanks: 6,
-  days: 31,
-  /** Day number → event id, for the dotted "has an event" markers. */
-  eventByDay: {} as Record<number, string>,
-};
