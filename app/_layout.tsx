@@ -14,6 +14,7 @@ import React, { useCallback } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AnnouncementsProvider } from '../src/announcements';
 import { LoadingOverlay } from '../src/components/LoadingOverlay';
 import { ContentProvider } from '../src/content';
 import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
@@ -53,13 +54,15 @@ export default function RootLayout() {
     <SafeAreaProvider onLayout={onReady}>
       <AppStoreProvider>
         <ContentProvider>
-          <LoadingProvider>
-            <StatusBar style="light" />
-            {/* Inside both providers: it needs events, registrations and prefs
-                together to keep the reminder schedule current. Renders nothing. */}
-            <NotificationSync />
-            <RootStack />
-          </LoadingProvider>
+          <AnnouncementsProvider>
+            <LoadingProvider>
+              <StatusBar style="light" />
+              {/* Inside both providers: it needs events, registrations and prefs
+                  together to keep the reminder schedule current. Renders nothing. */}
+              <NotificationSync />
+              <RootStack />
+            </LoadingProvider>
+          </AnnouncementsProvider>
         </ContentProvider>
       </AppStoreProvider>
     </SafeAreaProvider>
@@ -82,6 +85,7 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="etkinlik/[id]" />
         <Stack.Screen name="kayit/[id]" />
+        <Stack.Screen name="duyuru/[id]" />
         <Stack.Screen
           name="kayit-basarili"
           // The confirmation is a terminal state — swiping back into the form

@@ -8,19 +8,24 @@ import { PixelIcon } from '../../src/components/Pixel';
 import {
   ContentNotice,
   DottedRule,
-  EmptyState,
   PixelBadge,
   SectionTitle,
   Txt,
 } from '../../src/components/ui';
+import {
+  Announcement,
+  formatAnnouncementDate,
+  useAnnouncements,
+} from '../../src/announcements';
 import { useContent } from '../../src/content';
-import { ARCHIVE_TOTALS, FEATURED, FEED, FeaturedCard, FeedItem } from '../../src/data';
+import { ARCHIVE_TOTALS, ClubEvent } from '../../src/data';
 import { useAppStore } from '../../src/store';
 import { colors, gradientDirection, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
 
-const CARD_WIDTH = 272;
-const CARD_GAP = 12;
+/** Ana sayfa yarı etkinlik yarı duyuru; her bölüm bu kadar satır gösteriyor. */
+const EVENT_COUNT = 3;
+const ANNOUNCEMENT_COUNT = 3;
 
 export default function HomeRoute() {
   const insets = useSafeAreaInsets();
@@ -28,6 +33,13 @@ export default function HomeRoute() {
   const openEvent = useOpenEvent();
   const { registrations } = useAppStore();
   const { events, error, loading, refresh } = useContent();
+  const {
+    announcements,
+    error: announcementsError,
+    loading: announcementsLoading,
+  } = useAnnouncements();
+
+  const upcoming = events.slice(0, EVENT_COUNT);
 
   return (
     <ScrollView
@@ -79,50 +91,59 @@ export default function HomeRoute() {
 
       {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
-      {/* Both lists are editorial content about upcoming events, so between
-          terms they empty out together. One empty state beats two headings with
-          nothing underneath them. */}
-      {FEATURED.length === 0 && FEED.length === 0 ? (
-        <EmptyState
-          title="Yeni dönem hazırlanıyor"
-          body="Kulübün yaklaşan etkinlikleri henüz açıklanmadı. Bildirimleri açarsan program belli olduğunda haber veririz."
-          ctaLabel="Bildirimleri aç"
-          onPress={() => router.navigate('/(tabs)/bildirim')}
-        />
+      <SectionTitle
+        icon="lines"
+        trailing={
+          <Pressable onPress={() => router.navigate('/(tabs)/takvim')} accessibilityRole="button">
+            <Txt weight="semibold" size={12} color={colors.blue500}>
+              Takvim →
+            </Txt>
+          </Pressable>
+        }
+      >
+        Yaklaşan Etkinlikler
+      </SectionTitle>
+
+      {upcoming.length ? (
+        <View style={styles.feed}>
+          {upcoming.map((event) => (
+            <EventRow key={event.id} event={event} onPress={() => openEvent(event.id)} />
+          ))}
+        </View>
       ) : (
-        <>
-          <SectionTitle
-            icon="grid"
-            trailing={
-              <Txt weight="semibold" size={12} color={colors.blue500}>
-                {FEATURED.length} kart
-              </Txt>
-            }
-          >
-            Öne Çıkanlar
-          </SectionTitle>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + CARD_GAP}
-            decelerationRate="fast"
-            contentContainerStyle={styles.carousel}
-          >
-            {FEATURED.map((card) => (
-              <FeaturedTile key={card.kicker} card={card} onPress={() => openEvent(card.id)} />
-            ))}
-          </ScrollView>
-
-          <SectionTitle icon="lines">Akış</SectionTitle>
-
-          <View style={styles.feed}>
-            {FEED.map((item) => (
-              <FeedRow key={item.title} item={item} onPress={() => openEvent(item.id)} />
-            ))}
-          </View>
-        </>
+        <SectionEmpty
+          text={
+            error
+              ? 'Etkinlikler yüklenemedi. Aşağı çekerek tekrar deneyebilirsin.'
+              : 'Yeni dönemin programı henüz açıklanmadı.'
+          }
+        />
       )}
+
+      <SectionTitle icon="star">Duyurular</SectionTitle>
+
+      {announcements.length ? (
+        <View style={styles.feed}>
+          {announcements.slice(0, ANNOUNCEMENT_COUNT).map((item) => (
+            <AnnouncementRow
+              key={item.id}
+              item={item}
+              onPress={() => router.navigate(`/duyuru/${item.id}`)}
+            />
+          ))}
+        </View>
+      ) : (
+        <SectionEmpty
+          text={
+            announcementsError
+              ? 'Duyurulara ulaşılamadı. Kulüp sitesi yanıt vermiyor olabilir.'
+              : announcementsLoading
+                ? 'Duyurular yükleniyor…'
+                : 'Şu an yayınlanmış duyuru yok.'
+          }
+        />
+      )}
+
     </ScrollView>
   );
 }
@@ -140,58 +161,19 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function FeaturedTile({ card, onPress }: { card: FeaturedCard; onPress: () => void }) {
-  const body = (
-    <View style={styles.featuredBody}>
-      <PixelBadge icon={card.icon} label={card.kicker} bg={card.badgeBg} fg={card.badgeFg} />
-
-      <Txt weight="extrabold" size={17} leading={1.25} color={card.fg} tracking={-0.3} style={{ marginTop: 14 }}>
-        {card.title}
-      </Txt>
-      <Txt size={12.5} leading={1.45} color={card.sub} style={{ marginTop: 6 }}>
-        {card.body}
-      </Txt>
-
-      <View style={{ flex: 1 }} />
-
-      <View style={styles.featuredFooter}>
-        <Txt weight="bold" size={11.5} color={card.sub}>
-          {card.meta}
-        </Txt>
-        <Txt weight="bold" size={12} color={card.fg}>
-          Detay →
-        </Txt>
-      </View>
-    </View>
-  );
-
+function SectionEmpty({ text }: { text: string }) {
+  // Deliberately not the full EmptyState: two mascots stacked on one screen is
+  // heavier than the situation warrants when a section is simply quiet.
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.featured,
-        shadow.featured,
-        { transform: [{ translateY: pressed ? -2 : 0 }] },
-      ]}
-    >
-      {typeof card.bg === 'string' ? (
-        <View style={[styles.featuredFill, { backgroundColor: card.bg }]}>{body}</View>
-      ) : (
-        <LinearGradient
-          colors={card.bg}
-          start={gradientDirection.diagonal.start}
-          end={gradientDirection.diagonal.end}
-          style={styles.featuredFill}
-        >
-          {body}
-        </LinearGradient>
-      )}
-    </Pressable>
+    <View style={styles.sectionEmpty}>
+      <Txt size={13} leading={1.5} color={colors.muted}>
+        {text}
+      </Txt>
+    </View>
   );
 }
 
-function FeedRow({ item, onPress }: { item: FeedItem; onPress: () => void }) {
+function EventRow({ event, onPress }: { event: ClubEvent; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
@@ -201,32 +183,72 @@ function FeedRow({ item, onPress }: { item: FeedItem; onPress: () => void }) {
         pressed && { borderColor: colors.blue200, ...shadow.card },
       ]}
     >
-      <View style={[styles.dateTile, { backgroundColor: item.tint }]}>
+      <View style={[styles.dateTile, { backgroundColor: colors.blue100 }]}>
         <Txt weight="extrabold" size={15} color={colors.navy900} style={{ lineHeight: 15 }}>
-          {item.day}
+          {event.day}
         </Txt>
         <Txt weight="bold" size={8.5} color={colors.navy700} tracking={0.6}>
-          {item.mon}
+          {event.mon}
         </Txt>
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={styles.feedTags}>
           <Txt weight="bold" size={10.5} color={colors.blue500} tracking={0.4}>
-            {item.tag.toLocaleUpperCase('tr')}
+            {event.tag.toLocaleUpperCase('tr')}
           </Txt>
-          {item.isNew ? (
-            <PixelBadge icon="star" label="YENI" bg={colors.blue100} fg={colors.navy700} size={6} />
+          {event.soon ? (
+            <PixelBadge icon="clock" label="SON GUN" bg={colors.blue100} fg={colors.navy700} size={6} />
           ) : null}
+        </View>
+
+        <Txt weight="bold" size={15} leading={1.3} color={colors.text} tracking={-0.2} style={{ marginTop: 4 }}>
+          {event.title}
+        </Txt>
+        <Txt size={12.5} color={colors.muted} style={{ marginTop: 4 }}>
+          {event.short}
+        </Txt>
+      </View>
+    </Pressable>
+  );
+}
+
+function AnnouncementRow({ item, onPress }: { item: Announcement; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.feedRow,
+        pressed && { borderColor: colors.blue200, ...shadow.card },
+      ]}
+    >
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={styles.feedTags}>
+          <Txt weight="bold" size={10.5} color={colors.blue500} tracking={0.4}>
+            {item.category.toLocaleUpperCase('tr')}
+          </Txt>
+          <Txt size={11} color={colors.faint}>
+            {formatAnnouncementDate(item.createdAt)}
+          </Txt>
         </View>
 
         <Txt weight="bold" size={15} leading={1.3} color={colors.text} tracking={-0.2} style={{ marginTop: 4 }}>
           {item.title}
         </Txt>
-        <Txt size={12.5} color={colors.muted} style={{ marginTop: 4 }}>
-          {item.meta}
-        </Txt>
+
+        {/* The summary is already plain text; the HTML body only appears on the
+            detail screen, where RichText can draw it properly. */}
+        {item.summary ? (
+          <Txt size={12.5} leading={1.45} color={colors.muted} numberOfLines={2} style={{ marginTop: 4 }}>
+            {item.summary}
+          </Txt>
+        ) : null}
       </View>
+
+      <Txt size={12} color={colors.blue200}>
+        ›
+      </Txt>
     </Pressable>
   );
 }
@@ -260,18 +282,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
-  carousel: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 6, gap: CARD_GAP },
-  featured: { width: CARD_WIDTH, borderRadius: radius.xl },
-  // Cards in the rail stretch to the tallest one, so the fill has to grow with it
-  // or the shorter cards show page background under their content.
-  featuredFill: { flex: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  featuredBody: { padding: 16, paddingBottom: 18, minHeight: 150 },
-  featuredFooter: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  sectionEmpty: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10 },
 
   feed: { paddingHorizontal: 20, gap: 10 },
   feedRow: {

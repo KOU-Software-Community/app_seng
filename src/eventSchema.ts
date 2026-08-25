@@ -17,7 +17,7 @@ import type { ClubEvent, EventFact } from './data';
  * that reaches Firestore has already been validated.
  */
 
-const MONTHS_LONG = [
+export const MONTHS_LONG = [
   'Ocak',
   'Şubat',
   'Mart',
