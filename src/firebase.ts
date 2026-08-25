@@ -12,7 +12,7 @@ import {
   setDoc,
 } from 'firebase/firestore';
 
-import type { ArchiveEntry, ClubEvent } from './data';
+import type { ClubEvent } from './data';
 import type { Raffle } from './raffleSchema';
 
 import { FIREBASE_SETUP_HINT, firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
@@ -48,7 +48,6 @@ export function getDb(): Firestore {
 export const COLLECTIONS = {
   events: 'events',
   registrations: 'registrations',
-  archive: 'archive',
   devices: 'devices',
   raffles: 'raffles',
   raffleEntries: 'raffleEntries',
@@ -72,20 +71,19 @@ function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
  */
 export async function fetchContent(): Promise<{
   events: ClubEvent[];
-  archive: ArchiveEntry[];
   raffles: Raffle[];
 }> {
   const db = getDb();
 
-  const [eventsSnap, archiveSnap, rafflesSnap] = await Promise.all([
+  // Arşiv ayrı bir koleksiyon değil: geçmiş etkinliklerin kendisi. Tek okuma,
+  // tek sıralama; bölmeyi `splitByDate` yapıyor.
+  const [eventsSnap, rafflesSnap] = await Promise.all([
     withTimeout(getDocs(query(collection(db, COLLECTIONS.events), orderBy('startsAt'))), 'events'),
-    withTimeout(getDocs(collection(db, COLLECTIONS.archive)), 'archive'),
     withTimeout(getDocs(collection(db, COLLECTIONS.raffles)), 'raffles'),
   ]);
 
   return {
     events: eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as ClubEvent),
-    archive: archiveSnap.docs.map((d) => d.data() as ArchiveEntry),
     raffles: rafflesSnap.docs.map((d) => ({ eventId: d.id, ...d.data() }) as Raffle),
   };
 }

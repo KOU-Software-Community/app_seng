@@ -12,9 +12,9 @@ birebir uyarlandı.
 | --- | --- | --- |
 | Splash | `/` | 1.9 sn logo + pixel loader, sonra onboarding ya da ana sayfa |
 | Onboarding | `/onboarding` | 3 sayfa, "Atla" ile geçilebilir, bir kez gösterilir |
-| Ana sayfa | `/(tabs)` | İstatistikler, öne çıkanlar karuseli, akış |
+| Ana sayfa | `/(tabs)` | İstatistikler, yaklaşan etkinlikler, kulüp duyuruları |
 | Etkinlik takvimi | `/(tabs)/takvim` | Liste ve takvim (grid) görünümü |
-| Etkinlik arşivi | `/(tabs)/arsiv` | Kategori filtresi, foto ızgarası, boş durum, lightbox |
+| Etkinlik arşivi | `/(tabs)/arsiv` | Tarihi geçmiş etkinlikler, kategori filtresi, boş durum |
 | Bildirim ayarları | `/(tabs)/bildirim` | Ana anahtar, 5 kategori, hatırlatma ve sessiz saatler |
 | Etkinlik detay | `/etkinlik/[id]` | Hero, künye satırları, konuşmacı, kayıt CTA |
 | Kayıt formu | `/kayit/[id]` | Ad soyad, öğrenci no (9 hane), bölüm, sınıf, KVKK |
@@ -72,13 +72,13 @@ app/                 expo-router rotaları (dosya adı = rota)
 src/
   theme.ts           renk paleti, gradyanlar, tipografi, radius/spacing
   icons.ts           8×8 pixel ikon path'leri + onboarding pixel çizimleri
-  data.ts            paketlenmiş içerik — hem seed kaynağı hem çevrimdışı yedek
+  data.ts            tipler, sabit listeler ve çevrimdışı yedek (içerik Firestore'da)
   content.tsx        Firestore'dan okuma + yerele düşme (useContent)
   firebase.ts        getDb, fetchContent, pushRegistration
   firebaseConfig.ts  .env okur, SDK import etmez
   store.tsx          kayıtlar + bildirim tercihleri (AsyncStorage ile kalıcı)
   components/        Txt, PixelIcon, PixelBadge, Toggle, Segmented, kart vb.
-scripts/             npm run seed
+scripts/             kontroller, kural yayınlama, push gönderimi, kayıt dışa aktarma
 assets/brand/        kulüp rozeti ve laptop maskotu
 design-source/       kaynak tasarım kanvası (referans)
 ```
@@ -103,27 +103,27 @@ göstermiyor. Hangi kaynağın kullanıldığı `useContent().source` ile görü
 Firestore veritabanı oluşturulmuş durumda ama varsayılan kurallar her şeyi kapatıyor.
 Veriyi yüklemek için:
 
-1. `firestore.seed.rules` içeriğini Firebase Console → Firestore Database → **Rules**
-   sekmesine yapıştırıp **Publish** deyin.
-2. Terminalde seed'i çalıştırın:
-
 ```bash
-npm run seed
+npm install -g firebase-tools   # bir kez
+firebase login                  # bir kez
+npm run rules:deploy
 ```
 
-3. `firestore.rules` içeriğini aynı yere yapıştırıp tekrar **Publish** deyin.
+Kurallar projede yayınlanana kadar Firestore kendi varsayılanını uygular ve o her
+şeyi reddeder — uygulama `Missing or insufficient permissions` der. Dosya depoda
+durduğu sürece hiçbir şey yapmaz.
 
-Üçüncü adımı atlamayın — ikinci adımdaki kurallar etkinlik verisini herkesin
-değiştirmesine izin verir.
+İçerik yönetim panelinden giriliyor (`npm run admin`). Panel Admin SDK kullanıyor,
+bu kuralları hiç görmüyor; yazmak için kural gevşetmek gerekmez.
 
 ### Neler bağlı
 
 | Veri | Nereden |
 | --- | --- |
 | Etkinlikler | Firestore `events` → yoksa `src/data.ts` |
-| Arşiv | Firestore `archive` → yoksa `src/data.ts` |
+| Arşiv | Aynı `events` listesinin tarihi geçmiş yarısı (`splitByDate`) |
 | Kayıtlar | Önce cihaza yazılır, sonra Firestore `registrations` |
-| Öne çıkanlar / akış kartları | `src/data.ts` (editoryal içerik) |
+| Duyurular | `https://api.kouseng.com/announcements` |
 | Bildirim tercihleri | Sadece cihaz (AsyncStorage) |
 
 Kayıt akışı önce yerele yazıp ekranı anında açar, ardından Firestore'a gönderir. Yazma
@@ -136,8 +136,8 @@ başarısız olursa kayıt `synced: false` olarak işaretlenir — öğrenci kod
 - `src/firebaseConfig.ts` — sadece config okur, SDK import etmez.
 - `src/firebase.ts` — `getDb()`, `fetchContent()`, `pushRegistration()`.
 - `src/content.tsx` — `ContentProvider` + `useContent()`; Firestore/yerel geçişi burada.
-- `scripts/seed-firestore.ts` — `npm run seed`.
-- `firestore.rules` / `firestore.seed.rules` — güvenlik kuralları.
+- `scripts/deploy-rules.mjs` — `npm run rules:deploy`.
+- `firestore.rules` — güvenlik kuralları. Depoda durması yetmez, yayınlanması gerekir.
 
 Firestore SDK'sı açılış paketine dahil değil; dinamik import ile ilk okuma anında
 yükleniyor (Metro logunda ayrı bir `src/firebase.ts (20 modules)` satırı olarak görünür).
@@ -270,11 +270,10 @@ bozuyor.
 
 ## Kalan işler
 
-1. **Fotoğraflar** — `src/components/PhotoSlot.tsx` bir `uri` prop'u alıyor. Arşiv
-   görselleri Storage'a yüklenip URL'ler `archive` dokümanlarına eklendiğinde
-   placeholder kendiliğinden devre dışı kalır.
-2. **Öne çıkanlar / akış** — hâlâ `src/data.ts` içinde editoryal içerik. İstenirse
-   bunlar da Firestore'a taşınabilir.
+1. **Fotoğraflar** — uygulamada fotoğraf deposu **yok**. `PhotoSlot` bir `uri`
+   prop'u alıyor, yani görseller Storage'a yüklenip URL'ler etkinlik dokümanlarına
+   eklendiğinde placeholder kendiliğinden düşer. O gün gelene kadar arşivde
+   fotoğraf sayısı gösterilmiyor — sayacak bir şey yok.
 
 ## Mağazaya çıkarma
 

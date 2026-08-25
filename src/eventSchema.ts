@@ -92,6 +92,12 @@ export type EventInput = {
   tags: string[];
   soon: boolean;
   badge: string;
+  /**
+   * Kaç kişi katıldı — etkinlik olduktan sonra panelden giriliyor. Formdan metin
+   * geldiği için burada da metin; boş bırakmak geçerli, çünkü henüz olmamış bir
+   * etkinliğin katılımcı sayısı yok.
+   */
+  attendance?: string;
 };
 
 export type BuildResult =
@@ -248,6 +254,11 @@ export function buildEvent(input: EventInput): BuildResult {
     if (eh * 60 + em <= start) errors.endsAt = 'Bitiş saati başlangıçtan sonra olmalı.';
   }
 
+  const attendance = text(input.attendance ?? '');
+  if (attendance && !/^\d{1,6}$/.test(attendance)) {
+    errors.attendance = 'Katılımcı sayısı 0 veya daha büyük bir tam sayı olmalı.';
+  }
+
   if (!text(input.title)) errors.title = 'Başlık boş olamaz.';
   if (!text(input.venue)) errors.venue = 'Yer boş olamaz.';
   if (!text(input.tag)) errors.tag = 'Kategori boş olamaz.';
@@ -295,6 +306,9 @@ export function buildEvent(input: EventInput): BuildResult {
       speaker: text(input.speaker),
       speakerRole: text(input.speakerRole),
       facts,
+      // Boşsa alan hiç yazılmıyor: Firestore'da `attendance: undefined` yazmak
+      // hata verir ve `attendance: 0` "sıfır kişi geldi" demek olurdu.
+      ...(attendance ? { attendance: Number(attendance) } : {}),
     },
   };
 }
@@ -323,7 +337,59 @@ export function toInput(event: ClubEvent): EventInput {
     tags: event.tags ?? [],
     soon: event.soon,
     badge: event.badge,
+    attendance: event.attendance === undefined ? '' : String(event.attendance),
   };
+}
+
+/**
+ * Bugünün tarihi, `YYYY-MM-DD`, +03:00'a göre.
+ *
+ * Cihazın kendi saat diliminden okunmuyor: yurt dışındaki bir telefon, kulübün
+ * takviminde hâlâ bugün olan bir etkinliği arşive düşmüş gösterirdi.
+ */
+export function todayLocal(now: Date): string {
+  const local = new Date(now.getTime() + 3 * 60 * 60_000);
+  return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`;
+}
+
+/**
+ * Etkinlikleri takvim ve arşiv olarak ikiye ayırır.
+ *
+ * Arşiv ayrı bir koleksiyon değil; geçmiş etkinliğin ta kendisi. Ayrı tutmak,
+ * aynı gerçek etkinliği iki kez girmek ve ikisinin birbirinden kayması demekti.
+ *
+ * Sınır gün bazında: 12 Mart'taki etkinlik 12 Mart boyunca takvimde kalır, 13
+ * Mart'ta arşive geçer. Başlangıç anına göre bölmek, üç saatlik bir etkinliği
+ * daha başlarken arşive atardı.
+ */
+/**
+ * Etkinlik geçti mi — `today` `YYYY-MM-DD` biçiminde, `todayLocal`'dan.
+ *
+ * Tarihi okunamayan etkinlik geçmemiş sayılıyor. Yanlış tarafta olacaksa
+ * görünür tarafta olsun: arşive atmak onu olmuş gibi gösterir, ve kayıt
+ * düğmesini de kaldırır.
+ */
+export function isPast(event: ClubEvent, today: string): boolean {
+  const date = (event.startsAt ?? '').slice(0, 10);
+  return DATE_ONLY.test(date) && date < today;
+}
+
+export function splitByDate(
+  events: ClubEvent[],
+  today: string,
+): { upcoming: ClubEvent[]; past: ClubEvent[] } {
+  const upcoming: ClubEvent[] = [];
+  const past: ClubEvent[] = [];
+
+  for (const event of events) {
+    if (isPast(event, today)) past.push(event);
+    else upcoming.push(event);
+  }
+
+  upcoming.sort((a, b) => (a.startsAt ?? '').localeCompare(b.startsAt ?? ''));
+  // Arşiv en yeniden eskiye.
+  past.sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''));
+  return { upcoming, past };
 }
 
 export type MonthGrid = {

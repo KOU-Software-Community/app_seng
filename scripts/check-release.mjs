@@ -142,15 +142,43 @@ check(
 );
 
 check(
-  'takvim başlığında sabit tarih yok',
-  'Başlık "Mart – Nisan 2026" yazıyordu ve o etkinlikler geçtikten aylar sonra hâlâ ' +
-    'oradaydı. Tarih aralığı veriden türetilmeli, elle yazılmamalı.',
+  'takvim ve arşiv başlığında sabit tarih yok',
+  'Takvim başlığı "Mart – Nisan 2026" yazıyordu ve o etkinlikler geçtikten aylar ' +
+    'sonra hâlâ oradaydı. Arşiv başlığı da aynısını yapıyordu: "2023’ten bugüne". ' +
+    'Tarih aralığı veriden türetilmeli, elle yazılmamalı.',
   () => {
-    const takvim = read('app/(tabs)/takvim.tsx');
-    // Yorumlar hariç: sabit bir yıl JSX metnine gömülmüş mü?
-    const code = takvim.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-    const year = code.match(/\b(19|20)\d{2}\b/);
-    return year ? `başlıkta sabit yıl var: ${year[0]}` : null;
+    const bad = ['app/(tabs)/takvim.tsx', 'app/(tabs)/arsiv.tsx']
+      .map((f) => {
+        // Yorumlar hariç: sabit bir yıl JSX metnine gömülmüş mü?
+        const code = read(f).replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+        const year = code.match(/\b(19|20)\d{2}\b/);
+        return year ? `${f}: ${year[0]}` : null;
+      })
+      .filter(Boolean);
+    return bad.length ? `başlıkta sabit yıl var — ${bad.join(', ')}` : null;
+  },
+);
+
+check(
+  'arşiv uydurma veri taşımıyor',
+  'src/data.ts altı hayali etkinlik ("Kış Kampı: Backend 101") ve iki uydurma sayı ' +
+    'taşıyordu: ARCHIVE_TOTALS = { events: 38, photos: 412 }. İkincisi daha kötüydü — ' +
+    'uygulamada fotoğraf deposu hiç yok, yani 412 hiçbir şeyi saymıyordu. Demo kaydı ' +
+    'ile aynı sınıf hata: kullanıcı gerçek sanıyor.',
+  () => {
+    const data = read('src/data.ts');
+    const code = data.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (/ARCHIVE_TOTALS/.test(code)) return 'src/data.ts hâlâ ARCHIVE_TOTALS taşıyor';
+    if (/export const ARCHIVE\s*[:=]/.test(code)) return 'src/data.ts hâlâ sabit ARCHIVE dizisi taşıyor';
+    // Arşiv geçmiş etkinliklerden türemeli; ayrı bir koleksiyon olarak dönerse
+    // aynı etkinlik iki kez giriliyor demektir.
+    if (/COLLECTIONS\.archive|archive:\s*'archive'/.test(read('src/firebase.ts'))) {
+      return 'istemci hâlâ ayrı bir archive koleksiyonu okuyor';
+    }
+    if (!/splitByDate/.test(read('src/content.tsx'))) {
+      return 'content.tsx arşivi etkinliklerden türetmiyor';
+    }
+    return null;
   },
 );
 
@@ -226,7 +254,11 @@ check(
     // COLLECTIONS'ın değerleri: `events: 'events',` gibi satırlar.
     const block = read('src/firebase.ts').match(/COLLECTIONS = \{([\s\S]*?)\}/)?.[1] ?? '';
     const names = [...block.matchAll(/:\s*'([^']+)'/g)].map((m) => m[1]);
-    if (names.length < 6) return `COLLECTIONS okunamadı (${names.length} isim bulundu)`;
+    // Sayı değil, isim: regex tutmazsa `names` boş kalır ve kontrol hiçbir şey
+    // bulmadığı için yeşil verirdi. Bu ikisi hiçbir zaman kaybolmayacak.
+    if (!names.includes('events') || !names.includes('registrations')) {
+      return `COLLECTIONS okunamadı (bulunan: ${names.join(', ') || 'hiçbiri'})`;
+    }
 
     const missing = names.filter((n) => !new RegExp(`match /${n}/`).test(rules));
     return missing.length ? `firestore.rules kuralsız koleksiyon: ${missing.join(', ')}` : null;

@@ -75,7 +75,6 @@ export const gradients = {
   /** 140deg · two-stop hero + placeholder fills */
   hero: ['#001B4A', '#0389BC'],
   photo: ['#014576', '#93CBDC'],
-  lightbox: ['#014576', '#0389BC'],
 
   /** 135deg · primary CTA + avatar chips */
   cta: ['#014576', '#0389BC'],

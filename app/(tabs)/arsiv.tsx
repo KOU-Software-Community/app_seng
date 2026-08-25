@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
@@ -9,34 +8,41 @@ import {
   DottedRule,
   EmptyState,
   FilterChip,
-  GlassButton,
   GradientHeader,
   PixelTxt,
   Txt,
 } from '../../src/components/ui';
 import { useContent } from '../../src/content';
-import { ARCHIVE_CATEGORIES, ARCHIVE_TOTALS, ArchiveEntry } from '../../src/data';
+import { ARCHIVE_CATEGORIES, ClubEvent } from '../../src/data';
+import { parseIso } from '../../src/eventSchema';
 import { colors, gradients, radius } from '../../src/theme';
 
-/** Photos per archived event in the viewer. */
-const PHOTOS_PER_ENTRY = 4;
+/*
+ * Fotoğraf görüntüleyici buradaydı: her kayıt için dört fotoğraflık bir
+ * lightbox, kartlarda da "24 foto" rozeti. Uygulamada fotoğraf deposu hiç yok
+ * — dördü de aynı gradyan yer tutucuydu ve sayı hiçbir şeyi saymıyordu.
+ *
+ * Arşiv kaydı artık etkinliğin kendisi olduğu için karta dokunmak zaten var
+ * olan etkinlik detayına gidiyor. Gerçek fotoğraflar geldiğinde `PhotoSlot`
+ * `uri` alıyor, yer tutucu kendiliğinden düşüyor.
+ */
 
 export default function ArsivRoute() {
   const router = useRouter();
   const { archive, error, loading, refresh } = useContent();
   const [category, setCategory] = useState('Tümü');
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [photo, setPhoto] = useState(0);
 
   const entries = useMemo(
-    () =>
-      archive.map((a, i) => ({ ...a, index: i })).filter(
-        (a) => category === 'Tümü' || a.cat === category,
-      ),
+    () => archive.filter((e) => category === 'Tümü' || e.tag === category),
     [archive, category],
   );
 
-  const open = openIndex !== null ? (archive[openIndex] ?? null) : null;
+  // "2023'ten bugüne" sabitti ve arşiv boşken bile öyle diyordu. Artık gerçekten
+  // arşivdeki en eski etkinliğin yılı.
+  const firstYear = useMemo(() => {
+    const years = archive.map((e) => parseIso(e.startsAt ?? '')?.year).filter(Boolean) as number[];
+    return years.length ? Math.min(...years) : null;
+  }, [archive]);
 
   return (
     <View style={styles.screen}>
@@ -52,7 +58,11 @@ export default function ArsivRoute() {
             Etkinlik Arşivi
           </Txt>
           <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
-            2023&apos;ten bugüne {ARCHIVE_TOTALS.events} etkinlik · {ARCHIVE_TOTALS.photos} fotoğraf
+            {archive.length === 0
+              ? 'Geçmiş etkinlikler burada birikecek'
+              : firstYear
+                ? `${firstYear}'ten bugüne ${archive.length} etkinlik`
+                : `${archive.length} etkinlik`}
           </Txt>
           <DottedRule style={{ marginTop: 12 }} />
         </GradientHeader>
@@ -78,135 +88,60 @@ export default function ArsivRoute() {
           />
         ) : (
           <View style={styles.grid}>
-            {entries.map((entry) => (
+            {entries.map((event) => (
               <ArchiveCard
-                key={entry.title}
-                entry={entry}
-                onPress={() => {
-                  setOpenIndex(entry.index);
-                  setPhoto(0);
-                }}
+                key={event.id}
+                event={event}
+                onPress={() => router.push(`/etkinlik/${event.id}`)}
               />
             ))}
           </View>
         )}
       </ScrollView>
-
-      <Lightbox
-        entry={open}
-        photo={photo}
-        onPrev={() => setPhoto((p) => (p + PHOTOS_PER_ENTRY - 1) % PHOTOS_PER_ENTRY)}
-        onNext={() => setPhoto((p) => (p + 1) % PHOTOS_PER_ENTRY)}
-        onClose={() => setOpenIndex(null)}
-      />
     </View>
   );
 }
 
-function ArchiveCard({ entry, onPress }: { entry: ArchiveEntry; onPress: () => void }) {
+function ArchiveCard({ event, onPress }: { event: ClubEvent; onPress: () => void }) {
+  const parsed = parseIso(event.startsAt ?? '');
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={`${event.title} — etkinlik detayı`}
       style={({ pressed }) => [styles.card, { transform: [{ translateY: pressed ? -2 : 0 }] }]}
     >
       <PhotoSlot label="Foto" style={styles.cardPhoto}>
-        <View style={styles.yearBadge}>
-          <PixelTxt size={6} color={colors.onNavy}>
-            {entry.year}
-          </PixelTxt>
-        </View>
-        <View style={styles.countBadge}>
-          <Txt weight="semibold" size={10} color="#fff">
-            {entry.count} foto
-          </Txt>
-        </View>
+        {parsed ? (
+          <View style={styles.yearBadge}>
+            <PixelTxt size={6} color={colors.onNavy}>
+              {String(parsed.year)}
+            </PixelTxt>
+          </View>
+        ) : null}
+
+        {/* Katılımcı sayısı ancak etkinlikten sonra biliniyor; girilmediyse
+            rozet hiç çizilmiyor. Yerine bir sıfır koymak "kimse gelmedi"
+            demek olurdu. */}
+        {event.attendance === undefined ? null : (
+          <View style={styles.countBadge}>
+            <Txt weight="semibold" size={10} color="#fff">
+              {event.attendance} katılımcı
+            </Txt>
+          </View>
+        )}
       </PhotoSlot>
 
       <View style={styles.cardBody}>
         <Txt weight="bold" size={13.5} leading={1.3} color={colors.text} tracking={-0.2}>
-          {entry.title}
+          {event.title}
         </Txt>
         <Txt size={11.5} color={colors.muted} style={{ marginTop: 5 }}>
-          {entry.date} · {entry.cat}
+          {event.short} · {event.tag}
         </Txt>
       </View>
     </Pressable>
-  );
-}
-
-function Lightbox({
-  entry,
-  photo,
-  onPrev,
-  onNext,
-  onClose,
-}: {
-  entry: ArchiveEntry | null;
-  photo: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onClose: () => void;
-}) {
-  const insets = useSafeAreaInsets();
-
-  return (
-    <Modal
-      visible={!!entry}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View style={styles.lightbox}>
-        <View style={[styles.lightboxBar, { paddingTop: insets.top + 12 }]}>
-          <GlassButton
-            label="✕"
-            accessibilityLabel="Kapat"
-            onPress={onClose}
-            size={36}
-            bg="rgba(255,255,255,0.12)"
-          />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt weight="bold" size={14} color="#fff" numberOfLines={1}>
-              {entry?.title}
-            </Txt>
-            <Txt size={11.5} color={colors.blue200}>
-              {entry ? `${entry.date} · ${entry.cat}` : ''}
-            </Txt>
-          </View>
-          <PixelTxt size={8} color={colors.blue200}>
-            {photo + 1} / {PHOTOS_PER_ENTRY}
-          </PixelTxt>
-        </View>
-
-        <View style={styles.lightboxStage}>
-          <PhotoSlot
-            label="Arşiv fotoğrafı"
-            gradient={gradients.lightbox}
-            style={styles.lightboxPhoto}
-          />
-        </View>
-
-        <View style={[styles.lightboxNav, { paddingBottom: insets.bottom + 24 }]}>
-          <GlassButton label="‹" accessibilityLabel="Önceki fotoğraf" onPress={onPrev} size={44} />
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {Array.from({ length: PHOTOS_PER_ENTRY }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.lbDot,
-                  i === photo
-                    ? { width: 18, backgroundColor: colors.blue200 }
-                    : { width: 6, backgroundColor: 'rgba(147,203,220,0.35)' },
-                ]}
-              />
-            ))}
-          </View>
-          <GlassButton label="›" accessibilityLabel="Sonraki fotoğraf" onPress={onNext} size={44} />
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -254,23 +189,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
 
-
-  lightbox: { flex: 1, backgroundColor: 'rgba(2,10,26,0.94)' },
-  lightboxBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-  },
-  lightboxStage: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },
-  lightboxPhoto: { width: '100%', aspectRatio: 4 / 5, borderRadius: radius.xl },
-  lightboxNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    paddingTop: 18,
-  },
-  lbDot: { height: 6, borderRadius: 3 },
 });

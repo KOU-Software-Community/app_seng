@@ -18,7 +18,7 @@ import {
   useAnnouncements,
 } from '../../src/announcements';
 import { useContent } from '../../src/content';
-import { ARCHIVE_TOTALS, ClubEvent } from '../../src/data';
+import { ClubEvent } from '../../src/data';
 import { useAppStore } from '../../src/store';
 import { colors, gradientDirection, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
@@ -32,7 +32,7 @@ export default function HomeRoute() {
   const router = useRouter();
   const openEvent = useOpenEvent();
   const { registrations } = useAppStore();
-  const { events, error, loading, refresh } = useContent();
+  const { events, archive, error, loading, refresh } = useContent();
   const {
     announcements,
     error: announcementsError,
@@ -83,7 +83,9 @@ export default function HomeRoute() {
         <View style={styles.stats}>
           <Stat value={String(events.length)} label="Yaklaşan etkinlik" />
           <Stat value={String(registrations.length)} label="Kaydın var" />
-          <Stat value={String(ARCHIVE_TOTALS.events)} label="Arşiv etkinliği" />
+          {/* Sabit 38'di ve hiçbir şeyden türemiyordu. Artık gerçekten arşivde
+              olan etkinlik sayısı. */}
+          <Stat value={String(archive.length)} label="Arşiv etkinliği" />
         </View>
 
         <DottedRule style={{ marginTop: 16 }} />

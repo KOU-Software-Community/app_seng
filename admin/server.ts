@@ -166,6 +166,7 @@ function formToInput(body: Record<string, unknown>): EventInput {
     tags: s('tags').split(',').map((t) => t.trim()).filter(Boolean),
     soon: !!body.soon,
     badge: s('badge'),
+    attendance: s('attendance'),
   };
 }
 

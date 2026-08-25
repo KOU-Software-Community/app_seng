@@ -16,6 +16,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { useContent, useEvent } from '../../src/content';
+import { isPast, todayLocal } from '../../src/eventSchema';
 import { entriesOpen } from '../../src/raffleSchema';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius } from '../../src/theme';
@@ -31,6 +32,9 @@ export default function EventDetailRoute() {
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
   const registration = registrationFor(event.id);
+  // Geçmiş etkinliğe kayıt olunamaz. Arşiv kartı buraya geldiği için bu ekran
+  // artık olmuş etkinlikleri de gösteriyor ve "Kayıt Ol" düğmesi orada anlamsız.
+  const past = isPast(event, todayLocal(new Date()));
   // A raffle is an ordinary event with a definition attached. The tag is only a
   // label; what decides whether this screen collects entries is the definition.
   const raffle = getRaffle(event.id);
@@ -177,20 +181,30 @@ export default function EventDetailRoute() {
       >
         <View style={{ flex: 1 }}>
           <Txt weight="semibold" size={11.5} color={colors.faint}>
-            {raffle ? 'Çekiliş' : registration ? 'Kayıt kodun' : 'Kontenjan'}
+            {past ? 'Tamamlandı' : raffle ? 'Çekiliş' : registration ? 'Kayıt kodun' : 'Kontenjan'}
           </Txt>
           <Txt weight="extrabold" size={14} color={colors.navy900}>
-            {raffle
-              ? raffle.drawnAt
-                ? 'Sonuçlandı'
-                : `${raffle.winnerCount} kişi kazanacak`
-              : registration
-                ? registration.code
-                : event.spots}
+            {past
+              ? event.attendance === undefined
+                ? event.facts.find((f) => f.label === 'Tarih')?.value ?? 'Arşivde'
+                : `${event.attendance} katılımcı`
+              : raffle
+                ? raffle.drawnAt
+                  ? 'Sonuçlandı'
+                  : `${raffle.winnerCount} kişi kazanacak`
+                : registration
+                  ? registration.code
+                  : event.spots}
           </Txt>
         </View>
 
-        {raffle ? (
+        {past ? (
+          <View style={styles.registered}>
+            <Txt weight="bold" size={15.5} color={colors.muted}>
+              {registration ? `Katıldın · ${registration.code}` : 'Bu etkinlik geçti'}
+            </Txt>
+          </View>
+        ) : raffle ? (
           raffleEntry ? (
             <View style={styles.registered}>
               <Txt weight="bold" size={15.5} color={colors.blue500}>
