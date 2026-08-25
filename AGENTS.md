@@ -92,3 +92,31 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   provides the binary; that command is what registers the skill with the session.
 - `$HOME/.local/bin` must be on `PATH` or the install succeeds and the command is still
   not found. The hook appends it to `CLAUDE_ENV_FILE` so later shells inherit it.
+
+### From the 1.1.0 release
+
+- `ios.deploymentTarget` is a **minimum**, not a maximum. It was once set to `18.7.8`
+  under a commit titled "lower iOS deployment target", which would have limited the App
+  Store listing to devices running 18.7.8 or newer. Leave it unset unless there is a
+  specific reason; the SDK default is the right answer.
+- **A comment describing behaviour is not behaviour.** `Registration.synced` carried
+  "`syncPending()` retries these" for months. `syncPending` had never been written —
+  grep found the name in that one comment and nowhere else, and offline registrations
+  were silently lost. When a comment names a function, check that it exists.
+- Taking demo data out of `defaultState` does **not** take it off anyone's device. It is
+  already in AsyncStorage on every install that ran the old build, so removing seeded
+  state needs a migration in the hydration path too.
+- `npx expo prebuild` rewrites `package.json` scripts to `expo run:android` / `expo
+  run:ios` **every time it runs**. This project builds on EAS, not locally — revert
+  those two lines after any prebuild.
+- `android.blockedPermissions` does not delete the permission from the generated
+  manifest; it adds `tools:node="remove"` and the Android manifest merger drops it at
+  build time. Grepping the source manifest will show the permission still present and
+  look like a failure. Check for the marker, not the absence of the line.
+- `eas` commands act on the directory you are standing in. `eas project:info` prints the
+  EAS project, not the bundle identifier — the identifier lives in `app.json` and is
+  never configured in EAS. Confirm the project before any command that writes state;
+  running one in the wrong repo targets a different app entirely.
+- A notification icon renders at 24dp. The full three-line club wordmark turns to grey
+  mush at that size; only the `KOÜ` line survives. Generate candidates and downscale
+  them before choosing — this is not judgeable at full resolution.
