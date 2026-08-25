@@ -168,13 +168,65 @@ eas env:create --environment production --name EXPO_PUBLIC_FIREBASE_API_KEY --va
 Diğer altı değişken için de aynısını tekrarlayın. Tanımlanmazsa uygulama açılışta
 `[firebase] ...` uyarısı verir ve `getDb()` hata fırlatır.
 
+## Bildirimler
+
+İki ayrı mekanizma, tek ayar ekranı (`app/(tabs)/bildirim.tsx`). Dört tercihin
+dördü de artık gerçekten bir şey yapıyor.
+
+**Hatırlatmalar — cihazda, sunucusuz.** Kayıtlı olduğun etkinliğin `startsAt`
+değerinden geri sayılarak `expo-notifications` ile yerel olarak zamanlanır.
+Sunucu, ağ, token gerekmez. Kullanıcının seçtiği süreyi (`1 saat` / `1 gün` /
+`3 gün önce`) kullanır, sessiz saatler açıksa 23:00–08:00'e denk gelen
+hatırlatmayı sabah 08:00'e kaydırır, kaydırınca etkinliğin kendisinden sonraya
+düşüyorsa hiç kurmaz. Kayıt, tercih veya etkinlik listesi değiştiğinde tüm
+program iptal edilip yeniden kurulur.
+
+**Duyurular — push, kulüpten.** Cihaz `devices/{token}` dokümanına push token'ını
+ve tercihlerini yazar; gönderim `npm run push` ile yapılır.
+
+```bash
+npm run push -- --category Duyuru --title "Başlık" --body "Metin"
+npm run push -- --category Atölye --title "..." --body "..." --event ev2 --dry
+```
+
+`--event` bildirime dokununca açılacak etkinliği belirler, `--dry` kimseye
+göndermeden kaç cihaza gideceğini gösterir. Script `master` kapalı olanları,
+kategoriyi kapatmış olanları ve sessiz saatlerdekileri atlar; kaç cihazın hangi
+sebeple elendiğini yazar. `DeviceNotRegistered` dönen token'ları (uygulamayı
+kaldırmış kullanıcılar) koleksiyondan siler.
+
+### Gerekenler
+
+**Servis hesabı anahtarı** (sadece gönderici script için, uygulamaya girmez).
+`devices` koleksiyonu istemciye kapalı — token listesi sızarsa herkes herkese
+bildirim gönderebilir. Bu yüzden script Admin SDK kullanıyor. `.env.example`'daki
+`FIREBASE_SERVICE_ACCOUNT` satırına bakın. **Bu anahtar güvenlik kurallarını
+tamamen bypass eder; asla commit etmeyin, asla uygulamaya koymayın.**
+
+**Mağaza kimlik bilgileri** — bunlar olmadan push cihaza ulaşmaz:
+
+```bash
+eas credentials   # Android: FCM V1 service account JSON
+                  # iOS: APNs key (.p8) — EAS otomatik üretebilir
+```
+
+Push, Expo Go'da çalışmaz; development build veya production build gerekir.
+Yerel hatırlatmalar Expo Go'da da çalışır.
+
+### Bilinen eksik
+
+Android bildirim ikonu tanımlı değil (`app.json` → `expo-notifications` yalnızca
+`color` taşıyor). Android bu durumda launcher ikonundan siluet üretir; bizimki
+tam opak bir kare olduğu için beyaz bir kare görünür. 96×96, beyaz-üzeri-şeffaf
+bir monokrom ikon gerekiyor.
+
 ## Kalan işler
 
 1. **Fotoğraflar** — `src/components/PhotoSlot.tsx` bir `uri` prop'u alıyor. Arşiv
    görselleri Storage'a yüklenip URL'ler `archive` dokümanlarına eklendiğinde
    placeholder kendiliğinden devre dışı kalır.
-2. **Bildirimler** — ayar ekranı tercihleri cihazda tutuyor; gerçek gönderim için
-   `expo-notifications` + FCM ve tercihlerin sunucuya yazılması gerekiyor.
+2. **Bildirim ikonu** — Android için 96×96 beyaz-üzeri-şeffaf monokrom ikon.
+   Yukarıdaki "Bildirimler" bölümüne bakın. Bildirimlerin kendisi çalışıyor.
 3. **Kayıtları görme** — `registrations` koleksiyonu kurallar gereği istemciden
    okunamıyor (doğru olan bu). Kulüp yönetimi kayıtları Firebase Console'dan görür;
    liste/CSV isteniyorsa Admin SDK ile küçük bir araç gerekir.

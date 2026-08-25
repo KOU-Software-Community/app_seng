@@ -113,6 +113,35 @@ check(
 );
 
 check(
+  'bildirim wiring bağlı',
+  'NotificationSync mount edilmezse token da alınmaz, hatırlatma da kurulmaz — ' +
+    'özellik hiçbir hata vermeden ölür.',
+  () => {
+    if (!/<NotificationSync\s*\/>/.test(read('app/_layout.tsx'))) {
+      return '_layout.tsx NotificationSync render etmiyor';
+    }
+    const notif = read('src/notifications.tsx');
+    if (!/addNotificationResponseReceivedListener/.test(notif)) {
+      return 'bildirime dokunma dinleyicisi yok — bildirim etkinliği açmaz';
+    }
+    if (!/scheduleNotificationAsync/.test(notif)) return 'yerel hatırlatma kurulmuyor';
+    return null;
+  },
+);
+
+check(
+  'sahte okunmamış rozeti yok',
+  'Zildeki kırmızı nokta koşulsuz render ediliyordu; okunmamış bir şey yokken ' +
+    'varmış gibi gösteriyordu ve okunma durumunu tutan hiçbir şey yok.',
+  () => {
+    if (/styles\.bellDot/.test(read('app/(tabs)/index.tsx'))) {
+      return 'bellDot hâlâ render ediliyor';
+    }
+    return null;
+  },
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {

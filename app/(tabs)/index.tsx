@@ -57,7 +57,9 @@ export default function HomeRoute() {
             style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
           >
             <PixelIcon name="bell" size={16} color={colors.onNavy} />
-            <View style={styles.bellDot} />
+            {/* The red dot used to be unconditional, so it always claimed there
+                was something unread. Nothing tracks read state, so there is
+                nothing honest to show here until something does. */}
           </Pressable>
         </View>
 
@@ -226,15 +228,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.13)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  bellDot: {
-    position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 7,
-    height: 7,
-    borderRadius: 2,
-    backgroundColor: colors.blue200,
   },
 
   stats: { flexDirection: 'row', gap: 8, marginTop: 18 },
