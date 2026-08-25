@@ -58,11 +58,34 @@ Repo-level skills load automatically — no install step, no network call, which
 they are committed rather than installed. The hook exists because the cloud container is
 rebuilt every session and graphify is the one thing it does not keep.
 
-`graphify` maps an unfamiliar codebase into a queryable graph instead of re-reading it.
-It is installed but has never been run here — this codebase was written from scratch, so
-there was nothing foreign to map. **If `graphify-out/` ever exists, questions about
-architecture, file relationships or project content are graph queries first, file scans
-second.**
+`graphify` maps the codebase into a queryable graph instead of re-reading it. It was
+written from scratch here, so for a while there was nothing foreign to map — that stopped
+being true once the admin panel, the event schema and the notification layer arrived.
+
+**The graph is per-session and `graphify-out/` is gitignored.** The container is rebuilt
+every time, and a committed graph would go stale the moment the code moved — a stale graph
+is worse than none, because it describes a structure that no longer exists with complete
+confidence. Rebuild it instead:
+
+```
+/graphify .
+```
+
+Three things worth scoping out when you do: the `assets/*.png` icons (the skill spends one
+subagent per image and they say nothing about architecture), `.claude/skills/*` (agent
+discipline prose, not part of the app), and **`design-source/`**. That last one is not
+obvious and cost a rebuild to learn: it is a design-tool export kept for reference, not
+shipping code, and its two bundled scripts took 121 of 597 nodes — a fifth of the graph —
+and pushed `ImageSlot`, `get()` and `createRuntime()` above `useAppStore()` and
+`useContent()` in the god-node ranking. The graph names the wrong centres unless it is
+excluded.
+
+`AGENTS.md` and `README.md` are worth keeping — they carry the data-flow description the
+code alone does not state. Expect roughly a third of the doc-derived edges to dangle;
+the AST half is deterministic and trustworthy, the prose half is not.
+
+**Once it exists, questions about architecture, file relationships or project content are
+graph queries first (`graphify query`, `path`, `explain`), file scans second.**
 
 ## Working rules
 

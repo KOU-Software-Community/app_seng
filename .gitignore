@@ -37,6 +37,18 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# graphify — üretilen bilgi grafiği.
+#
+# Commit edilmiyor, üç sebeple: `.graphify_python` bu konteynerin yorumlayıcısına
+# giden mutlak bir yol taşıyor, `cache/` makineye özel, ve en önemlisi commit
+# edilmiş bir grafik kod değiştiği anda bayatlıyor — bayat grafik, olmayan
+# grafikten kötüdür çünkü var olmayan bir yapıyı kendinden emin anlatır.
+#
+# Konteyner her oturumda sıfırlandığı için grafik oturum başına yeniden kurulur:
+# `/graphify .` — AST kısmı deterministik ve LLM'siz, asıl maliyet birkaç
+# dokümanın semantik çıkarımı.
+graphify-out/
+
 # generated native folders
 /ios
 /android
