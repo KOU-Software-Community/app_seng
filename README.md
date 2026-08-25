@@ -46,6 +46,23 @@ Tip kontrolü:
 npm run typecheck
 ```
 
+Yayın öncesi regresyon kontrolü:
+
+```bash
+npm run check:release
+```
+
+`scripts/check-release.mjs` sekiz şeyi doğruluyor ve **her biri bir kez gerçekten
+başarısız olduğu için** orada: demo kaydının geri sızmaması, ana ekranda sabit isim
+olmaması, `deploymentTarget` override'ının geri gelmemesi, iki dosyadaki sürümün
+aynı kalması, uygulama kimliğinin değişmemesi, sürüm sayaçlarının `app.json`'a geri
+kopyalanmaması, `syncPending`'in tanımlı ve bağlı olması, ve servis hesabı
+anahtarlarının gitignore'lu kalması.
+
+Spekülatif kural eklemeyin. Bir regresyon kaçtığında onu yakalayan kontrolü ekleyin
+ve **eklemeden önce kontrolün kırmızı olduğunu görün** — boş geçen bir assertion,
+olmayan assertion'dan beterdir çünkü yeşil rapor verir.
+
 ## Proje yapısı
 
 ```
@@ -171,9 +188,12 @@ Diğer altı değişken için de aynısını tekrarlayın. Tanımlanmazsa uygula
 
 **Önce yapılması gerekenler:**
 
-- `app.json` içindeki `ios.bundleIdentifier` ve `android.package` şu an
-  `com.kouyazilim.app` — sahip olduğunuz bir ters alan adıyla değiştirin.
+- Uygulama kimliği her iki platformda da **`com.akadirr1.sengkou`**. App Store Connect
+  ve Play Console'da bu kimlikle kayıtlı. **İlk yayından sonra değiştirilemez** —
+  değiştirmek yeni bir uygulama açmak, kullanıcıları ve yorumları sıfırlamak demektir.
 - Apple Developer ($99/yıl) ve Google Play Console ($25 tek seferlik) hesapları.
+- Gizlilik politikası URL'si. Uygulama ad, öğrenci numarası, bölüm ve sınıf topluyor;
+  her iki mağaza da erişilebilir bir politika URL'si olmadan gönderim kabul etmez.
 
 ```bash
 npm install -g eas-cli && eas login && eas build:configure
@@ -195,8 +215,28 @@ eas submit --platform ios --profile production
 eas submit --platform android --profile production
 ```
 
-Sürüm numarası `app.json` içindeki `version` alanından okunur (`appVersionSource: "local"`);
-`production` profilinde build numarası otomatik artar.
+### Sürüm numaraları
+
+Kullanıcıya görünen sürüm (`1.1.0`) `app.json` içindeki `version` alanından okunur.
+
+Build numarası ve versionCode **EAS sunucusunda** tutulur (`appVersionSource: "remote"`),
+`app.json`'da bilerek yok — `production` profilinde her derlemede otomatik artar. Böylece
+"yerelde arttı ama commit'lemeyi unuttum, mağaza aynı numarayı reddetti" tuzağı ortadan
+kalkar.
+
+> **Uzaktan sayacı bir kez tohumlayın.** Yerel değerler kaldırıldığı için EAS'ın içe
+> aktaracağı bir şey yok; tohumlamazsanız sayaç 1'den başlar ve Play, versionCode 3
+> zaten yüklü olduğu için gönderimi **reddeder**. İlk uzaktan derlemeden önce bir kez:
+>
+> ```bash
+> eas build:version:set --platform ios      # 5 girin  → sonraki derleme 6 üretir
+> eas build:version:set --platform android  # 3 girin  → sonraki derleme 4 üretir
+> ```
+>
+> Bunlar mağazalara en son gönderilmiş numaralar. `autoIncrement` üzerine ekleyerek gider.
+
+`eas submit` iOS tarafı bilerek yapılandırılmadı; Apple bilgilerini komut interaktif
+olarak soracak.
 
 ### İkonlar
 

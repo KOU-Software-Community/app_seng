@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 
 import { NOTIFICATION_CATEGORIES, REMINDER_OPTIONS } from './data';
 import { isFirebaseConfigured } from './firebaseConfig';
@@ -24,7 +25,11 @@ export type Registration = {
   /**
    * False when the Firestore write has not landed — offline, rules rejected it,
    * or the database does not exist yet. The registration still counts locally so
-   * the student sees their code; `syncPending()` retries these.
+   * the student sees their code; `syncPending()` retries these on launch, when
+   * the app returns to the foreground, and when the student submits again.
+   *
+   * Undefined counts as pending: an unknown state is worth one extra write far
+   * more than it is worth a silently dropped registration.
    */
   synced?: boolean;
 };
@@ -55,28 +60,25 @@ const defaultNotifications: NotificationPrefs = {
 
 const defaultState: PersistedState = {
   onboardingSeen: false,
-  // Elif is already signed up for the React workshop — this is what makes the
-  // "Kayıtlısın" badge and the "2 kaydın var" counter real on first launch.
-  registrations: [
-    {
-      eventId: 'ev2',
-      code: 'KYK-2431',
-      name: 'Elif Yılmaz',
-      studentNo: '210101045',
-      department: 'Yazılım Müh.',
-      year: '3',
-      synced: true,
-    },
-  ],
+  // Empty on purpose. This used to hold a demo registration ("Elif Yılmaz"),
+  // which shipped to every install and showed a brand-new user someone else's
+  // registration on the badge and the counter. The app collects real
+  // applications, so a fresh install starts with none.
+  registrations: [],
   notifications: defaultNotifications,
 };
 
 type AppStore = PersistedState & {
   /** False until the persisted state has been read back from disk. */
   hydrated: boolean;
-  isRegistered: (eventId: string) => boolean;
   registrationFor: (eventId: string) => Registration | undefined;
   register: (input: Omit<Registration, 'code'>) => Registration;
+  /**
+   * Retries every registration that has not reached Firestore. Safe to call at
+   * any time: it is a no-op when nothing is pending and it will not overlap
+   * with a run already in flight.
+   */
+  syncPending: () => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
   setMaster: (on: boolean) => void;
@@ -89,6 +91,17 @@ const Ctx = createContext<AppStore | null>(null);
 
 /** Mirrors the KYK-#### format shown on the confirmation screen. */
 const makeCode = () => `KYK-${Math.floor(1000 + Math.random() * 9000)}`;
+
+/**
+ * 1.0.x shipped a demo registration inside the default state, so every device
+ * that opened one of those builds has it sitting in AsyncStorage. Taking it out
+ * of the defaults does not take it off their device — this does.
+ *
+ * Matched on both fields so a real registration that happens to draw the same
+ * four digits is never dropped.
+ */
+const isDemoRegistration = (r: Registration) =>
+  r.code === 'KYK-2431' && r.studentNo === '210101045';
 
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PersistedState>(defaultState);
@@ -105,7 +118,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           const saved = JSON.parse(raw) as Partial<PersistedState>;
           setState({
             onboardingSeen: saved.onboardingSeen ?? defaultState.onboardingSeen,
-            registrations: saved.registrations ?? defaultState.registrations,
+            registrations: (saved.registrations ?? defaultState.registrations).filter(
+              (r) => !isDemoRegistration(r),
+            ),
             notifications: {
               ...defaultNotifications,
               ...saved.notifications,
@@ -135,6 +150,101 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
   }, [state]);
 
+  // Latest registrations, readable from callbacks that must not be re-created on
+  // every state change (the AppState listener below registers once). Declared
+  // before the effects that read it so it is already current when they run.
+  const registrationsRef = useRef(state.registrations);
+  useEffect(() => {
+    registrationsRef.current = state.registrations;
+  }, [state.registrations]);
+
+  // One run at a time. Two overlapping runs would push the same registration
+  // twice and leave the club with duplicate documents.
+  const syncing = useRef(false);
+  // Set when a sync is asked for while one is already running — a registration
+  // submitted mid-run is not in the batch being worked through, and silently
+  // dropping that request would strand it until the next launch or foreground.
+  const resyncQueued = useRef(false);
+  // Lets the run below re-enter itself once it has finished.
+  const syncPendingRef = useRef<(() => void) | null>(null);
+
+  const syncPending = useCallback(() => {
+    if (!isFirebaseConfigured) return;
+    if (syncing.current) {
+      resyncQueued.current = true;
+      return;
+    }
+    const pending = registrationsRef.current.filter((r) => !r.synced);
+    if (!pending.length) return;
+
+    syncing.current = true;
+    void (async () => {
+      try {
+        const { pushRegistration } = await import('./firebase');
+        for (const entry of pending) {
+          try {
+            await pushRegistration({
+              eventId: entry.eventId,
+              code: entry.code,
+              name: entry.name,
+              studentNo: entry.studentNo,
+              department: entry.department,
+              year: entry.year,
+            });
+            setState((s) => ({
+              ...s,
+              registrations: s.registrations.map((r) =>
+                r.code === entry.code ? { ...r, synced: true } : r,
+              ),
+            }));
+            console.log(`[kayit] ${entry.code} Firestore'a yazıldı.`);
+          } catch (err: unknown) {
+            // Stop at the first failure rather than working through the rest.
+            // One rejected write almost always means the backend is unreachable,
+            // and each further attempt costs a full 8s timeout. They stay
+            // pending and the next trigger picks them up.
+            const message = err instanceof Error ? err.message : String(err);
+            console.log(`[kayit] ${entry.code} gönderilemedi, beklemede: ${message}`);
+            break;
+          }
+        }
+      } catch (err: unknown) {
+        // The dynamic import itself failed — nothing to retry right now.
+        console.log(`[kayit] senkronizasyon başlatılamadı: ${String(err)}`);
+      } finally {
+        syncing.current = false;
+        // Someone asked mid-run. Clearing the flag before re-entering keeps this
+        // bounded: only a fresh outside call can queue another pass.
+        if (resyncQueued.current) {
+          resyncQueued.current = false;
+          syncPendingRef.current?.();
+        }
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    syncPendingRef.current = syncPending;
+  }, [syncPending]);
+
+  // Anything still pending gets sent as soon as the app has state to work with,
+  // and again whenever a registration is added.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!state.registrations.some((r) => !r.synced)) return;
+    syncPending();
+  }, [hydrated, state.registrations, syncPending]);
+
+  // Returning to the foreground is the cheapest reliable retry point: the phone
+  // was just unlocked, so a connection that was missing at submit time is
+  // usually back.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') syncPending();
+    });
+    return () => sub.remove();
+  }, [syncPending]);
+
   const value = useMemo<AppStore>(() => {
     const registrationFor = (eventId: string) =>
       state.registrations.find((r) => r.eventId === eventId);
@@ -143,46 +253,28 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       ...state,
       hydrated,
       registrationFor,
-      isRegistered: (eventId: string) => !!registrationFor(eventId),
 
       register: (input) => {
         const existing = registrationFor(input.eventId);
-        if (existing) return existing;
-
-        // Save locally first so the confirmation screen is instant and works
-        // offline; the Firestore write follows and flips `synced`.
-        const entry: Registration = { ...input, code: makeCode(), synced: false };
-        setState((s) => ({ ...s, registrations: [...s.registrations, entry] }));
-
-        if (isFirebaseConfigured) {
-          import('./firebase')
-            .then(({ pushRegistration }) =>
-              pushRegistration({
-                eventId: entry.eventId,
-                code: entry.code,
-                name: entry.name,
-                studentNo: entry.studentNo,
-                department: entry.department,
-                year: entry.year,
-              }),
-            )
-            .then(() => {
-              setState((s) => ({
-                ...s,
-                registrations: s.registrations.map((r) =>
-                  r.code === entry.code ? { ...r, synced: true } : r,
-                ),
-              }));
-              console.log(`[kayit] ${entry.code} Firestore'a yazıldı.`);
-            })
-            .catch((err: unknown) => {
-              const message = err instanceof Error ? err.message : String(err);
-              console.log(`[kayit] ${entry.code} yerelde tutuldu, Firestore'a yazılamadı: ${message}`);
-            });
+        if (existing) {
+          // Submitting again on a registration that never reached Firestore is
+          // the student asking us to try once more. Keep their code — it is
+          // already on screen and possibly written down — and retry the write.
+          // Returning early without this is what used to strand a registration
+          // on the device forever.
+          if (!existing.synced) syncPending();
+          return existing;
         }
 
+        // Saved locally first so the confirmation screen is instant and works
+        // offline. The pending-sync effect sends it as soon as the state lands
+        // and keeps retrying until it does.
+        const entry: Registration = { ...input, code: makeCode(), synced: false };
+        setState((s) => ({ ...s, registrations: [...s.registrations, entry] }));
         return entry;
       },
+
+      syncPending,
 
       completeOnboarding: () => setState((s) => ({ ...s, onboardingSeen: true })),
       resetOnboarding: () => setState((s) => ({ ...s, onboardingSeen: false })),
@@ -211,7 +303,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       setQuietHours: (quietHours) =>
         setState((s) => ({ ...s, notifications: { ...s.notifications, quietHours } })),
     };
-  }, [state, hydrated]);
+  }, [state, hydrated, syncPending]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

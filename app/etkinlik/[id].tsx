@@ -151,7 +151,7 @@ export default function EventDetailRoute() {
         {registration ? (
           <View style={styles.registered}>
             <Txt weight="bold" size={15.5} color={colors.blue500}>
-              Kayıtlısın
+              {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor…'}
             </Txt>
           </View>
         ) : (

@@ -49,3 +49,14 @@ yarn-error.*
 *.keystore
 play-store-key.json
 AuthKey_*.p8
+
+# Firebase service account keys — never commit.
+# Unlike the EXPO_PUBLIC_* client config (which ships inside the app by design
+# and is protected by firestore.rules), an Admin SDK key bypasses the rules
+# entirely: full read/write on the whole database. The push-notification sender
+# script needs one locally; it must never reach the repo.
+*firebase-adminsdk*.json
+service-account*.json
+serviceAccountKey*.json
+google-services.json
+GoogleService-Info.plist

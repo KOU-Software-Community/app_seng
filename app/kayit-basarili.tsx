@@ -17,9 +17,12 @@ export default function RegistrationDoneRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
-  const { registrationFor } = useAppStore();
+  const { registrationFor, syncPending } = useAppStore();
 
   const registration = registrationFor(event.id);
+  // The code is real and the club will get it — but saying "yerin ayrıldı"
+  // before the write lands would be a promise we have not kept yet.
+  const pending = !!registration && !registration.synced;
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -53,11 +56,13 @@ export default function RegistrationDoneRoute() {
       </Animated.View>
 
       <Txt weight="extrabold" size={26} color="#fff" tracking={-0.5} style={styles.title}>
-        Kaydın alındı!
+        {pending ? 'Kaydın hazır' : 'Kaydın alındı!'}
       </Txt>
 
       <Txt size={14.5} leading={1.6} color={colors.blue200} style={styles.body}>
-        {event.title} için yerin ayrıldı. Etkinlikten 1 gün önce hatırlatma bildirimi göndereceğiz.
+        {pending
+          ? `${event.title} için kaydın telefonunda duruyor ama kulübe henüz ulaşmadı. Bağlantı gelir gelmez otomatik gönderilecek; kodunu saklaman yeterli.`
+          : `${event.title} için yerin ayrıldı. Etkinlikten 1 gün önce hatırlatma bildirimi göndereceğiz.`}
       </Txt>
 
       <View style={styles.codeBox}>
@@ -70,6 +75,22 @@ export default function RegistrationDoneRoute() {
       </View>
 
       <View style={[styles.actions, { marginBottom: insets.bottom }]}>
+        {pending ? (
+          <Pressable
+            onPress={syncPending}
+            accessibilityRole="button"
+            accessibilityLabel="Kaydı şimdi tekrar göndermeyi dene"
+            style={({ pressed }) => [
+              styles.outlineBtn,
+              pressed && { backgroundColor: 'rgba(255,255,255,0.08)' },
+            ]}
+          >
+            <Txt weight="semibold" size={14.5} color={colors.onNavy}>
+              Şimdi tekrar dene
+            </Txt>
+          </Pressable>
+        ) : null}
+
         <Pressable
           onPress={() => router.replace('/(tabs)')}
           accessibilityRole="button"
