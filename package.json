@@ -50,6 +50,7 @@
     "check:release": "node scripts/check-release.mjs",
     "lint": "expo lint",
     "seed": "tsx scripts/seed-firestore.ts",
+    "rules:deploy": "node scripts/deploy-rules.mjs",
     "push": "tsx scripts/send-push.ts",
     "export": "tsx scripts/export-registrations.ts",
     "check:schema": "tsx scripts/check-event-schema.ts",

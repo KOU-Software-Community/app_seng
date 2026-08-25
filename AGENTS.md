@@ -156,3 +156,11 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   so `date`, `time` and `number` fell through to browser defaults and sat visibly smaller
   than everything around them. It is now `input:not([type=checkbox])` — enumerate the
   exception, not the members.
+- **`firestore.rules` in the repo does nothing.** Firestore reads its rules from the
+  project, not from git, so an unpublished file leaves the Firestore default in force —
+  and that default denies everything. The app said `Missing or insufficient permissions`
+  while the rules file sat there looking correct, which it was. `service-account.json`
+  is unrelated: it is the panel's Admin SDK key, and the app never touches it — the app
+  is an unauthenticated client and the rules are the only thing standing between it and
+  the data. Publish with `npm run rules:deploy`; no local check can tell you what is
+  live, only that a rule was written at all.

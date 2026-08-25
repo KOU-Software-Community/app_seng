@@ -2,8 +2,18 @@ rules_version = '2';
 
 // KOÜ Yazılım Kulübü — Firestore Security Rules
 //
-// Bu kuralları Firebase Console → Firestore Database → Rules sekmesine yapıştırıp
-// "Publish" deyin.
+// YAYINLAMA
+//   npm run rules:deploy
+//
+// Bu dosya depoda durduğu sürece hiçbir şey yapmaz. Firestore kuralları
+// projeden okur, depodan değil — yayınlanmamışsa Firestore varsayılanı
+// geçerlidir ve o her şeyi reddeder. Uygulamanın
+// "Missing or insufficient permissions" demesinin sebebi budur ve dosyaya
+// bakarak anlaşılmaz: dosya doğrudur, yayınlanmamıştır.
+//
+// Elle yapmak isterseniz: Firebase Console → Firestore Database → Rules →
+// yapıştır → Publish. Script'in tercih edilme sebebi, yayınlanan sürümün
+// depodakiyle aynı olduğunu garanti etmesi.
 //
 // Neden önemli: uygulamadaki Firebase config (apiKey vb.) derleme sırasında
 // pakete gömülür, yani uygulamayı kuran herkes ona ulaşabilir. Veriyi koruyan şey
@@ -111,10 +121,11 @@ service cloud.firestore {
   }
 }
 
-// SEED NOTU
-// `npm run seed` istemci SDK'sı kullandığı için yukarıdaki `events`/`archive`
-// yazma yasağına takılır. Seed'i çalıştırmadan önce o iki bloktaki
-//   allow write: if false;
-// satırlarını geçici olarak
-//   allow write: if true;
-// yapın, seed'i çalıştırın, sonra MUTLAKA geri alın.
+// İÇERİK NASIL GİRİLİR
+// `events` ve `archive` istemciye kapalı yazımdır ve öyle kalmalı. İçerik
+// yönetim panelinden giriliyor (`npm run admin`); panel Admin SDK kullanır ve
+// bu kuralları hiç görmez, dolayısıyla yazmak için kural gevşetmek gerekmez.
+//
+// Eski `npm run seed` istemci SDK'sı kullanıyor, yani yazma yasağına takılır.
+// Kuralı geçici olarak gevşetip geri almayı unutmak, veritabanını herkese açık
+// bırakmanın en kolay yolu — o yüzden seed yerine panel kullanın.
