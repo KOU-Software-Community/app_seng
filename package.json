@@ -33,8 +33,10 @@
     "react-native-worklets-core": "^1.6.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/react": "~19.2.2",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "firebase-admin": "^14.3.0",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3"
@@ -50,7 +52,8 @@
     "seed": "tsx scripts/seed-firestore.ts",
     "push": "tsx scripts/send-push.ts",
     "export": "tsx scripts/export-registrations.ts",
-    "check:schema": "tsx scripts/check-event-schema.ts"
+    "check:schema": "tsx scripts/check-event-schema.ts",
+    "admin": "tsx admin/server.ts"
   },
   "private": true
 }
