@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PixelIcon } from '../../src/components/Pixel';
 import {
+  ContentNotice,
   DottedRule,
   EmptyState,
   PixelBadge,
@@ -26,13 +27,16 @@ export default function HomeRoute() {
   const router = useRouter();
   const openEvent = useOpenEvent();
   const { registrations } = useAppStore();
-  const { events } = useContent();
+  const { events, error, loading, refresh } = useContent();
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ paddingBottom: 24 }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue200} />
+      }
     >
       <LinearGradient
         colors={gradients.home}
@@ -72,6 +76,8 @@ export default function HomeRoute() {
 
         <DottedRule style={{ marginTop: 16 }} />
       </LinearGradient>
+
+      {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
       {/* Both lists are editorial content about upcoming events, so between
           terms they empty out together. One empty state beats two headings with

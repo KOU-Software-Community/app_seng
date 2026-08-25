@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
+  ContentNotice,
   DottedRule,
   EmptyState,
   FilterChip,
@@ -22,7 +23,7 @@ const PHOTOS_PER_ENTRY = 4;
 
 export default function ArsivRoute() {
   const router = useRouter();
-  const { archive } = useContent();
+  const { archive, error, loading, refresh } = useContent();
   const [category, setCategory] = useState('Tümü');
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [photo, setPhoto] = useState(0);
@@ -39,7 +40,13 @@ export default function ArsivRoute() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} />
+        }
+      >
         <GradientHeader gradient={gradients.section} style={{ paddingBottom: 16 }}>
           <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
             Etkinlik Arşivi
@@ -49,6 +56,8 @@ export default function ArsivRoute() {
           </Txt>
           <DottedRule style={{ marginTop: 12 }} />
         </GradientHeader>
+
+        {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
         <ScrollView
           horizontal

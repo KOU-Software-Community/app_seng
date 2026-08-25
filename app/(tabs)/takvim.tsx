@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Card,
+  ContentNotice,
   DottedRule,
   EmptyState,
   GradientHeader,
@@ -25,7 +26,7 @@ export default function TakvimRoute() {
   const [view, setView] = useState<View_>('list');
   const router = useRouter();
   const openEvent = useOpenEvent();
-  const { events } = useContent();
+  const { events, error, loading, refresh } = useContent();
   const hasEvents = events.length > 0;
 
   return (
@@ -33,6 +34,9 @@ export default function TakvimRoute() {
       style={styles.screen}
       contentContainerStyle={{ paddingBottom: 20 }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} />
+      }
     >
       <GradientHeader gradient={gradients.calendar}>
         <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
@@ -61,13 +65,25 @@ export default function TakvimRoute() {
         ) : null}
       </GradientHeader>
 
+      {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
+
       {!hasEvents ? (
-        <EmptyState
-          title="Takvim henüz boş"
-          body="Yeni dönemin etkinlikleri planlanıyor. Bildirimleri açarsan program açıklandığında ilk sen haberdar olursun."
-          ctaLabel="Bildirimleri aç"
-          onPress={() => router.navigate('/(tabs)/bildirim')}
-        />
+        // An empty calendar and a failed fetch look the same on screen, so the
+        // copy has to say which one it is — otherwise a connection problem reads
+        // as "the club has nothing planned".
+        error ? (
+          <EmptyState
+            title="Etkinlikler yüklenemedi"
+            body="Bağlantı kurulduğunda program burada görünecek. Yukarıdan yenileyebilir ya da aşağı çekebilirsin."
+          />
+        ) : (
+          <EmptyState
+            title="Takvim henüz boş"
+            body="Yeni dönemin etkinlikleri planlanıyor. Bildirimleri açarsan program açıklandığında ilk sen haberdar olursun."
+            ctaLabel="Bildirimleri aç"
+            onPress={() => router.navigate('/(tabs)/bildirim')}
+          />
+        )
       ) : view === 'list' ? (
         <ListView onOpen={openEvent} />
       ) : (
