@@ -1,9 +1,11 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Card,
   DottedRule,
+  EmptyState,
   GradientHeader,
   GroupLabel,
   PixelBadge,
@@ -20,8 +22,10 @@ type View_ = 'list' | 'grid';
 
 export default function TakvimRoute() {
   const [view, setView] = useState<View_>('list');
+  const router = useRouter();
   const openEvent = useOpenEvent();
   const { events } = useContent();
+  const hasEvents = events.length > 0;
 
   return (
     <ScrollView
@@ -34,24 +38,40 @@ export default function TakvimRoute() {
           Etkinlik Takvimi
         </Txt>
         <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
-          Mart – Nisan 2026 · {events.length} etkinlik
+          {/* The month range used to be hardcoded to "Mart – Nisan 2026" and was
+              still on screen months after those events had passed. */}
+          {hasEvents ? `${events.length} etkinlik` : 'Şu an planlanmış etkinlik yok'}
         </Txt>
 
         <DottedRule style={{ marginTop: 12 }} />
 
-        <Segmented
-          onNavy
-          value={view}
-          onChange={(v) => setView(v as View_)}
-          options={[
-            { label: 'Liste', value: 'list' },
-            { label: 'Takvim', value: 'grid' },
-          ]}
-          style={{ marginTop: 16 }}
-        />
+        {/* Nothing to switch between when the calendar is empty. */}
+        {hasEvents ? (
+          <Segmented
+            onNavy
+            value={view}
+            onChange={(v) => setView(v as View_)}
+            options={[
+              { label: 'Liste', value: 'list' },
+              { label: 'Takvim', value: 'grid' },
+            ]}
+            style={{ marginTop: 16 }}
+          />
+        ) : null}
       </GradientHeader>
 
-      {view === 'list' ? <ListView onOpen={openEvent} /> : <GridView onOpen={openEvent} />}
+      {!hasEvents ? (
+        <EmptyState
+          title="Takvim henüz boş"
+          body="Yeni dönemin etkinlikleri planlanıyor. Bildirimleri açarsan program açıklandığında ilk sen haberdar olursun."
+          ctaLabel="Bildirimleri aç"
+          onPress={() => router.navigate('/(tabs)/bildirim')}
+        />
+      ) : view === 'list' ? (
+        <ListView onOpen={openEvent} />
+      ) : (
+        <GridView onOpen={openEvent} />
+      )}
     </ScrollView>
   );
 }

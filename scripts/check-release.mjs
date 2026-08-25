@@ -142,6 +142,19 @@ check(
 );
 
 check(
+  'takvim başlığında sabit tarih yok',
+  'Başlık "Mart – Nisan 2026" yazıyordu ve o etkinlikler geçtikten aylar sonra hâlâ ' +
+    'oradaydı. Tarih aralığı veriden türetilmeli, elle yazılmamalı.',
+  () => {
+    const takvim = read('app/(tabs)/takvim.tsx');
+    // Yorumlar hariç: sabit bir yıl JSX metnine gömülmüş mü?
+    const code = takvim.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const year = code.match(/\b(19|20)\d{2}\b/);
+    return year ? `başlıkta sabit yıl var: ${year[0]}` : null;
+  },
+);
+
+check(
   'servis hesabı anahtarları gitignore’lu',
   'Admin SDK anahtarı firestore.rules’u tamamen bypass eder. Depo public.',
   () => {

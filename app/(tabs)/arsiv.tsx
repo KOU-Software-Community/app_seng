@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
   DottedRule,
+  EmptyState,
   FilterChip,
   GlassButton,
   GradientHeader,
@@ -61,8 +62,10 @@ export default function ArsivRoute() {
 
         {entries.length === 0 ? (
           <EmptyState
-            category={category}
-            onEnableNotifications={() => router.navigate('/(tabs)/bildirim')}
+            title="Bu kategoride henüz arşiv yok"
+            body={`İlk ${category.toLocaleLowerCase('tr')} etkinliğimiz bu dönem planlanıyor. Bildirimleri açarsan duyurulduğunda haber veririz.`}
+            ctaLabel="Bildirimleri aç"
+            onPress={() => router.navigate('/(tabs)/bildirim')}
           />
         ) : (
           <View style={styles.grid}>
@@ -120,44 +123,6 @@ function ArchiveCard({ entry, onPress }: { entry: ArchiveEntry; onPress: () => v
         </Txt>
       </View>
     </Pressable>
-  );
-}
-
-function EmptyState({
-  category,
-  onEnableNotifications,
-}: {
-  category: string;
-  onEnableNotifications: () => void;
-}) {
-  return (
-    <View style={styles.empty}>
-      <Image
-        source={require('../../assets/brand/mascot.png')}
-        style={styles.emptyArt}
-        resizeMode="contain"
-      />
-      <Txt weight="extrabold" size={16} color={colors.navy900} style={{ marginTop: 20 }}>
-        Bu kategoride henüz arşiv yok
-      </Txt>
-      <Txt size={13.5} leading={1.6} color={colors.muted} style={styles.emptyBody}>
-        İlk {category.toLocaleLowerCase('tr')} etkinliğimiz bu dönem planlanıyor. Bildirimleri
-        açarsan duyurulduğunda haber veririz.
-      </Txt>
-
-      <Pressable
-        onPress={onEnableNotifications}
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.emptyCta,
-          pressed && { backgroundColor: colors.blue100 },
-        ]}
-      >
-        <Txt weight="bold" size={13.5} color={colors.blue500}>
-          Bildirimleri aç
-        </Txt>
-      </Pressable>
-    </View>
   );
 }
 
@@ -280,17 +245,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
 
-  empty: { paddingHorizontal: 40, paddingVertical: 56, alignItems: 'center' },
-  emptyArt: { width: 132, height: 116, opacity: 0.5 },
-  emptyBody: { marginTop: 8, textAlign: 'center' },
-  emptyCta: {
-    marginTop: 20,
-    borderWidth: 1.5,
-    borderColor: colors.blue500,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 11,
-  },
 
   lightbox: { flex: 1, backgroundColor: 'rgba(2,10,26,0.94)' },
   lightboxBar: {

@@ -9,6 +9,7 @@ import {
   Card,
   GlassButton,
   IconTile,
+  MissingEvent,
   PixelBadge,
   PrimaryButton,
   Tag,
@@ -24,6 +25,8 @@ export default function EventDetailRoute() {
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
   const { registrationFor } = useAppStore();
+
+  if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
   const registration = registrationFor(event.id);
 
