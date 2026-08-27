@@ -110,10 +110,20 @@ check(
       .filter(([name, want]) => deps[name] && deps[name] !== want)
       .map(([name, want]) => `${name} ${deps[name]} ≠ ${want}`);
 
-    // `expo` kendi listesinde yok. Kurulu sürümüyle karşılaştırılıyor: paket
-    // yükseltilip package.json unutulursa bir sonraki `npm ci` eskiye döner.
+    // `expo` kendi listesinde yok; kurulu sürümüyle karşılaştırılıyor.
+    //
+    // Bu **önce** bakılıyor ve tek başına dönüyor: expo eskiyse yukarıdaki liste
+    // de eskidir ve her satırı ters okunur — "~57.0.15 ≠ ~57.0.10" doğru olanı
+    // yanlış gibi gösterir. O hâlde söylenecek tek şey node_modules'ün eski
+    // olduğu.
     const installed = json('node_modules/expo/package.json').version;
-    if (deps.expo !== `~${installed}`) bad.push(`expo ${deps.expo} ≠ ~${installed}`);
+    if (deps.expo !== `~${installed}`) {
+      return (
+        `node_modules eski: kurulu expo ${installed}, package.json ${deps.expo} istiyor. ` +
+        'Beklenen sürümler kurulu expo’nun listesinden okunuyor, yani bu hâlde ' +
+        'yanlış listeye bakılıyor — önce `npm ci`.'
+      );
+    }
 
     return bad.length ? bad.join(', ') : null;
   },
