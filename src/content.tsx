@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 
 import { ClubEvent, EVENTS } from './data';
 import { splitByDate, todayLocal } from './eventSchema';
-import { isFirebaseConfigured } from './firebaseConfig';
+import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from './firebaseConfig';
 import type { Raffle } from './raffleSchema';
 
 /**
@@ -61,7 +61,17 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
-      console.log('[content] Firebase yapılandırılmamış — yerel içerik kullanılıyor.');
+      // Yayınlanmış bir uygulamada bu **her zaman** bozuk bir build demek:
+      // EXPO_PUBLIC_FIREBASE_* değerleri derleme anında pakete giriyor ve
+      // yoklarsa uygulama hiçbir şeye bağlanamıyor.
+      //
+      // Eskiden sadece log yazıyordu. Release'de konsol yok, dolayısıyla
+      // uygulama sessizce boş açılıyordu — bugün iki kez tam olarak bu
+      // yüzden "neden boş" diye bakıldı. Artık ekranda görünüyor: bir mağaza
+      // sürümünde bunu fark etmenin başka yolu yok.
+      console.log(`[content] ${FIREBASE_SETUP_HINT}`);
+      setError('Uygulama yapılandırması eksik.');
+      setLoading(false);
       return;
     }
 

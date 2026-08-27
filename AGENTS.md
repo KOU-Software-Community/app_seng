@@ -211,6 +211,15 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   that appears whether or not a bucket exists. Event photos live in Supabase Storage
   instead; Firestore stays where it is. The app never touched a storage SDK — it renders
   a URL — so swapping providers was one file.
+- **A release build has no console.** `isFirebaseConfigured` being false is always a
+  broken build — `EXPO_PUBLIC_*` is inlined at build time, so a missing EAS environment
+  variable means the app connects to nothing. It only logged, so the app opened empty
+  and silent; in a store build there is no way to see why. It sets `error` now, which
+  puts `ContentNotice` on screen.
+- EAS environment variables belong to an environment (production/preview/development).
+  Every build profile in `eas.json` names its `environment` explicitly rather than
+  relying on a default — the failure mode of guessing wrong is a store build with no
+  configuration at all.
 - **Metro's transform cache survives an `.env` change.** Measuring whether
   `EXPO_PUBLIC_*` values are inlined gave "not in the bundle" three times, because
   earlier exports in the same session had run with no `.env` and the transformed module

@@ -355,6 +355,32 @@ jenerik bir hata sayfası değil.
 
 ## Mağazaya çıkarma
 
+### Build'e hangi değerler giriyor
+
+`EXPO_PUBLIC_*` olan her şey **derleme anında JS paketine yazılıyor** — ölçüldü.
+Öneki olmayan hiçbir şey girmiyor. Uygulamanın okuduğu tek grup:
+
+```
+EXPO_PUBLIC_FIREBASE_API_KEY / APP_ID / AUTH_DOMAIN
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID / PROJECT_ID / STORAGE_BUCKET
+```
+
+Supabase ve panel değişkenlerinin EAS'te **işi yok**: uygulama Supabase'e hiç
+bağlanmıyor, görsel adreslerini Firestore'dan hazır alıyor.
+
+`.env` gitignore'lu, dolayısıyla EAS Build sunucusuna **çıkmıyor**. Değerler
+`eas env:create --environment production` ile EAS'e girilmeli; her profil hangi
+ortamı kullandığını `eas.json` içinde açıkça söylüyor.
+
+Sonuç: **anahtar değiştirmek yeni build gerektiriyor.** Sunucudaki gibi env
+değiştirip yeniden başlatmak yok.
+
+Değişkenler eksikse uygulama artık boş açılmıyor — ekranda "Uygulama
+yapılandırması eksik" çıkıyor. Release'de konsol olmadığı için bunu görmenin
+başka yolu yok.
+
+
+
 `eas.json` hazır: `development` (simülatör), `preview` (dahili APK), `production`
 (App Store / Play Store).
 

@@ -458,6 +458,38 @@ check(
 );
 
 check(
+  'yapılandırmasız build sessiz kalmıyor',
+  'EXPO_PUBLIC_FIREBASE_* değerleri derleme anında pakete giriyor. EAS ortam ' +
+    'değişkenleri kurulmadan alınan bir build hiçbir şeye bağlanamıyor — ve eskiden ' +
+    'sadece konsola yazıyordu. Release’de konsol yok: uygulama sessizce boş açılıyor, ' +
+    'sebebini görmenin hiçbir yolu kalmıyor. Mağazadaki bir sürümde fark etmenin ' +
+    'bedeli bir inceleme turu.',
+  () => {
+    const content = read('src/content.tsx');
+    const block = /if \(!isFirebaseConfigured\) \{[\s\S]*?\n    \}/.exec(content)?.[0] ?? '';
+    if (!block) return 'content.tsx yapılandırma kontrolünü taşımıyor';
+    if (!/setError\(/.test(block)) return 'yapılandırma eksikken ekranda bir şey görünmüyor';
+    // Yükleme durumu kapanmazsa ekran sonsuza kadar dönüyor ve bildirim çıkmıyor.
+    if (!/setLoading\(false\)/.test(block)) return 'yükleme durumu kapatılmıyor';
+    return null;
+  },
+);
+
+check(
+  'build profilleri ortamını açıkça söylüyor',
+  'EAS ortam değişkenleri bir ortama bağlı (production/preview/development). Profil ' +
+    'hangisini alacağını söylemezse varsayılana güveniliyor — ve yanlış giderse ' +
+    'sonuç, yapılandırmasız bir mağaza build’i oluyor. Yazılı olan tahmin edilmez.',
+  () => {
+    const profiles = json('eas.json').build ?? {};
+    const missing = Object.entries(profiles)
+      .filter(([, v]) => !v.environment)
+      .map(([k]) => k);
+    return missing.length ? `environment tanımsız: ${missing.join(', ')}` : null;
+  },
+);
+
+check(
   'boş Firestore hata sayılmıyor',
   'Boş koleksiyon `error`’a geliştirici mesajı yazıyordu ("`npm run seed` çalıştırın"). ' +
     'src/data.ts artık boş olduğu için düşülecek yerel içerik de yok — sıradan bir boş ' +
