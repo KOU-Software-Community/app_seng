@@ -270,3 +270,21 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   event stays on the calendar through its own day and moves the next morning. `today`
   comes from `todayLocal`, which reads +03:00 rather than the device clock — a phone
   abroad otherwise archives an event the club still has on today's calendar.
+- **`newArchEnabled` was removed from the SDK 57 config schema.** It was valid in 52–53
+  and did nothing here — the new architecture is the only one in 57, so the flag turned
+  on something already on. A no-op field is invisible until the schema check calls it an
+  additional property and fails the EAS build. `check:release` greps `app.json` for it.
+- **A version guard's authority is the *installed* `expo`.** Expected versions come from
+  `node_modules/expo/bundledNativeModules.json`, so a stale `expo` ships a stale list and
+  the guard goes green against yesterday's expectations — locally it passed while
+  `expo doctor` on EAS listed eleven mismatches, because the local `expo` was 57.0.12 and
+  doctor compared against 57.0.17's list. `expo` is not in its own list, so it is pinned
+  separately against the installed version.
+- `npx expo install --check` needs api.expo.dev and **the container's proxy blocks it**
+  (`HTTP Proxy Network Error: Forbidden`). That is not a reason to type version numbers
+  by hand — the npm registry itself is reachable, and api.expo.dev was never where the
+  answer lived: every `expo` release carries the list it expects in its own
+  `bundledNativeModules.json`. `npm run deps:sync` reads the newest patch of the current
+  SDK major from the registry, installs it, then writes that release's list into
+  `package.json`. Expo's own major stays put: 57 → 58 is a migration, not a patch bump.
+  Run it whenever `paket sürümleri SDK ile uyuşuyor` goes red.
