@@ -17,6 +17,24 @@ const STORAGE_KEY = 'kyk.state.v1';
 
 export type Registration = {
   eventId: string;
+  /**
+   * Firestore doküman kimliği: `${eventId}__${studentNo}`.
+   *
+   * Rastgele değil, türetilmiş — aynı öğrenci numarasının aynı etkinliğe ikinci
+   * kez yazılması bu yüzden imkânsız: ikinci yazma var olan dokümana denk gelir
+   * ve kural onu reddeder. Sunucuda sayım yapmadan, hiçbir şey okumadan.
+   *
+   * `code` bu işi göremez: öğrenci telefonda okuyabilsin diye kısa tutuldu ve
+   * iki öğrencinin aynı kodu çekmesi mümkün.
+   */
+  regId: string;
+  /**
+   * Sayım jetonu — `eventSeats` içindeki herkese açık listeye bu giriyor.
+   *
+   * `regId` oraya konamaz: içinde öğrenci numarası var ve o liste herkese
+   * açık. Jeton rastgele, hiçbir şey söylemiyor, tek işi sayılmak.
+   */
+  seatId: string;
   code: string;
   name: string;
   studentNo: string;
@@ -32,6 +50,15 @@ export type Registration = {
    * more than it is worth a silently dropped registration.
    */
   synced?: boolean;
+  /**
+   * Firestore yazmayı reddetti ve yeniden denemek bunu değiştirmeyecek.
+   *
+   * En olası sebep: bu öğrenci numarasıyla bu etkinliğe zaten kayıt olunmuş.
+   * Kurallar yayınlanmamış olması da aynı hatayı veriyor ve Firestore ikisini
+   * ayırt etmiyor — o yüzden kayıt silinmiyor, arka planda denenmeyi bırakıyor
+   * ve öğrenciye elle tekrar deneme imkânı kalıyor.
+   */
+  blocked?: boolean;
 };
 
 export type NotificationPrefs = {
@@ -88,7 +115,7 @@ type AppStore = PersistedState & {
   /** False until the persisted state has been read back from disk. */
   hydrated: boolean;
   registrationFor: (eventId: string) => Registration | undefined;
-  register: (input: Omit<Registration, 'code'>) => Registration;
+  register: (input: Omit<Registration, 'code' | 'regId' | 'seatId'>) => Registration;
   /** Bu etkinliğin çekilişine katılım, varsa. */
   raffleEntryFor: (eventId: string) => RaffleEntry | undefined;
   /** Katılımı önce cihaza yazar, gönderimi `syncPending` üstlenir. */
@@ -143,6 +170,21 @@ const makeCode = () => {
  * Kayıt kodundan uzun, çünkü bu kod kimseye gösterilmiyor: okunabilir olması
  * gerekmiyor, çakışmaması gerekiyor. 16 sembol, 32'lik alfabeden.
  */
+/**
+ * Firestore'un "kural reddetti" hatası mı?
+ *
+ * Ağ hatasından ayırmak gerekiyor çünkü yeniden denemek yalnızca ikincisini
+ * düzeltir. Firestore reddin *sebebini* söylemiyor — aynı öğrenci numarası da,
+ * yayınlanmamış kurallar da `permission-denied` veriyor. O yüzden kayıt
+ * silinmiyor, sadece arka plan denemesi duruyor.
+ */
+function isRulesRejection(err: unknown): boolean {
+  const code = (err as { code?: unknown })?.code;
+  if (typeof code === 'string') return code === 'permission-denied';
+  const message = err instanceof Error ? err.message : String(err);
+  return /permission-denied|insufficient permissions/i.test(message);
+}
+
 const makeEntryId = () => {
   let id = '';
   for (let i = 0; i < 16; i += 1) {
@@ -177,9 +219,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           const saved = JSON.parse(raw) as Partial<PersistedState>;
           setState({
             onboardingSeen: saved.onboardingSeen ?? defaultState.onboardingSeen,
-            registrations: (saved.registrations ?? defaultState.registrations).filter(
-              (r) => !isDemoRegistration(r),
-            ),
+            registrations: (saved.registrations ?? defaultState.registrations)
+              .filter((r) => !isDemoRegistration(r))
+              // `regId` ve `seatId` sonradan geldi; onlarsız kaydedilmiş bir
+              // kayıt cihazda duruyor olabilir ve kimliksiz gönderilemez.
+              // `regId` türetiliyor, jeton rastgele.
+              .map((r) => ({
+                ...r,
+                regId: r.regId ?? `${r.eventId}__${r.studentNo}`,
+                seatId: r.seatId ?? makeEntryId(),
+              })),
             raffleEntries: saved.raffleEntries ?? defaultState.raffleEntries,
             notifications: {
               ...defaultNotifications,
@@ -239,7 +288,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       resyncQueued.current = true;
       return;
     }
-    const pending = registrationsRef.current.filter((r) => !r.synced);
+    const pending = registrationsRef.current.filter((r) => !r.synced && !r.blocked);
     const pendingEntries = raffleEntriesRef.current.filter((e) => !e.synced);
     if (!pending.length && !pendingEntries.length) return;
 
@@ -250,6 +299,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         for (const entry of pending) {
           try {
             await pushRegistration({
+              regId: entry.regId,
+              seatId: entry.seatId,
               eventId: entry.eventId,
               code: entry.code,
               name: entry.name,
@@ -260,16 +311,31 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             setState((s) => ({
               ...s,
               registrations: s.registrations.map((r) =>
-                r.code === entry.code ? { ...r, synced: true } : r,
+                r.regId === entry.regId ? { ...r, synced: true } : r,
               ),
             }));
             console.log(`[kayit] ${entry.code} Firestore'a yazıldı.`);
           } catch (err: unknown) {
-            // Stop at the first failure rather than working through the rest.
-            // One rejected write almost always means the backend is unreachable,
-            // and each further attempt costs a full 8s timeout. They stay
-            // pending and the next trigger picks them up.
             const message = err instanceof Error ? err.message : String(err);
+
+            // Yeniden denemenin düzeltemeyeceği tek hata sınıfı bu: kural
+            // reddetti. Sonsuza kadar denemek her açılışta bir yazma harcar ve
+            // öğrenciye "Gönderiliyor…" yazan bir ekran bırakır. Duruyoruz ve
+            // ekranda elle tekrar deneme kalıyor.
+            if (isRulesRejection(err)) {
+              setState((s) => ({
+                ...s,
+                registrations: s.registrations.map((r) =>
+                  r.regId === entry.regId ? { ...r, blocked: true } : r,
+                ),
+              }));
+              console.log(`[kayit] ${entry.code} kabul edilmedi: ${message}`);
+              continue;
+            }
+
+            // Kalanı ağ ya da erişilebilirlik sorunu. İlk hatada duruyoruz:
+            // her deneme 8 saniyelik zaman aşımına mal oluyor ve sebep hepsinde
+            // aynı. Beklemede kalıyorlar, sonraki tetikleyici alıyor.
             console.log(`[kayit] ${entry.code} gönderilemedi, beklemede: ${message}`);
             break;
           }
@@ -361,7 +427,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         // Saved locally first so the confirmation screen is instant and works
         // offline. The pending-sync effect sends it as soon as the state lands
         // and keeps retrying until it does.
-        const entry: Registration = { ...input, code: makeCode(), synced: false };
+        const entry: Registration = {
+          ...input,
+          regId: `${input.eventId}__${input.studentNo}`,
+          seatId: makeEntryId(),
+          code: makeCode(),
+          synced: false,
+        };
         setState((s) => ({ ...s, registrations: [...s.registrations, entry] }));
         return entry;
       },

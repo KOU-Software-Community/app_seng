@@ -22,7 +22,14 @@ export type ClubEvent = {
   /** Registration deadline is imminent — drives the "SON GUN" badge. */
   soon: boolean;
   badge: string;
-  spots: string;
+  /**
+   * Kontenjan. Tanımsız ya da 0 ise sınırsız.
+   *
+   * Eskiden `spots` diye serbest metindi ("12 / 60 yer kaldı") — elle yazılan,
+   * hiçbir şeyden türemeyen ve kimse kayıt oldukça güncellenmeyen bir cümle.
+   * Kalan yer artık gerçekten kayıt sayısından çıkıyor; bkz. `seatsLeft`.
+   */
+  capacity?: number;
   desc: string;
   tags: string[];
   speaker: string;

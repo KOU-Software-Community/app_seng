@@ -21,7 +21,8 @@ import {
   Segmented,
   Txt,
 } from '../../src/components/ui';
-import { useEvent } from '../../src/content';
+import { useContent, useEvent } from '../../src/content';
+import { isFull } from '../../src/eventSchema';
 import { DEPARTMENTS, PRIVACY_POLICY_URL, YEARS } from '../../src/data';
 import { useAppStore } from '../../src/store';
 import { colors, fonts, gradients, radius } from '../../src/theme';
@@ -33,7 +34,8 @@ export default function RegistrationRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
-  const { register } = useAppStore();
+  const { registeredCount } = useContent();
+  const { register, registrationFor } = useAppStore();
 
   const [name, setName] = useState('');
   const [studentNo, setStudentNo] = useState('');
@@ -45,10 +47,15 @@ export default function RegistrationRoute() {
   // After every hook, so the early return cannot change the hook order.
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
+  // Detay ekranı dolu etkinlikte düğmeyi göstermiyor ama bu ekrana derin
+  // bağlantıyla da gelinebiliyor. Zaten kayıtlı olan öğrenci engellenmiyor:
+  // kontenjan dolduğu için kendi kaydını tekrar göndermesi kapanmamalı.
+  const full = isFull(event, registeredCount(event.id)) && !registrationFor(event.id);
+
   const noValid = new RegExp(`^\\d{${STUDENT_NO_LENGTH}}$`).test(studentNo);
   // Only complain once they have started typing.
   const noError = studentNo.length > 0 && !noValid;
-  const valid = name.trim().length > 2 && noValid && !!department && !!year && kvkk;
+  const valid = !full && name.trim().length > 2 && noValid && !!department && !!year && kvkk;
 
   const submit = () => {
     if (!valid) return;
@@ -197,7 +204,7 @@ export default function RegistrationRoute() {
 
       <View style={[styles.submitBar, { paddingBottom: insets.bottom + 16 }]}>
         <PrimaryButton
-          label={valid ? 'Kaydımı Tamamla' : 'Alanları doldur'}
+          label={full ? 'Kontenjan doldu' : valid ? 'Kaydımı Tamamla' : 'Alanları doldur'}
           onPress={submit}
           disabled={!valid}
         />

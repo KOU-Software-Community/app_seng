@@ -294,7 +294,13 @@ function categoryOptions(current: string): string {
 export function eventForm(
   values: Record<string, unknown>,
   errors: FieldError,
-  opts: { editing: boolean },
+  opts: {
+    editing: boolean;
+    /** Gerçek kayıt sayısı — `registrations` koleksiyonundan. */
+    registered?: number;
+    /** Uygulamanın gördüğü sayı — `eventSeats` dokümanından. */
+    shown?: number;
+  },
 ): string {
   const v = (k: string) => esc(values[k] ?? '');
   const e = (k: string) => (errors[k] ? `<div class="err">${esc(errors[k])}</div>` : '');
@@ -364,8 +370,9 @@ export function eventForm(
         </div>
 
         <div class="row">
-          <label>Kontenjan metni
-            <input type="text" name="spots" value="${v('spots')}" placeholder="12 / 60 yer kaldı">
+          <label>Kontenjan <span class="hint">(boş = sınırsız)</span>
+            <input type="number" name="capacity" min="0" max="999999" value="${v('capacity')}">
+            ${e('capacity')}
           </label>
           <label>Etiketler <span class="hint">(virgülle)</span>
             <input type="text" name="tags" value="${v('tags')}" placeholder="Başlangıç seviye, Laptop getir">
@@ -393,6 +400,29 @@ export function eventForm(
         </div>
       </form>
     </div>
+
+    ${
+      opts.registered === undefined
+        ? ''
+        : `<div class="card">
+             <h2 style="font-size:15px">Kayıtlar</h2>
+             <p class="hint" style="margin-top:0">
+               Gerçek kayıt sayısı <strong>${opts.registered}</strong>.
+               Uygulamanın gördüğü sayı <strong>${opts.shown ?? 0}</strong>.
+               Kalan yer bu ikinciden hesaplanıyor.
+             </p>
+             ${
+               opts.registered === (opts.shown ?? 0)
+                 ? '<p class="hint">İkisi aynı — yapılacak bir şey yok.</p>'
+                 : `<div class="banner">Sayılar ayrışmış. Uygulama ${
+                     (opts.shown ?? 0) > opts.registered ? 'olduğundan az' : 'olduğundan çok'
+                   } yer gösteriyor.</div>`
+             }
+             <form method="post" action="/events/${esc(values.id ?? '')}/seats">
+               <button class="btn-ghost" type="submit">Sayacı gerçek kayıtlara eşitle</button>
+             </form>
+           </div>`
+    }
 
     <div class="card">
       <h2 style="font-size:15px">Türetilen alanlar</h2>

@@ -123,6 +123,7 @@ bu kuralları hiç görmüyor; yazmak için kural gevşetmek gerekmez.
 | Etkinlikler | Firestore `events` → yoksa `src/data.ts` |
 | Arşiv | Aynı `events` listesinin tarihi geçmiş yarısı (`splitByDate`) |
 | Kayıtlar | Önce cihaza yazılır, sonra Firestore `registrations` |
+| Kalan kontenjan | `events.capacity` − `eventSeats/{id}.regIds.length` |
 | Duyurular | `https://api.kouseng.com/announcements` |
 | Bildirim tercihleri | Sadece cihaz (AsyncStorage) |
 
@@ -134,7 +135,7 @@ başarısız olursa kayıt `synced: false` olarak işaretlenir — öğrenci kod
 - `.env` — gerçek değerler. **Git'e girmiyor** (`.gitignore` içinde).
 - `.env.example` — boş şablon, repoda duruyor.
 - `src/firebaseConfig.ts` — sadece config okur, SDK import etmez.
-- `src/firebase.ts` — `getDb()`, `fetchContent()`, `pushRegistration()`.
+- `src/firebase.ts` — `getDb()`, `fetchContent()`, `pushRegistration()` (kayıt + koltuk tek batch).
 - `src/content.tsx` — `ContentProvider` + `useContent()`; Firestore/yerel geçişi burada.
 - `scripts/deploy-rules.mjs` — `npm run rules:deploy`.
 - `firestore.rules` — güvenlik kuralları. Depoda durması yetmez, yayınlanması gerekir.

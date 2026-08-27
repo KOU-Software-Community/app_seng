@@ -160,7 +160,7 @@ function formToInput(body: Record<string, unknown>): EventInput {
     title: s('title'),
     tag: s('tag'),
     desc: s('desc'),
-    spots: s('spots'),
+    capacity: s('capacity'),
     speaker: s('speaker'),
     speakerRole: s('speakerRole'),
     tags: s('tags').split(',').map((t) => t.trim()).filter(Boolean),
@@ -232,6 +232,35 @@ app.get('/', async (_req, res) => {
   );
 });
 
+/**
+ * Bir etkinliğin gerçek kayıt sayısı — `registrations` koleksiyonundan, Admin
+ * SDK ile. Uygulamanın gördüğü sayı `eventSeats`'ten geliyor; ikisi ayrıştığı
+ * an doğru olan bu.
+ */
+async function trueRegisteredCount(eventId: string): Promise<number> {
+  const snap = await db.collection('registrations').where('eventId', '==', eventId).count().get();
+  return snap.data().count;
+}
+
+/**
+ * Koltuk dokümanını gerçek kayıtlardan yeniden kurar.
+ *
+ * Uygulama koltuğu kaydın kimliğiyle `arrayUnion` ediyor, yani normal şartlarda
+ * ayrışmaz. Ayrışabileceği iki yol var: kuralları geçen ama kayıt yazmayan
+ * elle atılmış bir istek, ve panelden silinen bir kayıt. İkisi de burada
+ * düzeliyor.
+ */
+async function rebuildSeats(eventId: string): Promise<number> {
+  const snap = await db.collection('registrations').where('eventId', '==', eventId).get();
+  // Doküman kimliği değil, kaydın kendi koltuk jetonu: kimlikte öğrenci
+  // numarası geçiyor ve bu liste herkese açık.
+  const seatIds = snap.docs
+    .map((d) => (d.data() as { seatId?: unknown }).seatId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  await db.collection('eventSeats').doc(eventId).set({ eventId, seatIds });
+  return seatIds.length;
+}
+
 app.get('/events/new', (_req, res) => {
   res.type('html').send(eventForm({}, {}, { editing: false }));
 });
@@ -262,7 +291,13 @@ app.post('/events/new', async (req, res) => {
   }
 
   const { id, ...rest } = built.event;
-  await ref.set({ ...rest, published: true });
+  // Koltuk dokümanı etkinlikle birlikte doğuyor. Uygulama ona `merge` ile
+  // yazıyor, yani yokken de çalışırdı — ama o zaman kural "var olan sayıya +1"
+  // diyemezdi ve ilk kaydı doğrulayamazdı.
+  await Promise.all([
+    ref.set({ ...rest, published: true }),
+    db.collection('eventSeats').doc(id).set({ eventId: id, seatIds: [] }),
+  ]);
   res.redirect('/');
 });
 
@@ -271,7 +306,16 @@ app.get('/events/:id', async (req, res) => {
   if (!doc.exists) return res.status(404).type('html').send(page('Bulunamadı', '<div class="card">Etkinlik bulunamadı.</div>'));
 
   const event = { id: doc.id, ...(doc.data() as Omit<ClubEvent, 'id'>) } as ClubEvent;
-  res.type('html').send(eventForm(inputToForm(toInput(event)), {}, { editing: true }));
+  const seats = await db.collection('eventSeats').doc(req.params.id).get();
+  const shown = (seats.data()?.seatIds as string[] | undefined)?.length ?? 0;
+
+  res.type('html').send(
+    eventForm(inputToForm(toInput(event)), {}, {
+      editing: true,
+      registered: await trueRegisteredCount(req.params.id),
+      shown,
+    }),
+  );
 });
 
 app.post('/events/:id', async (req, res) => {
@@ -292,8 +336,19 @@ app.post('/events/:id', async (req, res) => {
 });
 
 app.post('/events/:id/delete', async (req, res) => {
-  await db.collection('events').doc(req.params.id).delete();
+  await Promise.all([
+    db.collection('events').doc(req.params.id).delete(),
+    // Sahipsiz koltuk dokümanı bırakmıyoruz: aynı kimlikle yeni bir etkinlik
+    // açılırsa eski kayıtların koltuklarıyla dolu başlardı.
+    db.collection('eventSeats').doc(req.params.id).delete(),
+  ]);
   res.redirect('/');
+});
+
+/** Uygulamanın gördüğü sayıyı gerçek kayıtlara eşitler. */
+app.post('/events/:id/seats', async (req, res) => {
+  await rebuildSeats(req.params.id);
+  res.redirect(`/events/${encodeURIComponent(req.params.id)}`);
 });
 
 // ---------------------------------------------------------------- kayıtlar
