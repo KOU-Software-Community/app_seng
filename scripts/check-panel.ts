@@ -9,6 +9,7 @@
  * veriyi silmemesi** (gizlenen alan formdan da düşerse kaydetmek onu sessizce
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
+import { isBucketMissing } from '../admin/photos';
 import { archiveList, eventForm } from '../admin/views';
 
 let failed = 0;
@@ -112,6 +113,42 @@ assert('liste kaçırılıyor', !/<img src=x/.test(escapedList), 'ham <img çık
 // parçalar taşıyor.
 const withError = eventForm(VALUES, { photos: nasty }, { editing: true, archive: true });
 assert('hata mesajı kaçırılıyor', !/<img src=x/.test(withError));
+
+// 7. Yükleme hatasının tanınması.
+//
+// Bu kontrol var çünkü tam olarak burası kaçırıldı: `err.code === 404` diye
+// bakılıyordu, gaxios 6 ise `status` yazıyor. Sonuç, yöneticiye üç kez üst üste
+// "Bir şeyler ters gitti" göstermek oldu. Aşağıdaki nesne gerçek bir panel
+// günlüğünden, olduğu gibi.
+const GAXIOS_404 = Object.assign(
+  new Error(
+    '{\n  "error": {\n    "code": 404,\n' +
+      '    "message": "The specified bucket does not exist.",\n' +
+      '    "errors": [ { "reason": "notFound" } ]\n  }\n}\n',
+  ),
+  { status: 404, response: { status: 404 } },
+);
+assert('gaxios 404 tanınıyor (status alanı)', isBucketMissing(GAXIOS_404));
+
+// Katman değişip sayıyı başka bir alana koyarsa mesaj hâlâ tanıyor.
+assert(
+  'yalnızca mesajdan da tanınıyor',
+  isBucketMissing(new Error('The specified bucket does not exist.')),
+);
+// Eski biçim de tanınmaya devam etsin.
+assert('code alanı da tanınıyor', isBucketMissing(Object.assign(new Error('x'), { code: 404 })));
+
+// Ve tanımaması gerekenler: bunlar için kuruluma dair bir şey söylemek yanlış
+// yönlendirme olur.
+assert(
+  'kimlik hatası bucket hatası sayılmıyor',
+  !isBucketMissing(Object.assign(new Error('16 UNAUTHENTICATED'), { code: 16 })),
+);
+assert(
+  'yetki hatası bucket hatası sayılmıyor',
+  !isBucketMissing(Object.assign(new Error('Permission denied'), { status: 403 })),
+);
+assert('sıradan hata sayılmıyor', !isBucketMissing(new Error('socket hang up')));
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

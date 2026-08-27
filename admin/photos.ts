@@ -46,6 +46,41 @@ function objectPath(eventId: string): string {
 export class PhotoUploadError extends Error {}
 
 /**
+ * "Bucket yok" hatası mı?
+ *
+ * `err.code === 404` diye bakılıyordu ve **hiç tutmuyordu**: gaxios 6 bu durumda
+ * `code` yazmıyor, `status` yazıyor. Hata genel yakalayıcıya düşüp yöneticiye
+ * yine "Bir şeyler ters gitti" gösteriyordu.
+ *
+ * Artık üçüne birden bakılıyor. Mesaj kontrolü de var çünkü katman değişirse
+ * (Admin SDK sararsa) sayısal alanların hangisinin taşındığı yine değişebilir;
+ * Storage'ın kendi cümlesi değişmiyor.
+ */
+export function isBucketMissing(err: unknown): boolean {
+  const e = err as { code?: unknown; status?: unknown; message?: unknown };
+  const status = Number(e?.status ?? e?.code);
+  return status === 404 || /bucket does not exist/i.test(String(e?.message ?? ''));
+}
+
+/**
+ * Projede gerçekten hangi bucket'lar var?
+ *
+ * Hata mesajına ekleniyor. "Bucket yok" iki farklı sebepten geliyor — Storage
+ * hiç açılmamış, ya da ad tutmuyor — ve ikisi aynı 404'ü veriyor. Listeyi
+ * göstermek ayrımı yöneticinin yerine yapıyor.
+ */
+async function existingBuckets(): Promise<string> {
+  try {
+    const [buckets] = await getStorage().bucket(bucketName()).storage.getBuckets();
+    if (!buckets.length) return 'Projede hiç bucket yok — Storage henüz açılmamış.';
+    return `Projedeki bucket'lar: ${buckets.map((b) => b.name).join(', ')}`;
+  } catch {
+    // Listeleme yetkisi olmayabilir. Asıl hatayı bunun üstüne yığmıyoruz.
+    return 'Projedeki bucket listesi okunamadı.';
+  }
+}
+
+/**
  * Bir görseli küçültüp yükler ve indirme adresini döndürür.
  *
  * Adres `firebasestorage.googleapis.com/...?token=` biçiminde. `makePublic()`
@@ -74,16 +109,17 @@ export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<
       },
     });
   } catch (err) {
-    // 404 "bucket does not exist" en sık görülen kurulum hatası ve genel
-    // yakalayıcıya bırakılırsa yönetici "Bir şeyler ters gitti" görüyor —
-    // yedi fotoğraf seçtiği için mi, Storage kapalı olduğu için mi bilmiyor.
-    if ((err as { code?: number }).code === 404) {
+    // En sık görülen kurulum hatası. Genel yakalayıcıya bırakılırsa yönetici
+    // "Bir şeyler ters gitti" görüyor — fotoğraf sayısı yüzünden mi, Storage
+    // kapalı olduğu için mi bilmiyor.
+    if (isBucketMissing(err)) {
       throw new PhotoUploadError(
         `Storage bucket bulunamadı: ${bucketName()}\n\n` +
-          'Firebase Console → Storage → "Get started" adımı tamamlanmadan bucket ' +
-          'oluşmuyor; yapılandırmada adı görünse bile ortada bir bucket olmuyor.\n' +
-          'Storage zaten açıksa Console’daki gerçek bucket adını ' +
-          'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ile karşılaştırın — eski projeler ' +
+          `${await existingBuckets()}\n\n` +
+          'Liste boşsa: Firebase Console → Storage → "Get started". Bucket ancak o ' +
+          'adımda oluşuyor; yapılandırmada adı görünmesi yetmiyor.\n' +
+          'Listede başka bir ad varsa: onu .env dosyasındaki ' +
+          'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET değerine yazın. Eski projeler ' +
           '<proje>.appspot.com, yeniler <proje>.firebasestorage.app kullanıyor.',
       );
     }

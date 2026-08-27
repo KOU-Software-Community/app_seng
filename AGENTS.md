@@ -203,6 +203,12 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   you meant. Deleting the retry branch from `registrations` left the check green because
   `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
   one block out before matching.
+- **An error branch you never triggered is a branch you never wrote.** The panel's
+  "Storage bucket not found" message matched `err.code === 404`; gaxios 6 puts the
+  number in `err.status` and leaves `code` unset, so the branch never ran and the
+  operator kept seeing the generic page. It was written from the shape of the error I
+  assumed, never from one I had seen. `check:panel` now carries the real object out of a
+  panel log — the same way `check:html` carries real announcement bodies.
 - **A field the form stops showing is a field the form stops sending.** The archive
   form hides capacity and the badge because they mean nothing for an event that
   already happened — and saving would then have wiped both. They are rendered as
