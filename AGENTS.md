@@ -308,9 +308,35 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   bulunamadı". Play needs draft for the *first* upload of an app that has never had a
   release; leaving it there afterwards is a test channel with no testers. `check:release`
   now refuses it, so turning it back on has to be deliberate.
-- TestFlight's "the requested app is not available or doesn't exist" is never the
-  build's export compliance here — `ITSAppUsesNonExemptEncryption: false` is already in
-  `app.json`, so no build ever waits on that question. It is a distribution fact: the
-  build is still processing, it was not added to a tester group, or the device is signed
-  into a different Apple ID than the invitation. Nothing in this repo can cause or fix
-  it, and nothing in this repo can observe it either — checking means App Store Connect.
+- **TestFlight's "the requested app is not available or doesn't exist" is an App Store
+  Connect availability fact, not a build fact.** The EAS xcodebuild log settles the
+  build side on its own: `ARCHIVE SUCCEEDED`, zero errors, `beta-reports-active = 1`
+  (an entitlement only App Store distribution profiles carry), no `ProvisionedDevices`
+  (so not ad-hoc), `get-task-allow = 0`, minimum iOS 15.1. A binary that signs like that
+  cannot be the reason a tester cannot install it. Do not go looking in `app.json` —
+  export compliance is already answered there, and it produces a "Missing Compliance"
+  banner, not this error.
+  The reported cause that matches the signature — *visible in TestFlight, notification
+  arrives, install fails instantly* — is the app's **Pricing and Availability →
+  App Availability** left with countries in `Processing`, which is account-shaped: it
+  hits every app at once and survives new builds, which is why it looks like a build
+  problem and is not one. Next is Agreements, Tax and Banking pending account-wide.
+  Beyond that it is a known Apple-side bug that only Developer Support clears.
+  **Unverified from this repo:** none of it can be observed here — `eas-cli` has no
+  credentials in the container and App Store Connect has no read path. Treat the above
+  as where to look, not as a diagnosis, and never assert which one it was.
+- **EAS's remote version counter and Play's used-code list are two separate ledgers.**
+  With `appVersionSource: "remote"`, `autoIncrement` bumps a number EAS keeps for the
+  project — initialised from the local config and updated only by EAS builds. It has no
+  idea what Play already holds. So a fresh build can auto-increment perfectly and still
+  land on a `versionCode` Play has seen, and the error reads as though autoIncrement had
+  failed when it did exactly what it promises. `eas build:version:get --platform android`
+  shows the counter; `eas build:version:set` moves it above what the store holds. A
+  rebuild alone does not fix a counter that is behind — it just burns another number.
+- **`releaseStatus` lives in `submit`, so changing it does not need a new build.** The
+  artifact is unaffected by anything under `eas.json` → `submit`; only `eas submit` reads
+  it. When that setting stranded a build as a draft in Play, the fix was to publish the
+  draft already uploaded there (Internal testing → the draft → review → roll out), not
+  to rebuild. Saying "the config only affects future submits" invited exactly the
+  unnecessary build it was meant to prevent — say which command reads a setting, not
+  just when it takes effect.
