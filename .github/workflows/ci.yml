@@ -1,0 +1,39 @@
+# Depodaki kontroller yalnızca birinin hatırlaması hâlinde çalışıyordu.
+#
+# `check:all` altı saniye sürüyor ve 180'den fazla assertion taşıyor; her biri
+# gerçekten bir kez yanlış gitmiş bir şeyi koruyor. Kimsenin çalıştırmadığı bir
+# kontrol, olmayan bir kontroldür.
+name: check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Aynı dala arka arkaya push yapıldığında eskisini iptal et: ikinci push'un
+# sonucu zaten birincisininkini geçersiz kılıyor.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` — `npm install` değil. Lock dosyasına birebir uyar ve uymuyorsa
+      # sessizce güncellemek yerine hata verir.
+      - run: npm ci
+
+      # typecheck · release · schema · html · raffle
+      - run: npm run check:all
+
+      # Paketleme ve import hataları typecheck'e takılmıyor: eksik bir dosya ya
+      # da çözülemeyen bir modül ancak Metro paketlerken ortaya çıkıyor.
+      - run: npx expo export --platform ios
