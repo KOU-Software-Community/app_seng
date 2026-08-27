@@ -12,9 +12,14 @@ on:
 
 # Aynı dala arka arkaya push yapıldığında eskisini iptal et: ikinci push'un
 # sonucu zaten birincisininkini geçersiz kılıyor.
+#
+# `main` hariç. Üç PR arka arkaya merge edilince ilk ikisinin koşusu iptal oldu
+# ve o iki commit hiç kontrol edilmemiş kaldı. Dal koşularında bu sorun değil —
+# önemli olan dalın son hâli — ama main'de her commit'in yeşil olduğunu bilmek
+# gerekiyor, yoksa "hangi commit'te bozuldu" sorusunun cevabı kayboluyor.
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
