@@ -81,6 +81,45 @@ check(
 );
 
 check(
+  'app.json şemada olmayan alan taşımıyor',
+  '`newArchEnabled` SDK 52-53’te geçerliydi; 57’de yeni mimari tek seçenek olduğu ' +
+    'için alan şemadan kalktı. Kalması `expo doctor`’ı kırmızıya düşürüyordu ve ' +
+    'yaptığı hiçbir şey yoktu — zaten açık olan bir şeyi açıyordu.',
+  () => {
+    const raw = read('app.json');
+    const stale = ['newArchEnabled'].filter((k) => raw.includes(`"${k}"`));
+    return stale.length ? `app.json hâlâ taşıyor: ${stale.join(', ')}` : null;
+  },
+);
+
+check(
+  'paket sürümleri SDK ile uyuşuyor',
+  '`expo doctor` on bir paketin SDK’nın beklediği sürümde olmadığını söylemişti — ' +
+    'EAS build’de, yani en geç görülecek yerde. Caret aralığı (`^0.10.0`) SDK’nın ' +
+    'hiç denemediği bir sürüme çözülebiliyor ve sonuç yalnızca gerçek cihazda ortaya ' +
+    'çıkıyor.\n' +
+    'Bu kontrolün yetkilisi **kurulu** expo: beklenen sürümler onun içindeki listede. ' +
+    'Yani expo’nun kendisi eskiyse liste de eski olur ve kontrol eski beklentiye karşı ' +
+    'yeşil verir — tam olarak bu oldu. `expo` sürümü o yüzden ayrıca sabitleniyor.\n' +
+    'Kırmızıya dönerse: `npm run deps:sync`. Elle sürüm yazılmıyor.',
+  () => {
+    // Expo hangi sürümü beklediğini bu dosyada tutuyor; tahmin etmeye gerek yok.
+    const bundled = json('node_modules/expo/bundledNativeModules.json');
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const bad = Object.entries(bundled)
+      .filter(([name, want]) => deps[name] && deps[name] !== want)
+      .map(([name, want]) => `${name} ${deps[name]} ≠ ${want}`);
+
+    // `expo` kendi listesinde yok. Kurulu sürümüyle karşılaştırılıyor: paket
+    // yükseltilip package.json unutulursa bir sonraki `npm ci` eskiye döner.
+    const installed = json('node_modules/expo/package.json').version;
+    if (deps.expo !== `~${installed}`) bad.push(`expo ${deps.expo} ≠ ~${installed}`);
+
+    return bad.length ? bad.join(', ') : null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

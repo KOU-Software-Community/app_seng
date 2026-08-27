@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "kykapp",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "primaryColor": "#0389BC",
     "assetBundlePatterns": [
       "**/*"
