@@ -130,6 +130,23 @@ check(
 );
 
 check(
+  'submit ayarı testçilere ulaşıyor',
+  'Android testçileri "öğe bulunamadı" gördü ve build kusursuzdu: submit ayarı ' +
+    '`releaseStatus: "draft"` taşıyordu. Draft bir sürüm Play Console’da durur, hiçbir ' +
+    'kanala dağıtılmaz — yükleme başarılı görünür, EAS yeşil der, kimse indiremez. ' +
+    'Play’in ilk yüklemesinde gerekebiliyor; orada kalması testçisi olmayan bir test ' +
+    'kanalı demek. Bilerek draft’a alınacaksa bu kontrol de bilerek değiştirilsin.',
+  () => {
+    const android = json('eas.json').submit?.production?.android;
+    if (!android) return 'eas.json: submit.production.android yok';
+    if (android.releaseStatus === 'draft') {
+      return `eas.json: releaseStatus "draft" — "${android.track}" kanalındaki testçilere ulaşmaz`;
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

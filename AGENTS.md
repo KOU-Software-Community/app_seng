@@ -301,3 +301,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   one state a dependency-sync tool never finds in the wild — after a pull, after a
   branch switch, on a colleague's first clone, `node_modules` is behind by definition.
   Test the state the user is actually in, not the state you happen to be in.
+- **A successful upload is not a delivered build.** `eas.json` carried
+  `submit.production.android.releaseStatus: "draft"`, and a draft release sits in Play
+  Console without being distributed to any track — `eas submit` reports success, the
+  build is genuinely there, and every tester on the internal track sees "öğe
+  bulunamadı". Play needs draft for the *first* upload of an app that has never had a
+  release; leaving it there afterwards is a test channel with no testers. `check:release`
+  now refuses it, so turning it back on has to be deliberate.
+- TestFlight's "the requested app is not available or doesn't exist" is never the
+  build's export compliance here — `ITSAppUsesNonExemptEncryption: false` is already in
+  `app.json`, so no build ever waits on that question. It is a distribution fact: the
+  build is still processing, it was not added to a tester group, or the device is signed
+  into a different Apple ID than the invitation. Nothing in this repo can cause or fix
+  it, and nothing in this repo can observe it either — checking means App Store Connect.
