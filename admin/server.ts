@@ -20,7 +20,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import 'dotenv/config';
+import '../scripts/load-env';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';

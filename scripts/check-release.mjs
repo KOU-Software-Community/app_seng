@@ -421,6 +421,43 @@ check(
 );
 
 check(
+  'tek koleksiyon uygulamayı karartmıyor',
+  '`eventSeats` okuması `Promise.all` içindeydi. Kuralı yayınlanmadığı için ' +
+    'reddedilince etkinlikler ve çekilişler de düştü — okunabildikleri hâlde. ' +
+    'Uygulama tamamen boş açıldı ve "Missing or insufficient permissions" yazdı. ' +
+    'Kalan yer bir zenginleştirme; takvim onsuz da doğru.',
+  () => {
+    const fb = read('src/firebase.ts');
+    const all = /Promise\.all\(\[([\s\S]*?)\]\)/.exec(fb)?.[1] ?? '';
+    if (/eventSeats/.test(all)) return 'koltuk okuması hâlâ Promise.all içinde';
+    if (!/catch \(err: unknown\)[\s\S]{0,400}Koltuk sayıları okunamadı/.test(fb)) {
+      return 'koltuk okumasının hatası yakalanmıyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'sunucu tarafı .env.local okuyor',
+  '`import \'dotenv/config\'` yalnızca `.env` okuyor; `.env.local` bir Expo geleneği, ' +
+    'dotenv’in değil. Yani `npm start` onu görüyor, `npm run admin` görmüyordu. ' +
+    'Belgeler "gizli değerler .env.local’e" diyordu ve panel onları hiç okumuyordu: ' +
+    'anahtar doğru yerde duruyor, hiçbir şey çalışmıyor, ortada hata da yok.',
+  () => {
+    const entries = ['admin/server.ts', 'scripts/send-push.ts', 'scripts/export-registrations.ts'];
+    const bare = entries.filter((f) => /'dotenv\/config'/.test(read(f)));
+    if (bare.length) return `hâlâ doğrudan dotenv/config: ${bare.join(', ')}`;
+    const missing = entries.filter((f) => !/load-env/.test(read(f)));
+    if (missing.length) return `ortam yükleyici bağlı değil: ${missing.join(', ')}`;
+    // Sıra da önemli: dotenv var olanın üzerine yazmıyor, önce yüklenen kazanıyor.
+    if (!/\['\.env\.local', '\.env'\]/.test(read('scripts/load-env.ts'))) {
+      return 'yükleyici .env.local’i .env’den önce okumuyor';
+    }
+    return null;
+  },
+);
+
+check(
   'boş Firestore hata sayılmıyor',
   'Boş koleksiyon `error`’a geliştirici mesajı yazıyordu ("`npm run seed` çalıştırın"). ' +
     'src/data.ts artık boş olduğu için düşülecek yerel içerik de yok — sıradan bir boş ' +

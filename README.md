@@ -133,7 +133,11 @@ başarısız olursa kayıt `synced: false` olarak işaretlenir — öğrenci kod
 
 ### Dosyalar
 
-- `.env` — gerçek değerler. **Git'e girmiyor** (`.gitignore` içinde).
+- `.env` ve `.env.local` — gerçek değerler. **İkisi de git'e girmiyor.**
+  Çakışırsa `.env.local` kazanıyor (Expo'nun sırası). Sunucu tarafı
+  (`npm run admin`, `push`, `export`) `scripts/load-env.ts` üzerinden ikisini de
+  okuyor — düz `dotenv/config` yalnızca `.env` okur ve `.env.local`'i sessizce
+  yok sayar.
 - `.env.example` — boş şablon, repoda duruyor.
 - `src/firebaseConfig.ts` — sadece config okur, SDK import etmez.
 - `src/firebase.ts` — `getDb()`, `fetchContent()`, `pushRegistration()` (kayıt + koltuk tek batch).
