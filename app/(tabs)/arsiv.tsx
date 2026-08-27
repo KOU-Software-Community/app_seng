@@ -112,7 +112,7 @@ function ArchiveCard({ event, onPress }: { event: ClubEvent; onPress: () => void
       accessibilityLabel={`${event.title} — etkinlik detayı`}
       style={({ pressed }) => [styles.card, { transform: [{ translateY: pressed ? -2 : 0 }] }]}
     >
-      <PhotoSlot label="Foto" style={styles.cardPhoto}>
+      <PhotoSlot uri={event.photos?.[0]} label="Foto" style={styles.cardPhoto}>
         {parsed ? (
           <View style={styles.yearBadge}>
             <PixelTxt size={6} color={colors.onNavy}>

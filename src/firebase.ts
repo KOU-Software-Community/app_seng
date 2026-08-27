@@ -97,16 +97,32 @@ export async function fetchContent(): Promise<{
   //
   // Koltuklar da tek okumada geliyor — etkinlik başına ayrı bir sayım sorgusu
   // değil, küçük dokümanlardan oluşan tek bir koleksiyon.
-  const [eventsSnap, rafflesSnap, seatsSnap] = await Promise.all([
+  const [eventsSnap, rafflesSnap] = await Promise.all([
     withTimeout(getDocs(query(collection(db, COLLECTIONS.events), orderBy('startsAt'))), 'events'),
     withTimeout(getDocs(collection(db, COLLECTIONS.raffles)), 'raffles'),
-    withTimeout(getDocs(collection(db, COLLECTIONS.eventSeats)), 'eventSeats'),
   ]);
 
+  // Koltuklar ayrı ve hatası yutuluyor — bilerek.
+  //
+  // `Promise.all` içindeyken bu okuma başarısız olduğunda etkinlikler ve
+  // çekilişler de düşüyordu: `eventSeats` kuralı yayınlanmadan uygulama tamamen
+  // boş açıldı ve ekranda "Missing or insufficient permissions" yazdı. Oysa
+  // etkinlikler okunabiliyordu.
+  //
+  // Kalan yer bir zenginleştirme; takvim onsuz da doğru. Kontenjanı olan bir
+  // etkinlik bu durumda "Sınırsız" değil, sadece kalan yeri bilinmiyor gibi
+  // davranır ve kayıt açık kalır — dolu bir etkinliği kapatmamak, boş bir
+  // uygulama göstermekten iyi.
   const registered: Record<string, number> = {};
-  for (const d of seatsSnap.docs) {
-    const ids = (d.data() as { seatIds?: unknown }).seatIds;
-    registered[d.id] = Array.isArray(ids) ? ids.length : 0;
+  try {
+    const seatsSnap = await withTimeout(getDocs(collection(db, COLLECTIONS.eventSeats)), 'eventSeats');
+    for (const d of seatsSnap.docs) {
+      const ids = (d.data() as { seatIds?: unknown }).seatIds;
+      registered[d.id] = Array.isArray(ids) ? ids.length : 0;
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`[content] Koltuk sayıları okunamadı, kalan yer gösterilmeyecek: ${message}`);
   }
 
   return {

@@ -6,7 +6,7 @@
  * HTML'e girmez.** Etkinlik başlıkları ve öğrenci adları serbest metin; kaçış
  * atlanırsa panel kendi kendine XSS taşır.
  */
-import { EVENT_CATEGORIES } from '../src/eventSchema';
+import { EVENT_CATEGORIES, MAX_PHOTOS } from '../src/eventSchema';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -57,7 +57,26 @@ input:not([type=checkbox]), textarea, select {
 textarea { min-height: 96px; resize: vertical; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--blue); }
 .hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
-.err { color: var(--danger); font-size: 12.5px; font-weight: 600; margin-top: 5px; }
+.prefill { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 6px; }
+.photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+.photo { position: relative; width: 118px; }
+.photo img {
+  width: 100%; height: 84px; object-fit: cover;
+  border-radius: 8px; border: 1.5px solid var(--border); display: block;
+}
+.photo-drop {
+  display: flex; align-items: center; gap: 5px; margin: 6px 0 0;
+  font-size: 12px; font-weight: 600; color: var(--danger);
+}
+.photo-tag {
+  position: absolute; top: 6px; left: 6px; background: rgba(0,27,74,0.78);
+  color: #fff; font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 4px;
+}
+/* pre-line: kurulum hataları çok satırlı ve tek satıra sıkışınca okunmuyor. */
+.err {
+  color: var(--danger); font-size: 12.5px; font-weight: 600;
+  margin-top: 5px; white-space: pre-line;
+}
 .banner {
   background: #FDECEA; border: 1px solid #F5C6C2; color: var(--danger);
   padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px;
@@ -86,6 +105,7 @@ export function page(title: string, body: string, opts: { nav?: boolean } = {}):
     ? ''
     : `<nav>
          <a href="/">Etkinlikler</a>
+         <a href="/arsiv">Arşiv</a>
          <a href="/raffles">Çekilişler</a>
          <a href="/registrations">Kayıtlar</a>
          <form method="post" action="/logout" style="margin:0">
@@ -273,6 +293,84 @@ export function winnersForm(
 }
 
 /**
+ * Arşiv listesi — yalnızca tarihi geçmiş etkinlikler.
+ *
+ * Ayrı bir sayfa olmasının sebebi ayrı bir veri olması değil: arşiv, `events`
+ * listesinin geçmiş yarısı. Ama iş akışı ayrı — burada bakılan şey "hangi
+ * etkinliğin görseli eksik", takvimde bakılan şey "sırada ne var". Bir arada
+ * oldukları sürece ikisi de zor okunuyordu.
+ */
+export function archiveList(
+  rows: { id: string; title: string; short: string; tag: string; photos: number; attendance?: number }[],
+): string {
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td><strong>${esc(r.title)}</strong><br><span class="hint">${esc(r.short)}</span></td>
+        <td>${esc(r.tag)}</td>
+        <td>${
+          r.photos
+            ? `${r.photos} görsel`
+            : '<span class="hint" style="color:var(--danger)">görsel yok</span>'
+        }</td>
+        <td>${r.attendance === undefined ? '<span class="hint">—</span>' : `${r.attendance} kişi`}</td>
+        <td style="white-space:nowrap">
+          <a class="btn btn-ghost" style="padding:6px 12px;font-size:13px"
+             href="/arsiv/${encodeURIComponent(r.id)}">Düzenle</a>
+        </td>
+      </tr>`,
+    )
+    .join('');
+
+  return page(
+    'Arşiv',
+    `<div class="card">
+       <div style="display:flex;align-items:center;margin-bottom:16px">
+         <h2 style="margin:0">Arşiv</h2>
+         <a class="btn" style="margin-left:auto" href="/arsiv/yeni">Yeni arşiv kaydı</a>
+       </div>
+       <p class="hint" style="margin-top:0">
+         Tarihi geçmiş etkinlikler. Bir etkinlik kendi gününün ertesi sabahı buraya
+         geçiyor — ayrıca bir şey yapmak gerekmiyor. Uygulamada kayıt düğmesi
+         çıkmıyor, takvimde de görünmüyor.
+       </p>
+       ${
+         rows.length
+           ? `<table><thead><tr><th>Etkinlik</th><th>Kategori</th><th>Görsel</th><th>Katılım</th><th></th></tr></thead><tbody>${body}</tbody></table>`
+           : `<p class="empty">Arşivde etkinlik yok. Geçmiş bir etkinlik eklemek için
+              <strong>Yeni arşiv kaydı</strong> deyin.</p>`
+       }
+     </div>`,
+  );
+}
+
+/**
+ * Yüklü görseller: küçük önizleme + silme kutusu.
+ *
+ * Var olanlar gizli alan olarak geri gönderiliyor — form gönderilince sunucu
+ * neyin kaldığını ancak böyle biliyor. Silme ayrı bir kutu: bir görseli
+ * kaldırmak, kalanların sırasını bozmadan olmalı.
+ */
+function photoRows(photos: unknown): string {
+  const list = Array.isArray(photos) ? photos.map(String).filter(Boolean) : [];
+  if (!list.length) return '<p class="hint" style="margin:0 0 16px">Henüz görsel yok.</p>';
+
+  return `<div class="photos">${list
+    .map(
+      (url, i) => `<div class="photo">
+        <img src="${esc(url)}" alt="">
+        <input type="hidden" name="photo" value="${esc(url)}">
+        <label class="photo-drop">
+          <input type="checkbox" name="dropPhoto" value="${esc(url)}" style="width:auto">
+          Sil
+        </label>
+        ${i === 0 ? '<span class="photo-tag">Kapak</span>' : ''}
+      </div>`,
+    )
+    .join('')}</div>`;
+}
+
+/**
  * Kategori seçenekleri. Kayıtlı değer listede yoksa başa ekleniyor: panelin
  * menüsü değişti diye var olan bir etkinliğin kategorisi sessizce başka bir şeye
  * dönmemeli.
@@ -300,18 +398,56 @@ export function eventForm(
     registered?: number;
     /** Uygulamanın gördüğü sayı — `eventSeats` dokümanından. */
     shown?: number;
+    /**
+     * Arşiv kipi. Aynı form, çünkü arşiv kaydı ayrı bir varlık değil: tarihi
+     * geçmiş etkinliğin kendisi. Olmuş bir etkinlikte kontenjan ve "son gün"
+     * rozeti anlamsız, katılımcı sayısı ve görseller ise asıl mesele —
+     * dolayısıyla gösterilen alanlar değişiyor, veri modeli değil.
+     */
+    archive?: boolean;
+    /** Arşiv formunda "var olan etkinlikten doldur" listesi. */
+    sources?: { id: string; label: string }[];
   },
 ): string {
   const v = (k: string) => esc(values[k] ?? '');
   const e = (k: string) => (errors[k] ? `<div class="err">${esc(errors[k])}</div>` : '');
+  const archive = !!opts.archive;
+  const action = archive ? (opts.editing ? '' : '/arsiv/yeni') : '';
+
+  const title = archive
+    ? opts.editing
+      ? 'Arşiv kaydını düzenle'
+      : 'Yeni arşiv kaydı'
+    : opts.editing
+      ? 'Etkinliği düzenle'
+      : 'Yeni etkinlik';
 
   return page(
-    opts.editing ? 'Etkinliği düzenle' : 'Yeni etkinlik',
+    title,
     `<div class="card">
-      <h2>${opts.editing ? 'Etkinliği düzenle' : 'Yeni etkinlik'}</h2>
+      <h2>${title}</h2>
       ${Object.keys(errors).length ? '<div class="banner">Form kaydedilmedi — aşağıdaki alanları düzeltin.</div>' : ''}
+      ${
+        archive && !opts.editing && opts.sources?.length
+          ? `<form method="get" action="/arsiv/yeni" class="prefill">
+               <label style="flex:1;margin:0">Var olan etkinlikten doldur
+                 <select name="from">
+                   <option value="">Seçin…</option>
+                   ${opts.sources
+                     .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}</option>`)
+                     .join('')}
+                 </select>
+               </label>
+               <button class="btn-ghost" type="submit">Doldur</button>
+             </form>
+             <p class="hint" style="margin:0 0 18px">
+               Alanları kopyalar; <strong>yeni bir kayıt</strong> oluşturur. Kimliği
+               değiştirmeyi unutmayın — aynı kimlik var olan etkinliğin üzerine yazar.
+             </p>`
+          : ''
+      }
 
-      <form method="post">
+      <form method="post"${action ? ` action="${action}"` : ''} enctype="multipart/form-data">
         <div class="row">
           <label>Kimlik <span class="hint">(URL'de görünür, sonradan değiştirilemez)</span>
             <input type="text" name="id" value="${v('id')}" ${opts.editing ? 'readonly' : ''} placeholder="git-atolyesi" required>
@@ -370,10 +506,14 @@ export function eventForm(
         </div>
 
         <div class="row">
-          <label>Kontenjan <span class="hint">(boş = sınırsız)</span>
-            <input type="number" name="capacity" min="0" max="999999" value="${v('capacity')}">
-            ${e('capacity')}
-          </label>
+          ${
+            archive
+              ? `<input type="hidden" name="capacity" value="${v('capacity')}">`
+              : `<label>Kontenjan <span class="hint">(boş = sınırsız)</span>
+                   <input type="number" name="capacity" min="0" max="999999" value="${v('capacity')}">
+                   ${e('capacity')}
+                 </label>`
+          }
           <label>Etiketler <span class="hint">(virgülle)</span>
             <input type="text" name="tags" value="${v('tags')}" placeholder="Başlangıç seviye, Laptop getir">
           </label>
@@ -383,26 +523,42 @@ export function eventForm(
           </label>
         </div>
 
-        <div class="row">
-          <label>Rozet metni <span class="hint">(boşsa rozet çıkmaz)</span>
-            <input type="text" name="badge" value="${v('badge')}" placeholder="SON GUN">
-          </label>
-          <label style="flex:0 0 auto">
-            <input type="checkbox" name="soon" value="1" ${values.soon ? 'checked' : ''}
-                   style="width:auto;margin-right:8px">
-            Son gün rozetini göster
-          </label>
-        </div>
+        <label>Görseller <span class="hint">(ilki kapak — en fazla ${MAX_PHOTOS})</span>
+          <input type="file" name="photos" accept="image/*" multiple>
+        </label>
+        <p class="hint" style="margin:-8px 0 14px">
+          Yüklenen görseller 1600 px'e küçültülüp JPEG'e çevriliyor; telefondan
+          çıktığı gibi atabilirsiniz. Kapak arşiv kartında ve etkinlik detayının
+          üstünde, kalanı detaydaki galeride görünür.
+        </p>
+        ${e('photos')}
+        ${photoRows(values.photos)}
+
+        ${
+          archive
+            ? `<input type="hidden" name="badge" value="${v('badge')}">
+               ${values.soon ? '<input type="hidden" name="soon" value="1">' : ''}`
+            : `<div class="row">
+                 <label>Rozet metni <span class="hint">(boşsa rozet çıkmaz)</span>
+                   <input type="text" name="badge" value="${v('badge')}" placeholder="SON GUN">
+                 </label>
+                 <label style="flex:0 0 auto">
+                   <input type="checkbox" name="soon" value="1" ${values.soon ? 'checked' : ''}
+                          style="width:auto;margin-right:8px">
+                   Son gün rozetini göster
+                 </label>
+               </div>`
+        }
 
         <div class="actions">
           <button type="submit">${opts.editing ? 'Kaydet' : 'Oluştur'}</button>
-          <a class="btn btn-ghost" href="/">Vazgeç</a>
+          <a class="btn btn-ghost" href="${archive ? '/arsiv' : '/'}">Vazgeç</a>
         </div>
       </form>
     </div>
 
     ${
-      opts.registered === undefined
+      archive || opts.registered === undefined
         ? ''
         : `<div class="card">
              <h2 style="font-size:15px">Kayıtlar</h2>

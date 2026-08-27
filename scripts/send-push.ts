@@ -19,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import 'dotenv/config';
+import './load-env';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 

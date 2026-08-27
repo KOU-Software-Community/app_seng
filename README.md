@@ -123,7 +123,8 @@ bu kuralları hiç görmüyor; yazmak için kural gevşetmek gerekmez.
 | Etkinlikler | Firestore `events` → yoksa `src/data.ts` |
 | Arşiv | Aynı `events` listesinin tarihi geçmiş yarısı (`splitByDate`) |
 | Kayıtlar | Önce cihaza yazılır, sonra Firestore `registrations` |
-| Kalan kontenjan | `events.capacity` − `eventSeats/{id}.regIds.length` |
+| Kalan kontenjan | `events.capacity` − `eventSeats/{id}.seatIds.length` |
+| Görseller | Firebase Storage → adresler `events.photos` içinde |
 | Duyurular | `https://api.kouseng.com/announcements` |
 | Bildirim tercihleri | Sadece cihaz (AsyncStorage) |
 
@@ -132,7 +133,11 @@ başarısız olursa kayıt `synced: false` olarak işaretlenir — öğrenci kod
 
 ### Dosyalar
 
-- `.env` — gerçek değerler. **Git'e girmiyor** (`.gitignore` içinde).
+- `.env` ve `.env.local` — gerçek değerler. **İkisi de git'e girmiyor.**
+  Çakışırsa `.env.local` kazanıyor (Expo'nun sırası). Sunucu tarafı
+  (`npm run admin`, `push`, `export`) `scripts/load-env.ts` üzerinden ikisini de
+  okuyor — düz `dotenv/config` yalnızca `.env` okur ve `.env.local`'i sessizce
+  yok sayar.
 - `.env.example` — boş şablon, repoda duruyor.
 - `src/firebaseConfig.ts` — sadece config okur, SDK import etmez.
 - `src/firebase.ts` — `getDb()`, `fetchContent()`, `pushRegistration()` (kayıt + koltuk tek batch).
@@ -269,12 +274,69 @@ servis hesabı anahtarını kullanıyor (`.env.example` içindeki
 başa BOM konuyor, yoksa Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri
 bozuyor.
 
+## Arşiv paneli
+
+`/arsiv` yalnızca tarihi geçmiş etkinlikleri listeliyor ve her satırda kaç görsel
+olduğunu gösteriyor — sayfanın işi "hangi etkinliğin görseli eksik" sorusuna
+bakmak. Takvimde bakılan soru "sırada ne var", ikisi bir aradayken ikisi de zor
+okunuyordu.
+
+Arşiv ayrı bir koleksiyon **değil**: `events` listesinin geçmiş yarısı. Bir
+etkinlik kendi gününün ertesi sabahı arşive geçiyor, ayrıca bir şey yapmak
+gerekmiyor.
+
+- **Yeni arşiv kaydı** — uygulamadan önceki etkinlikler için. Tarihi geçmişte
+  olmak zorunda; gelecek tarihli bir kayıt takvimde görünür ve kayıt kabul ederdi.
+- **Var olan etkinlikten doldur** — alanları kopyalar, yeni bir kayıt oluşturur.
+  Kimliği değiştirmek gerekiyor, yoksa var olanın üzerine yazar.
+- Kontenjan, rozet ve son-gün alanları arşiv formunda **görünmüyor** (olmuş bir
+  etkinlikte anlamsızlar) ama gizli alan olarak korunuyorlar — kaydetmek var olan
+  değeri silmiyor.
+
+## Görseller
+
+Panelden yükleniyor, **Supabase Storage**'da duruyor. Etkinlik başına en fazla
+altı görsel: ilki kapak (arşiv kartı ve etkinlik detayının üstü), kalanı
+detaydaki galeri. Tek görsel varsa galeri hiç çıkmıyor.
+
+Yüklenen dosya 1600 px'e küçültülüp JPEG'e çevriliyor — telefondan çıktığı gibi
+atılabilir. Uygulama hiçbir depolama SDK'sı kullanmıyor; elinde bir adres var ve
+`<Image>` ile çekiyor.
+
+### Neden Firebase Storage değil
+
+Cloud Storage, 2024 sonrası açılan projelerde **Blaze planı** istiyor. Elli arşiv
+fotoğrafı için kart bağlamanın anlamı yok. Supabase ücretsiz katmanında 1 GB
+veriyor ve kart istemiyor.
+
+Firestore hâlâ Firebase'de: etkinlikler, kayıtlar, çekilişler, cihaz kayıtları.
+Supabase **yalnızca dosyaları** tutuyor. İki servis biraz çirkin ama alternatifi
+ücretsiz depolama için tüm veri katmanını yeniden yazmaktı.
+
+### Kurulum
+
+1. Supabase Dashboard → **Storage → New bucket**
+   - Ad: `event-photos`
+   - **Public bucket: açık** (uygulama görselleri adresle çekiyor)
+2. Project Settings → **API Keys → Secret keys → Reveal** → `.env.local`:
+   ```
+   SUPABASE_URL=https://<proje-ref>.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+   ```
+   **`sb_publishable_…` değil.** O anahtar istemciye gömülmek için var: okur,
+   yazamaz. Panel yanlış türü ilk istekten önce yakalayıp söylüyor — yoksa
+   Supabase "row-level security policy" der ve asıl sebebi hiç söylemez.
+
+`service_role` anahtarı Firebase servis hesabı anahtarıyla aynı sınıfta: RLS'i
+tamamen aşar, `EXPO_PUBLIC_` öneki almaz, uygulamaya girmez. `.env.local`
+gitignore'lu.
+
+Bucket yoksa ya da anahtarlar eksikse panel ne yapılması gerektiğini yazıyor —
+jenerik bir hata sayfası değil.
+
 ## Kalan işler
 
-1. **Fotoğraflar** — uygulamada fotoğraf deposu **yok**. `PhotoSlot` bir `uri`
-   prop'u alıyor, yani görseller Storage'a yüklenip URL'ler etkinlik dokümanlarına
-   eklendiğinde placeholder kendiliğinden düşer. O gün gelene kadar arşivde
-   fotoğraf sayısı gösterilmiyor — sayacak bir şey yok.
+1. **Mağaza ekran görüntüleri** ve EAS build/submit.
 
 ## Mağazaya çıkarma
 

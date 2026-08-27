@@ -96,9 +96,12 @@ graph queries first (`graphify query`, `path`, `explain`), file scans second.**
 - **Do not publish artifacts.**
 - **Do not work around the environment's network policy.** If something is unreachable,
   say it is unreachable. Never assert an outcome you did not observe.
-- **Keys:** only publishable/anon keys reach the app; service-role keys never do. Secrets
-  go in gitignored `.env.local`; values that are public by design go in the committed
-  `.env`.
+- **Keys:** only publishable/anon keys reach the app; service-role and Supabase secret
+  keys never do. **Both `.env` and `.env.local` are gitignored** — the line that called
+  `.env` "committed" was wrong, and nothing has ever been committed to it. Either file
+  is safe; `.env.local` wins where they overlap, matching Expo. Server-side entry points
+  go through `scripts/load-env.ts`, because `import 'dotenv/config'` reads only `.env`
+  and silently ignores `.env.local`.
 - **An assertion that cannot fail is worse than no assertion** — it reports green. When
   you add a check, break the thing it guards and watch it go red before trusting it.
 - Add `check:*` scripts to `package.json` when the first regression appears, not before,
@@ -203,6 +206,47 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   you meant. Deleting the retry branch from `registrations` left the check green because
   `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
   one block out before matching.
+- **Firebase Cloud Storage costs money on any project created after 2024** — the
+  default bucket needs Blaze, and the config's `storageBucket` value is a computed name
+  that appears whether or not a bucket exists. Event photos live in Supabase Storage
+  instead; Firestore stays where it is. The app never touched a storage SDK — it renders
+  a URL — so swapping providers was one file.
+- **`.env.local` is an Expo convention, not a dotenv one.** `import 'dotenv/config'`
+  loads `.env` and nothing else, so a key placed exactly where the docs said belongs
+  produced no error at all — just an undefined variable and a panel that did not work.
+  `scripts/load-env.ts` loads `.env.local` then `.env`; dotenv does not overwrite what
+  is already set, so first-loaded wins.
+- **One failed read inside `Promise.all` blacks out everything beside it.** `fetchContent`
+  fetched events, raffles and `eventSeats` together; the seat rule was not published yet,
+  so the whole app opened empty with "Missing or insufficient permissions" while the
+  events were perfectly readable. Seat counts are an enrichment — they are fetched
+  separately now and their failure only costs the remaining-seat line.
+- A publishable Supabase key in the panel's secret slot fails as
+  `row-level security policy`, which never names the actual cause. The key type is
+  visible in the value itself — `sb_publishable_` prefix, or `role: anon` in a legacy
+  JWT payload — so the panel refuses before the first request instead of relaying a
+  message about policies.
+- **An error branch you never triggered is a branch you never wrote.** The panel's
+  "Storage bucket not found" message matched `err.code === 404`; gaxios 6 puts the
+  number in `err.status` and leaves `code` unset, so the branch never ran and the
+  operator kept seeing the generic page. It was written from the shape of the error I
+  assumed, never from one I had seen. `check:panel` now carries the real object out of a
+  panel log — the same way `check:html` carries real announcement bodies.
+- **A field the form stops showing is a field the form stops sending.** The archive
+  form hides capacity and the badge because they mean nothing for an event that
+  already happened — and saving would then have wiped both. They are rendered as
+  hidden inputs instead, and `check:panel` asserts the values survive.
+- **Upload after validating, never before.** A rejected form that has already written
+  its files leaves objects in Storage that no event points at — quota is paid for them
+  and nobody ever notices. The panel validates, then uploads, and deletes what it
+  uploaded if the second build fails.
+- `makePublic()` throws on a bucket with uniform bucket-level access, which new Firebase
+  projects turn on by default. The download URL with a `firebaseStorageDownloadTokens`
+  metadata value works under both settings and does not make the bucket listable.
+- A multer `fileFilter` that answers `cb(null, false)` **drops the file silently**: the
+  event saves, the operator believes the photo uploaded, and it is nowhere. Pass an
+  error instead, and translate multer's codes — an unexplained "Bir şeyler ters gitti"
+  after picking seven photos tells the operator nothing.
 - **A check that reads comments finds its own rationale.** A guard has now gone red
   against correct code three times because the comment explaining *why* something was
   removed still contains its name — `addDoc`, `increment(1)`, `HOLD_MS`. Strip comments

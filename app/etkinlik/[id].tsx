@@ -4,6 +4,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PhotoGallery } from '../../src/components/PhotoGallery';
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
   Card,
@@ -52,6 +53,7 @@ export default function EventDetailRoute() {
         showsVerticalScrollIndicator={false}
       >
         <PhotoSlot
+          uri={event.photos?.[0]}
           label="Etkinlik görseli"
           gradient={gradients.hero}
           showLabel={false}
@@ -177,6 +179,11 @@ export default function EventDetailRoute() {
             </Card>
           ) : null}
         </View>
+
+        {/* Konuşmacı bloğunun dışında: şerit kenara kadar kayabilsin diye kendi
+            yatay boşluğunu kendi veriyor. Kapak hero'da çiziliyor, galeri
+            kalanları gösteriyor ve tek görsel varsa hiç çıkmıyor. */}
+        <PhotoGallery photos={event.photos ?? []} />
       </ScrollView>
 
       <LinearGradient
