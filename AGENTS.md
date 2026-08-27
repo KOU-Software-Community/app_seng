@@ -288,3 +288,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   SDK major from the registry, installs it, then writes that release's list into
   `package.json`. Expo's own major stays put: 57 → 58 is a migration, not a patch bump.
   Run it whenever `paket sürümleri SDK ile uyuşuyor` goes red.
+- **A tool that reads its expectations from disk must prove what it read.**
+  `deps:sync` takes the expected versions from the installed `expo`'s
+  `bundledNativeModules.json`. `git pull` updates `package.json` and leaves
+  `node_modules` alone — so the first thing it did on a freshly pulled checkout was
+  read *yesterday's* list and rewrite eleven correct versions **backwards**. The fix is
+  not a warning: it verifies the installed `expo` is the target before opening the
+  list, installs it if not, and re-checks afterwards. The same trap made
+  `check:release` print `~57.0.15 ≠ ~57.0.10`, which reads as "the new version is
+  wrong"; it now reports the stale `node_modules` instead and says `npm ci`.
+- **Every check ran against a tree where `node_modules` already matched.** That is the
+  one state a dependency-sync tool never finds in the wild — after a pull, after a
+  branch switch, on a colleague's first clone, `node_modules` is behind by definition.
+  Test the state the user is actually in, not the state you happen to be in.
