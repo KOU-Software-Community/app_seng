@@ -116,39 +116,33 @@ assert('hata mesajı kaçırılıyor', !/<img src=x/.test(withError));
 
 // 7. Yükleme hatasının tanınması.
 //
-// Bu kontrol var çünkü tam olarak burası kaçırıldı: `err.code === 404` diye
-// bakılıyordu, gaxios 6 ise `status` yazıyor. Sonuç, yöneticiye üç kez üst üste
-// "Bir şeyler ters gitti" göstermek oldu. Aşağıdaki nesne gerçek bir panel
-// günlüğünden, olduğu gibi.
-const GAXIOS_404 = Object.assign(
-  new Error(
-    '{\n  "error": {\n    "code": 404,\n' +
-      '    "message": "The specified bucket does not exist.",\n' +
-      '    "errors": [ { "reason": "notFound" } ]\n  }\n}\n',
-  ),
-  { status: 404, response: { status: 404 } },
+// Bu kontrol var çünkü tam olarak burası bir kez kaçırıldı: Firebase yolunda
+// `err.code === 404` diye bakılıyordu, gaxios ise `status` yazıyordu. Dal hiç
+// çalışmadı ve yöneticiye üç kez üst üste "Bir şeyler ters gitti" gösterildi.
+//
+// Supabase'in hata nesnesi başka bir şekle sahip ve `statusCode` **metin**
+// olarak geliyor. Aynı hatayı ikinci kez yapmamak için üç alan da sınanıyor.
+const SUPABASE_NO_BUCKET = {
+  statusCode: '404',
+  error: 'Bucket not found',
+  message: 'Bucket not found',
+};
+assert('supabase "Bucket not found" tanınıyor', isBucketMissing(SUPABASE_NO_BUCKET));
+assert(
+  'metin statusCode sayıya çevriliyor',
+  isBucketMissing({ statusCode: '404', message: 'başka bir şey' }),
 );
-assert('gaxios 404 tanınıyor (status alanı)', isBucketMissing(GAXIOS_404));
+assert('yalnızca mesajdan da tanınıyor', isBucketMissing({ message: 'Bucket not found' }));
 
-// Katman değişip sayıyı başka bir alana koyarsa mesaj hâlâ tanıyor.
+// Nesne bulunamadı: bucket **var**, dosya yok. Kuruluma dair bir şey söylemek
+// yanlış yönlendirme olurdu — ama ikisi de 404 döndüğü için ayırt edilemiyor.
+// Yükleme yolunda bu hata hiç oluşmadığı için sorun değil; yine de not düşülüyor.
 assert(
-  'yalnızca mesajdan da tanınıyor',
-  isBucketMissing(new Error('The specified bucket does not exist.')),
+  'yükleme hatası olmayanlar sayılmıyor',
+  !isBucketMissing({ statusCode: '400', message: 'Duplicate' }) &&
+    !isBucketMissing({ message: 'row-level security policy' }) &&
+    !isBucketMissing(new Error('fetch failed')),
 );
-// Eski biçim de tanınmaya devam etsin.
-assert('code alanı da tanınıyor', isBucketMissing(Object.assign(new Error('x'), { code: 404 })));
-
-// Ve tanımaması gerekenler: bunlar için kuruluma dair bir şey söylemek yanlış
-// yönlendirme olur.
-assert(
-  'kimlik hatası bucket hatası sayılmıyor',
-  !isBucketMissing(Object.assign(new Error('16 UNAUTHENTICATED'), { code: 16 })),
-);
-assert(
-  'yetki hatası bucket hatası sayılmıyor',
-  !isBucketMissing(Object.assign(new Error('Permission denied'), { status: 403 })),
-);
-assert('sıradan hata sayılmıyor', !isBucketMissing(new Error('socket hang up')));
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

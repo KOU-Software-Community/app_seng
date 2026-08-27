@@ -1,13 +1,18 @@
 /**
- * Etkinlik görselleri — küçültme ve Firebase Storage'a yazma.
+ * Etkinlik görselleri — küçültme ve Supabase Storage'a yazma.
  *
- * Uygulama Storage SDK'sını hiç kullanmıyor: elinde bir adres var ve onu
- * `<Image>` ile çekiyor. Yani buradan çıkan tek şey bir URL, ve yükleme
- * tamamen Admin SDK ile burada oluyor.
+ * Neden Firebase değil: Cloud Storage, 2024 sonrası açılan projelerde Blaze
+ * planı istiyor. Elli arşiv fotoğrafı için kart bağlamanın anlamı yok. Supabase
+ * ücretsiz katmanında 1 GB veriyor ve kart istemiyor.
+ *
+ * Uygulama tarafında hiçbir şey değişmiyor: `PhotoSlot` bir adres alıyor ve
+ * `<Image>` ile çekiyor — o adresin nerede barındığını bilmiyor. Firestore hâlâ
+ * etkinliklerin, kayıtların ve çekilişlerin yeri; Supabase yalnızca dosyaları
+ * tutuyor.
  */
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
-import { getStorage } from 'firebase-admin/storage';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 
 /**
@@ -26,15 +31,40 @@ export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 
+/** Varsayılan bucket adı. `.env` ile değiştirilebilir. */
+const DEFAULT_BUCKET = 'event-photos';
+
+/** Kuruluma bağlı, yöneticiye gösterilebilir yükleme hatası. */
+export class PhotoUploadError extends Error {}
+
 function bucketName(): string {
-  const name = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET;
-  if (!name) {
-    throw new Error(
-      'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET tanımlı değil — görsel yüklenemez.\n' +
-        'Uygulamanın kullandığı .env değişkeninin aynısı.',
+  return process.env.SUPABASE_STORAGE_BUCKET || DEFAULT_BUCKET;
+}
+
+let client: SupabaseClient | undefined;
+
+/**
+ * Servis anahtarıyla bağlanıyor: panel güvenilen bir sunucu ve RLS'i aşması
+ * gerekiyor. Bu anahtar uygulamaya **girmiyor** — `EXPO_PUBLIC_` öneki yok,
+ * `.env.local` gitignore'lu, ve uygulama yalnızca herkese açık adresi görüyor.
+ */
+function storage() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new PhotoUploadError(
+      'Supabase yapılandırılmamış — görsel yüklenemez.\n\n' +
+        '.env.local dosyasına ekleyin:\n' +
+        '  SUPABASE_URL=https://<proje-ref>.supabase.co\n' +
+        '  SUPABASE_SERVICE_ROLE_KEY=...\n\n' +
+        'İkisi de Supabase Dashboard → Project Settings → API altında.\n' +
+        'service_role anahtarı gizlidir: EXPO_PUBLIC_ öneki almaz ve uygulamaya girmez.',
     );
   }
-  return name;
+
+  if (!client) client = createClient(url, key, { auth: { persistSession: false } });
+  return client.storage.from(bucketName());
 }
 
 /** `events/{eventId}/` altındaki dosya yolu. Ad rastgele: aynı ada yazıp eskisini ezmiyoruz. */
@@ -42,54 +72,42 @@ function objectPath(eventId: string): string {
   return `events/${eventId}/${randomBytes(8).toString('hex')}.jpg`;
 }
 
-/** Kuruluma bağlı, yöneticiye gösterilebilir yükleme hatası. */
-export class PhotoUploadError extends Error {}
-
 /**
- * "Bucket yok" hatası mı?
+ * Bucket bulunamadı hatası mı?
  *
- * `err.code === 404` diye bakılıyordu ve **hiç tutmuyordu**: gaxios 6 bu durumda
- * `code` yazmıyor, `status` yazıyor. Hata genel yakalayıcıya düşüp yöneticiye
- * yine "Bir şeyler ters gitti" gösteriyordu.
+ * Daha önce bu tam olarak kaçırıldı: Firebase yolunda `err.code === 404` diye
+ * bakılıyordu, gaxios ise `status` yazıyordu — dal hiç çalışmadı ve yöneticiye
+ * üç kez üst üste "Bir şeyler ters gitti" gösterildi. Bu yüzden burada tek bir
+ * alana güvenilmiyor.
  *
- * Artık üçüne birden bakılıyor. Mesaj kontrolü de var çünkü katman değişirse
- * (Admin SDK sararsa) sayısal alanların hangisinin taşındığı yine değişebilir;
- * Storage'ın kendi cümlesi değişmiyor.
+ * Supabase'in kendi cümlesi "Bucket not found"; `statusCode` alanı **metin**
+ * olarak `'404'` geliyor, sayı olarak değil. `Number()` ikisini de çeviriyor.
  */
 export function isBucketMissing(err: unknown): boolean {
-  const e = err as { code?: unknown; status?: unknown; message?: unknown };
-  const status = Number(e?.status ?? e?.code);
-  return status === 404 || /bucket does not exist/i.test(String(e?.message ?? ''));
+  const e = err as { statusCode?: unknown; status?: unknown; code?: unknown; message?: unknown };
+  const status = Number(e?.statusCode ?? e?.status ?? e?.code);
+  return status === 404 || /bucket not found|bucket does not exist/i.test(String(e?.message ?? ''));
+}
+
+function missingBucketMessage(): PhotoUploadError {
+  return new PhotoUploadError(
+    `Supabase'de "${bucketName()}" adlı bucket yok.\n\n` +
+      'Supabase Dashboard → Storage → New bucket:\n' +
+      `  Ad: ${bucketName()}\n` +
+      '  Public bucket: AÇIK  (uygulama görselleri adresle çekiyor)\n\n' +
+      'Başka bir ad kullanmak isterseniz .env.local içine ' +
+      'SUPABASE_STORAGE_BUCKET yazın.',
+  );
 }
 
 /**
- * Projede gerçekten hangi bucket'lar var?
+ * Bir görseli küçültüp yükler ve herkese açık adresini döndürür.
  *
- * Hata mesajına ekleniyor. "Bucket yok" iki farklı sebepten geliyor — Storage
- * hiç açılmamış, ya da ad tutmuyor — ve ikisi aynı 404'ü veriyor. Listeyi
- * göstermek ayrımı yöneticinin yerine yapıyor.
- */
-async function existingBuckets(): Promise<string> {
-  try {
-    const [buckets] = await getStorage().bucket(bucketName()).storage.getBuckets();
-    if (!buckets.length) return 'Projede hiç bucket yok — Storage henüz açılmamış.';
-    return `Projedeki bucket'lar: ${buckets.map((b) => b.name).join(', ')}`;
-  } catch {
-    // Listeleme yetkisi olmayabilir. Asıl hatayı bunun üstüne yığmıyoruz.
-    return 'Projedeki bucket listesi okunamadı.';
-  }
-}
-
-/**
- * Bir görseli küçültüp yükler ve indirme adresini döndürür.
- *
- * Adres `firebasestorage.googleapis.com/...?token=` biçiminde. `makePublic()`
- * kullanılmadı: yeni projelerde bucket düzeyinde tek tip erişim açık geliyor ve
- * o durumda nesne ACL'leri devre dışı, `makePublic()` hata veriyor. Token'lı
- * adres iki yapılandırmada da çalışıyor ve bucket'ı listelenebilir yapmıyor.
+ * Bucket public olduğu için adres kalıcı ve imzasız:
+ * `https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<yol>`
  */
 export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<string> {
-  const bucket = getStorage().bucket(bucketName());
+  const bucket = storage();
   const path = objectPath(eventId);
 
   const body = await sharp(input)
@@ -98,44 +116,33 @@ export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<
     .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
     .toBuffer();
 
-  const token = randomUUID();
-  try {
-    await bucket.file(path).save(body, {
-      contentType: 'image/jpeg',
-      metadata: {
-        // Bir yıl: görseller değişmiyor, değişirse yeni bir ad alıyorlar.
-        cacheControl: 'public, max-age=31536000, immutable',
-        metadata: { firebaseStorageDownloadTokens: token },
-      },
-    });
-  } catch (err) {
-    // En sık görülen kurulum hatası. Genel yakalayıcıya bırakılırsa yönetici
-    // "Bir şeyler ters gitti" görüyor — fotoğraf sayısı yüzünden mi, Storage
-    // kapalı olduğu için mi bilmiyor.
-    if (isBucketMissing(err)) {
-      throw new PhotoUploadError(
-        `Storage bucket bulunamadı: ${bucketName()}\n\n` +
-          `${await existingBuckets()}\n\n` +
-          'Liste boşsa: Firebase Console → Storage → "Get started". Bucket ancak o ' +
-          'adımda oluşuyor; yapılandırmada adı görünmesi yetmiyor.\n' +
-          'Listede başka bir ad varsa: onu .env dosyasındaki ' +
-          'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET değerine yazın. Eski projeler ' +
-          '<proje>.appspot.com, yeniler <proje>.firebasestorage.app kullanıyor.',
-      );
-    }
-    throw err;
+  // supabase-js hata fırlatmıyor, `error` alanı döndürüyor. `throw` beklemek
+  // sessizce başarılı sanmak olurdu.
+  const { error } = await bucket.upload(path, body, {
+    contentType: 'image/jpeg',
+    // Bir yıl: görseller değişmiyor, değişirse yeni bir ad alıyorlar.
+    cacheControl: '31536000',
+    upsert: false,
+  });
+
+  if (error) {
+    if (isBucketMissing(error)) throw missingBucketMessage();
+    throw new PhotoUploadError(`Görsel yüklenemedi: ${error.message}`);
   }
 
-  return `https://firebasestorage.googleapis.com/v0/b/${bucketName()}/o/${encodeURIComponent(
-    path,
-  )}?alt=media&token=${token}`;
+  return bucket.getPublicUrl(path).data.publicUrl;
 }
 
-/** Adresten dosya yolunu geri çıkarır. Bizim üretmediğimiz bir adres için null. */
+/**
+ * Adresten dosya yolunu geri çıkarır. Bizim üretmediğimiz bir adres için null.
+ *
+ * Silme yalnızca bizim yüklediklerimize dokunsun diye: `events/` ile
+ * başlamayan bir yol bu panelden çıkmamıştır.
+ */
 function pathFromUrl(url: string): string | null {
-  const m = /\/o\/([^?]+)\?/.exec(url);
+  const m = new RegExp(`/object/public/${bucketName()}/(.+)$`).exec(url);
   if (!m) return null;
-  const path = decodeURIComponent(m[1]);
+  const path = decodeURIComponent(m[1].split('?')[0]);
   return path.startsWith('events/') ? path : null;
 }
 
@@ -147,24 +154,34 @@ function pathFromUrl(url: string): string | null {
  * değil.
  */
 export async function deletePhotos(urls: string[]): Promise<void> {
-  const bucket = getStorage().bucket(bucketName());
-  await Promise.all(
-    urls.map(async (url) => {
-      const path = pathFromUrl(url);
-      if (!path) return;
-      try {
-        await bucket.file(path).delete({ ignoreNotFound: true });
-      } catch (err) {
-        console.error(`[panel] görsel silinemedi (${path}):`, err);
-      }
-    }),
-  );
+  const paths = urls.map(pathFromUrl).filter((p): p is string => !!p);
+  if (!paths.length) return;
+
+  try {
+    const { error } = await storage().remove(paths);
+    if (error) console.error('[panel] görseller silinemedi:', error.message);
+  } catch (err) {
+    console.error('[panel] görseller silinemedi:', err);
+  }
 }
 
 /** Etkinlik silinince altındaki her şey gider. */
 export async function deleteEventPhotos(eventId: string): Promise<void> {
   try {
-    await getStorage().bucket(bucketName()).deleteFiles({ prefix: `events/${eventId}/` });
+    const bucket = storage();
+    const { data, error } = await bucket.list(`events/${eventId}`);
+    if (error) {
+      console.error(`[panel] ${eventId} görselleri listelenemedi:`, error.message);
+      return;
+    }
+    if (!data?.length) return;
+
+    const { error: removeError } = await bucket.remove(
+      data.map((f) => `events/${eventId}/${f.name}`),
+    );
+    if (removeError) {
+      console.error(`[panel] ${eventId} görselleri silinemedi:`, removeError.message);
+    }
   } catch (err) {
     console.error(`[panel] ${eventId} görselleri silinemedi:`, err);
   }

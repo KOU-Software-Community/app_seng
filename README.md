@@ -291,16 +291,41 @@ gerekmiyor.
 
 ## Görseller
 
-Panelden yükleniyor, Firebase Storage'da duruyor. Etkinlik başına en fazla altı
-görsel: ilki kapak (arşiv kartı ve etkinlik detayının üstü), kalanı detaydaki
-galeri. Tek görsel varsa galeri hiç çıkmıyor.
+Panelden yükleniyor, **Supabase Storage**'da duruyor. Etkinlik başına en fazla
+altı görsel: ilki kapak (arşiv kartı ve etkinlik detayının üstü), kalanı
+detaydaki galeri. Tek görsel varsa galeri hiç çıkmıyor.
 
 Yüklenen dosya 1600 px'e küçültülüp JPEG'e çevriliyor — telefondan çıktığı gibi
-atılabilir. Uygulama Storage SDK'sını hiç kullanmıyor; elinde bir adres var ve
+atılabilir. Uygulama hiçbir depolama SDK'sı kullanmıyor; elinde bir adres var ve
 `<Image>` ile çekiyor.
 
-Panelin çalıştığı yerde `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` tanımlı olmalı ve
-projede Storage açık olmalı. Yoksa yükleme hata verir — etkinlik kaydı etkilenmez.
+### Neden Firebase Storage değil
+
+Cloud Storage, 2024 sonrası açılan projelerde **Blaze planı** istiyor. Elli arşiv
+fotoğrafı için kart bağlamanın anlamı yok. Supabase ücretsiz katmanında 1 GB
+veriyor ve kart istemiyor.
+
+Firestore hâlâ Firebase'de: etkinlikler, kayıtlar, çekilişler, cihaz kayıtları.
+Supabase **yalnızca dosyaları** tutuyor. İki servis biraz çirkin ama alternatifi
+ücretsiz depolama için tüm veri katmanını yeniden yazmaktı.
+
+### Kurulum
+
+1. Supabase Dashboard → **Storage → New bucket**
+   - Ad: `event-photos`
+   - **Public bucket: açık** (uygulama görselleri adresle çekiyor)
+2. Project Settings → API → `.env.local` dosyasına:
+   ```
+   SUPABASE_URL=https://<proje-ref>.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=...
+   ```
+
+`service_role` anahtarı Firebase servis hesabı anahtarıyla aynı sınıfta: RLS'i
+tamamen aşar, `EXPO_PUBLIC_` öneki almaz, uygulamaya girmez. `.env.local`
+gitignore'lu.
+
+Bucket yoksa ya da anahtarlar eksikse panel ne yapılması gerektiğini yazıyor —
+jenerik bir hata sayfası değil.
 
 ## Kalan işler
 

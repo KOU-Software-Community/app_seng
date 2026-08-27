@@ -203,6 +203,11 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   you meant. Deleting the retry branch from `registrations` left the check green because
   `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
   one block out before matching.
+- **Firebase Cloud Storage costs money on any project created after 2024** — the
+  default bucket needs Blaze, and the config's `storageBucket` value is a computed name
+  that appears whether or not a bucket exists. Event photos live in Supabase Storage
+  instead; Firestore stays where it is. The app never touched a storage SDK — it renders
+  a URL — so swapping providers was one file.
 - **An error branch you never triggered is a branch you never wrote.** The panel's
   "Storage bucket not found" message matched `err.code === 404`; gaxios 6 puts the
   number in `err.status` and leaves `code` unset, so the branch never ran and the

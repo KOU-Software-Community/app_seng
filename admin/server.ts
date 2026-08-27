@@ -86,12 +86,9 @@ function loadServiceAccount() {
   }
 }
 
-initializeApp({
-  credential: cert(loadServiceAccount()),
-  // Görseller buraya yükleniyor. Uygulamanın bağlandığı bucket'ın aynısı —
-  // ayrışırsa panel bir yere yükler, uygulama başka yerden okumaya çalışır.
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-});
+// Görseller Firebase'de değil Supabase'de duruyor (bkz. admin/photos.ts), o
+// yüzden burada storageBucket yok. Firebase yalnızca Firestore için.
+initializeApp({ credential: cert(loadServiceAccount()) });
 const db = getFirestore();
 
 const app = express();
