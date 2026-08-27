@@ -31,14 +31,17 @@ import multer from 'multer';
 import {
   MAX_PHOTOS,
   buildEvent,
+  isPast,
   joinLocal,
   splitLocal,
   toInput,
+  todayLocal,
   type EventInput,
 } from '../src/eventSchema';
 import {
   ACCEPTED_TYPES,
   MAX_UPLOAD_BYTES,
+  PhotoUploadError,
   deleteEventPhotos,
   deletePhotos,
   uploadEventPhoto,
@@ -52,7 +55,7 @@ import {
   type RaffleField,
   type RaffleFieldType,
 } from '../src/raffleSchema';
-import { esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
+import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
 const PORT = Number(process.env.ADMIN_PORT ?? 4000);
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
@@ -368,11 +371,12 @@ async function rebuildSeats(eventId: string): Promise<number> {
 async function saveEventWithPhotos(
   req: Request,
   res: Response,
-  opts: { editing: boolean; id?: string },
+  opts: { editing: boolean; id?: string; archive?: boolean },
 ): Promise<void> {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
   const base = formToInput(req.body);
   const input = opts.id ? { ...base, id: opts.id } : base;
+  const view = { editing: opts.editing, archive: opts.archive };
   const form = () => inputToForm(input, formDateTime(req.body));
 
   if (input.photos!.length + files.length > MAX_PHOTOS) {
@@ -383,7 +387,7 @@ async function saveEventWithPhotos(
         eventForm(
           form(),
           { photos: `En fazla ${MAX_PHOTOS} görsel olabilir; ${input.photos!.length} tanesi zaten yüklü.` },
-          { editing: opts.editing },
+          view,
         ),
       );
     return;
@@ -392,7 +396,20 @@ async function saveEventWithPhotos(
   // Görseller olmadan doğrula. Hata varsa hiçbir dosya yüklenmemiş oluyor.
   const checked = buildEvent(input);
   if (!checked.ok) {
-    res.status(400).type('html').send(eventForm(form(), checked.errors, { editing: opts.editing }));
+    res.status(400).type('html').send(eventForm(form(), checked.errors, view));
+    return;
+  }
+
+  // Arşiv kaydı geçmişte olmalı. Gelecek tarihli bir kayıt takvimde görünür ve
+  // kayıt kabul eder — arşiv formunda kontenjan sorulmadığı için de kontenjansız
+  // bir etkinlik olurdu.
+  if (opts.archive && !isPast(checked.event, today())) {
+    res
+      .status(400)
+      .type('html')
+      .send(
+        eventForm(form(), { startsAt: 'Arşiv kaydının tarihi bugünden önce olmalı.' }, view),
+      );
     return;
   }
 
@@ -402,7 +419,7 @@ async function saveEventWithPhotos(
     res
       .status(409)
       .type('html')
-      .send(eventForm(form(), { id: 'Bu kimlik zaten kullanılıyor.' }, { editing: false }));
+      .send(eventForm(form(), { id: 'Bu kimlik zaten kullanılıyor.' }, view));
     return;
   }
 
@@ -411,8 +428,20 @@ async function saveEventWithPhotos(
   const before = ((existing.data()?.photos as string[] | undefined) ?? []).filter(Boolean);
 
   const uploaded: string[] = [];
-  for (const file of files) {
-    uploaded.push(await uploadEventPhoto(checked.event.id, file.buffer));
+  try {
+    for (const file of files) {
+      uploaded.push(await uploadEventPhoto(checked.event.id, file.buffer));
+    }
+  } catch (err) {
+    // Yükleme yarıda kaldı: etkinlik henüz kaydedilmedi, dolayısıyla ortada
+    // yarım bir kayıt yok — ama gitmiş dosyalar varsa onları bırakmıyoruz.
+    await deletePhotos(uploaded);
+    if (!(err instanceof PhotoUploadError)) throw err;
+    res
+      .status(502)
+      .type('html')
+      .send(eventForm(form(), { photos: err.message }, view));
+    return;
   }
 
   const built = buildEvent({ ...input, photos: [...input.photos!, ...uploaded] });
@@ -420,7 +449,7 @@ async function saveEventWithPhotos(
     // Buraya ancak yüklemenin ürettiği adres beklenmedikse düşülür. Yüklenenleri
     // geri alıyoruz ki yetim dosya kalmasın.
     await deletePhotos(uploaded);
-    res.status(400).type('html').send(eventForm(form(), built.errors, { editing: opts.editing }));
+    res.status(400).type('html').send(eventForm(form(), built.errors, view));
     return;
   }
 
@@ -437,7 +466,7 @@ async function saveEventWithPhotos(
   const removed = before.filter((url) => !built.event.photos?.includes(url));
   if (removed.length) await deletePhotos(removed);
 
-  res.redirect('/');
+  res.redirect(opts.archive ? '/arsiv' : '/');
 }
 
 app.get('/events/new', (_req, res) => {
@@ -487,6 +516,87 @@ app.post('/events/:id/delete', async (req, res) => {
 app.post('/events/:id/seats', async (req, res) => {
   await rebuildSeats(req.params.id);
   res.redirect(`/events/${encodeURIComponent(req.params.id)}`);
+});
+
+// ---------------------------------------------------------------- arşiv
+//
+// Arşiv ayrı bir koleksiyon değil — `events` listesinin tarihi geçmiş yarısı.
+// Ayrı olan iş akışı: burada sorulan soru "hangi etkinliğin görseli eksik",
+// takvimde sorulan "sırada ne var". Kontenjan ve son-gün rozeti olmuş bir
+// etkinlikte anlamsız olduğu için form onları göstermiyor.
+
+/** Bugün, +03:00'a göre. Her istekte yeniden okunuyor: sunucu gün boyu ayakta. */
+const today = () => todayLocal(new Date());
+
+async function allEvents(): Promise<ClubEvent[]> {
+  const snap = await db.collection('events').get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ClubEvent, 'id'>) }) as ClubEvent);
+}
+
+app.get('/arsiv', async (_req, res) => {
+  const past = (await allEvents())
+    .filter((e) => isPast(e, today()))
+    .sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''));
+
+  res.type('html').send(
+    archiveList(
+      past.map((e) => ({
+        id: e.id,
+        title: e.title,
+        short: e.short,
+        tag: e.tag,
+        photos: e.photos?.length ?? 0,
+        attendance: e.attendance,
+      })),
+    ),
+  );
+});
+
+app.get('/arsiv/yeni', async (req, res) => {
+  const events = await allEvents();
+  const sources = events
+    .sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''))
+    .map((e) => ({ id: e.id, label: `${e.title} — ${e.short}` }));
+
+  // `?from=` var olan bir etkinliğin alanlarını kopyalıyor. Kimlik bilerek
+  // boş bırakılıyor: aynı kimlikle kaydetmek yeni bir kayıt değil, var olanın
+  // üzerine yazmak olurdu.
+  const from = String(req.query.from ?? '');
+  const source = from ? events.find((e) => e.id === from) : undefined;
+  const values = source ? { ...inputToForm(toInput(source)), id: '' } : {};
+
+  res.type('html').send(eventForm(values, {}, { editing: false, archive: true, sources }));
+});
+
+app.post('/arsiv/yeni', photoUpload, async (req, res) => {
+  await saveEventWithPhotos(req, res, { editing: false, archive: true });
+});
+
+app.get('/arsiv/:id', async (req, res) => {
+  const doc = await db.collection('events').doc(req.params.id).get();
+  if (!doc.exists) {
+    return res
+      .status(404)
+      .type('html')
+      .send(page('Bulunamadı', '<div class="card">Etkinlik bulunamadı.</div>'));
+  }
+
+  const event = { id: doc.id, ...(doc.data() as Omit<ClubEvent, 'id'>) } as ClubEvent;
+  // Yaklaşan bir etkinlik arşiv formunda düzenlenemez: kontenjan ve rozet
+  // gizli olduğu için kaydetmek onları sessizce silerdi.
+  if (!isPast(event, today())) {
+    return res.redirect(`/events/${encodeURIComponent(event.id)}`);
+  }
+
+  res.type('html').send(eventForm(inputToForm(toInput(event)), {}, { editing: true, archive: true }));
+});
+
+app.post('/arsiv/:id', photoUpload, async (req, res) => {
+  await saveEventWithPhotos(req, res, {
+    editing: true,
+    id: String(req.params.id),
+    archive: true,
+  });
 });
 
 // ---------------------------------------------------------------- kayıtlar

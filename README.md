@@ -270,6 +270,25 @@ servis hesabı anahtarını kullanıyor (`.env.example` içindeki
 başa BOM konuyor, yoksa Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri
 bozuyor.
 
+## Arşiv paneli
+
+`/arsiv` yalnızca tarihi geçmiş etkinlikleri listeliyor ve her satırda kaç görsel
+olduğunu gösteriyor — sayfanın işi "hangi etkinliğin görseli eksik" sorusuna
+bakmak. Takvimde bakılan soru "sırada ne var", ikisi bir aradayken ikisi de zor
+okunuyordu.
+
+Arşiv ayrı bir koleksiyon **değil**: `events` listesinin geçmiş yarısı. Bir
+etkinlik kendi gününün ertesi sabahı arşive geçiyor, ayrıca bir şey yapmak
+gerekmiyor.
+
+- **Yeni arşiv kaydı** — uygulamadan önceki etkinlikler için. Tarihi geçmişte
+  olmak zorunda; gelecek tarihli bir kayıt takvimde görünür ve kayıt kabul ederdi.
+- **Var olan etkinlikten doldur** — alanları kopyalar, yeni bir kayıt oluşturur.
+  Kimliği değiştirmek gerekiyor, yoksa var olanın üzerine yazar.
+- Kontenjan, rozet ve son-gün alanları arşiv formunda **görünmüyor** (olmuş bir
+  etkinlikte anlamsızlar) ama gizli alan olarak korunuyorlar — kaydetmek var olan
+  değeri silmiyor.
+
 ## Görseller
 
 Panelden yükleniyor, Firebase Storage'da duruyor. Etkinlik başına en fazla altı

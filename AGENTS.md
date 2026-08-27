@@ -203,6 +203,10 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   you meant. Deleting the retry branch from `registrations` left the check green because
   `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
   one block out before matching.
+- **A field the form stops showing is a field the form stops sending.** The archive
+  form hides capacity and the badge because they mean nothing for an event that
+  already happened — and saving would then have wiped both. They are rendered as
+  hidden inputs instead, and `check:panel` asserts the values survive.
 - **Upload after validating, never before.** A rejected form that has already written
   its files leaves objects in Storage that no event points at — quota is paid for them
   and nobody ever notices. The panel validates, then uploads, and deletes what it

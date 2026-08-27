@@ -42,6 +42,9 @@ function objectPath(eventId: string): string {
   return `events/${eventId}/${randomBytes(8).toString('hex')}.jpg`;
 }
 
+/** Kuruluma bağlı, yöneticiye gösterilebilir yükleme hatası. */
+export class PhotoUploadError extends Error {}
+
 /**
  * Bir görseli küçültüp yükler ve indirme adresini döndürür.
  *
@@ -61,14 +64,31 @@ export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<
     .toBuffer();
 
   const token = randomUUID();
-  await bucket.file(path).save(body, {
-    contentType: 'image/jpeg',
-    metadata: {
-      // Bir yıl: görseller değişmiyor, değişirse yeni bir ad alıyorlar.
-      cacheControl: 'public, max-age=31536000, immutable',
-      metadata: { firebaseStorageDownloadTokens: token },
-    },
-  });
+  try {
+    await bucket.file(path).save(body, {
+      contentType: 'image/jpeg',
+      metadata: {
+        // Bir yıl: görseller değişmiyor, değişirse yeni bir ad alıyorlar.
+        cacheControl: 'public, max-age=31536000, immutable',
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+  } catch (err) {
+    // 404 "bucket does not exist" en sık görülen kurulum hatası ve genel
+    // yakalayıcıya bırakılırsa yönetici "Bir şeyler ters gitti" görüyor —
+    // yedi fotoğraf seçtiği için mi, Storage kapalı olduğu için mi bilmiyor.
+    if ((err as { code?: number }).code === 404) {
+      throw new PhotoUploadError(
+        `Storage bucket bulunamadı: ${bucketName()}\n\n` +
+          'Firebase Console → Storage → "Get started" adımı tamamlanmadan bucket ' +
+          'oluşmuyor; yapılandırmada adı görünse bile ortada bir bucket olmuyor.\n' +
+          'Storage zaten açıksa Console’daki gerçek bucket adını ' +
+          'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ile karşılaştırın — eski projeler ' +
+          '<proje>.appspot.com, yeniler <proje>.firebasestorage.app kullanıyor.',
+      );
+    }
+    throw err;
+  }
 
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName()}/o/${encodeURIComponent(
     path,

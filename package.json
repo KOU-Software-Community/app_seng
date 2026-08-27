@@ -59,7 +59,8 @@
     "admin": "tsx admin/server.ts",
     "check:html": "tsx scripts/check-html.ts",
     "check:raffle": "tsx scripts/check-raffle.ts",
-    "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle"
+    "check:panel": "tsx scripts/check-panel.ts",
+    "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle && npm run check:panel"
   },
   "private": true
 }
