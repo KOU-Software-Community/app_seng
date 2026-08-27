@@ -30,6 +30,11 @@ type ContentValue = {
    */
   raffles: Raffle[];
   getRaffle: (eventId?: string) => Raffle | undefined;
+  /**
+   * Bu etkinliğe kaç kişi kaydolmuş. `eventSeats` dokümanındaki kimlik
+   * listesinin uzunluğu — elle girilen bir sayı değil, gerçek kayıtlar.
+   */
+  registeredCount: (eventId?: string) => number;
   source: ContentSource;
   loading: boolean;
   /**
@@ -48,6 +53,7 @@ const Ctx = createContext<ContentValue | null>(null);
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [all, setAll] = useState<ClubEvent[]>(EVENTS);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
+  const [registered, setRegistered] = useState<Record<string, number>>({});
   const [source, setSource] = useState<ContentSource>('local');
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +71,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     // Dynamic import keeps the Firestore SDK out of the startup bundle.
     import('./firebase')
       .then(({ fetchContent }) => fetchContent())
-      .then(({ events: remoteEvents, raffles: remoteRaffles }) => {
+      .then(({ events: remoteEvents, raffles: remoteRaffles, registered: counts }) => {
         if (cancelled) return;
 
         // Reaching Firestore and finding it empty is an answer, not a failure:
@@ -77,6 +83,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         // calendar was being reported to the user as a connection problem.
         setAll(remoteEvents);
         setRaffles(remoteRaffles);
+        setRegistered(counts);
         setSource('firestore');
         setError(null);
         console.log(`[content] Firestore bağlı — ${remoteEvents.length} etkinlik.`);
@@ -108,6 +115,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       archive: past,
       raffles,
       getRaffle: (eventId) => raffles.find((r) => r.eventId === eventId),
+      registeredCount: (eventId) => (eventId ? (registered[eventId] ?? 0) : 0),
       source,
       loading,
       error,
@@ -122,7 +130,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return all.find((e) => e.id === key);
       },
     }),
-    [upcoming, past, all, raffles, source, loading, error],
+    [upcoming, past, all, raffles, registered, source, loading, error],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

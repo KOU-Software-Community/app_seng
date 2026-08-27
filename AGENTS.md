@@ -175,6 +175,34 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   behind a four-photo lightbox. There is no photo storage anywhere in this app — all
   four slots were the same gradient placeholder and 412 counted nothing. Fiction with a
   UI around it is much harder to spot than fiction in a variable.
+- **A retry is only safe if every write in it is idempotent.** `pushRegistration` was
+  fixed to `setDoc(registrations/{regId})` so a resend lands on the same document — and
+  then the seat count was almost added as `increment(1)` in the same batch, which would
+  have reopened the identical hole one field over: the batch is atomic, but a resend
+  after a lost `synced` flag runs it again. The count is a list of registration ids
+  written with `arrayUnion`, which ignores an id it already holds.
+- A Firestore rule that denies `create` on a document the client writes with
+  `set(..., {merge: true})` does not degrade — it fails the whole write. `eventSeats`
+  docs are born in the panel, but an event predating them would have had *no* student
+  able to register, so the rule allows a first-seat create against an existing event.
+- **A document id can carry a uniqueness rule that no query can.** One student number
+  per event is enforced by making the registration's id `eventId__studentNo`: a second
+  device writing the same student hits an existing document, and the rule only lets a
+  write through that changes nothing but `createdAt`. No count, no read, nothing to race
+  against — but the id is now personal data, so what goes in the public seat list is a
+  separate random token.
+- `set()` on a document that already exists is an **update** to Firestore rules, not a
+  create. `allow create` alone therefore rejects the very retry that `setDoc` exists to
+  make safe, and the registration retries forever getting denied every time. The narrow
+  `affectedKeys().hasOnly(['createdAt'])` update branch is what lets an identical resend
+  through while still refusing a different one.
+- **Only retry what a retry can fix.** `permission-denied` is a rules decision and will
+  be the same next launch, so it stops the background retry and surfaces a manual one
+  instead of burning a write per app open behind a "Gönderiliyor…" that never resolves.
+- Grepping `firestore.rules` as one string finds a line in *some* block, not the block
+  you meant. Deleting the retry branch from `registrations` left the check green because
+  `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
+  one block out before matching.
 - **A check that reads comments finds its own rationale.** A guard has now gone red
   against correct code three times because the comment explaining *why* something was
   removed still contains its name — `addDoc`, `increment(1)`, `HOLD_MS`. Strip comments

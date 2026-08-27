@@ -18,6 +18,9 @@ import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const COLUMNS = [
+  // Firestore doküman kimliği: eventId__studentNo. İki dışa aktarım
+  // birleştirilirken aynı kaydın iki kez sayılmaması buna bakarak anlaşılıyor.
+  'regId',
   'eventId',
   'code',
   'name',

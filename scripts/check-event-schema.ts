@@ -9,10 +9,13 @@
  */
 import {
   buildEvent,
+  isFull,
   isPast,
   joinLocal,
   monthGrids,
   monthOrder,
+  seatsLabel,
+  seatsLeft,
   splitByDate,
   splitLocal,
   toInput,
@@ -35,7 +38,7 @@ const EV1: ClubEvent = {
   tag: 'Atölye',
   soon: true,
   badge: 'SON GUN',
-  spots: '12 / 60 yer kaldı',
+  capacity: 60,
   desc: 'Versiyon kontrolüne sıfırdan başlıyoruz.',
   tags: ['Başlangıç seviye', 'Laptop getir'],
   speaker: 'Mert Aydın',
@@ -56,7 +59,7 @@ const EV1_INPUT: EventInput = {
   title: 'Git & GitHub Atölyesi',
   tag: 'Atölye',
   desc: 'Versiyon kontrolüne sıfırdan başlıyoruz.',
-  spots: '12 / 60 yer kaldı',
+  capacity: '60',
   speaker: 'Mert Aydın',
   speakerRole: '3. sınıf · Kulüp teknik ekip',
   tags: ['Başlangıç seviye', 'Laptop getir'],
@@ -272,6 +275,54 @@ assert(
   'bozuk tarih takvimde kalıyor',
   splitByDate([unreadable], '2026-03-12').upcoming.length === 1,
 );
+
+// 11. Kontenjan. Elle yazılan "12 / 60 yer kaldı" cümlesi gitti; kalan yer
+//     gerçek kayıt sayısından çıkıyor ve yönetici kontenjanı yükselttiğinde
+//     kendiliğinden artıyor.
+const capped = buildEvent({ ...EV1_INPUT, capacity: '60' });
+if (!capped.ok) assert('kontenjanlı etkinlik kurulabiliyor', false);
+else {
+  assert('kontenjan sayıya dönüyor', capped.event.capacity === 60, String(capped.event.capacity));
+  assert('boşken kalan 60', seatsLeft(capped.event, 0) === 60);
+  assert('12 kayıtta kalan 48', seatsLeft(capped.event, 12) === 48);
+  assert('kontenjan kadar kayıtta 0', seatsLeft(capped.event, 60) === 0);
+  // Sayaç bir şekilde şişerse kalan negatife düşmemeli.
+  assert('fazla kayıtta 0, negatif değil', seatsLeft(capped.event, 75) === 0);
+  assert('dolu', isFull(capped.event, 60) && isFull(capped.event, 75));
+  assert('dolu değil', !isFull(capped.event, 59));
+  assert('etiket', seatsLabel(capped.event, 12) === '48 / 60 yer kaldı', seatsLabel(capped.event, 12));
+  assert('dolu etiketi', seatsLabel(capped.event, 60) === 'Kontenjan doldu');
+
+  // Yönetici kontenjanı yükseltti: aynı kayıt sayısıyla kalan yer artmalı.
+  const raised = buildEvent({ ...EV1_INPUT, capacity: '90' });
+  assert(
+    'kontenjan yükselince kalan artıyor',
+    raised.ok && seatsLeft(raised.event, 60) === 30,
+    raised.ok ? String(seatsLeft(raised.event, 60)) : 'kurulamadı',
+  );
+  assert('yükseltince dolu değil', raised.ok && !isFull(raised.event, 60));
+}
+
+// Sınırsız etkinlik: kontenjan yok. `null` dönüyor, 0 değil — 0 dönseydi
+// "sıfır yer kaldı" ile aynı değer olur ve kayıt düğmesi kapanırdı.
+const open = buildEvent({ ...EV1_INPUT, capacity: '' });
+if (!open.ok) assert('kontenjansız etkinlik kurulabiliyor', false);
+else {
+  assert('kontenjan alanı hiç yok', !('capacity' in open.event));
+  assert('sınırsızda kalan null', seatsLeft(open.event, 500) === null);
+  assert('sınırsız hiç dolmuyor', !isFull(open.event, 5000));
+  assert('sınırsız etiketi', seatsLabel(open.event, 500) === 'Sınırsız');
+}
+
+// 0 yazmak da sınırsız demek: "kontenjan 0" diye bir şey yok, ya sınır var ya
+// yok. Alan yazılmıyor ki uygulama onu dolu sanmasın.
+const zero = buildEvent({ ...EV1_INPUT, capacity: '0' });
+assert('0 sınırsız sayılıyor', zero.ok && !('capacity' in zero.event));
+
+assert('ondalık kontenjan ret', !buildEvent({ ...EV1_INPUT, capacity: '4.5' }).ok);
+assert('negatif kontenjan ret', !buildEvent({ ...EV1_INPUT, capacity: '-3' }).ok);
+assert('harfli kontenjan ret', !buildEvent({ ...EV1_INPUT, capacity: 'çok' }).ok);
+assert('gidiş-dönüş kontenjan', capped.ok && toInput(capped.event).capacity === '60');
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

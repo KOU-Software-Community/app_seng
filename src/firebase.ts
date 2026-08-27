@@ -1,7 +1,7 @@
 import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
 import {
   Firestore,
-  addDoc,
+  arrayUnion,
   collection,
   doc,
   getDocs,
@@ -10,6 +10,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  writeBatch,
 } from 'firebase/firestore';
 
 import type { ClubEvent } from './data';
@@ -48,6 +49,20 @@ export function getDb(): Firestore {
 export const COLLECTIONS = {
   events: 'events',
   registrations: 'registrations',
+  /**
+   * Etkinlik başına koltuk jetonları. Kayıtların kendisi istemciye kapalı —
+   * kim kaydolduğu kimseyi ilgilendirmiyor — ama kaç kişi kaydolduğu ekranda
+   * gösteriliyor, dolayısıyla sayının okunabilir bir yerde durması gerekiyor.
+   *
+   * Jetonlar rastgele ve hiçbir şey söylemiyor. Kayıt dokümanının kimliği
+   * kullanılamazdı: içinde öğrenci numarası geçiyor ve bu liste herkese açık.
+   *
+   * Sayaç yerine liste: `arrayUnion` aynı jetonu ikinci kez eklemez, yani
+   * yeniden gönderim sayıyı şişirmez. Bir sayaç `increment(1)` ile artsaydı,
+   * kayıt yazması idempotent olduktan sonra bile aynı çökme penceresinde iki
+   * kez artabilirdi.
+   */
+  eventSeats: 'eventSeats',
   devices: 'devices',
   raffles: 'raffles',
   raffleEntries: 'raffleEntries',
@@ -72,19 +87,32 @@ function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
 export async function fetchContent(): Promise<{
   events: ClubEvent[];
   raffles: Raffle[];
+  /** Etkinlik kimliği → kayıt sayısı. */
+  registered: Record<string, number>;
 }> {
   const db = getDb();
 
   // Arşiv ayrı bir koleksiyon değil: geçmiş etkinliklerin kendisi. Tek okuma,
   // tek sıralama; bölmeyi `splitByDate` yapıyor.
-  const [eventsSnap, rafflesSnap] = await Promise.all([
+  //
+  // Koltuklar da tek okumada geliyor — etkinlik başına ayrı bir sayım sorgusu
+  // değil, küçük dokümanlardan oluşan tek bir koleksiyon.
+  const [eventsSnap, rafflesSnap, seatsSnap] = await Promise.all([
     withTimeout(getDocs(query(collection(db, COLLECTIONS.events), orderBy('startsAt'))), 'events'),
     withTimeout(getDocs(collection(db, COLLECTIONS.raffles)), 'raffles'),
+    withTimeout(getDocs(collection(db, COLLECTIONS.eventSeats)), 'eventSeats'),
   ]);
+
+  const registered: Record<string, number> = {};
+  for (const d of seatsSnap.docs) {
+    const ids = (d.data() as { seatIds?: unknown }).seatIds;
+    registered[d.id] = Array.isArray(ids) ? ids.length : 0;
+  }
 
   return {
     events: eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as ClubEvent),
     raffles: rafflesSnap.docs.map((d) => ({ eventId: d.id, ...d.data() }) as Raffle),
+    registered,
   };
 }
 
@@ -112,6 +140,8 @@ export async function pushRaffleEntry(entry: {
 }
 
 export type RegistrationPayload = {
+  regId: string;
+  seatId: string;
   eventId: string;
   code: string;
   name: string;
@@ -120,14 +150,44 @@ export type RegistrationPayload = {
   year: string;
 };
 
-/** Writes one registration. Throws on failure so the caller can mark it unsynced. */
+/**
+ * Writes one registration. Throws on failure so the caller can mark it unsynced.
+ *
+ * Doküman kimliği `${eventId}__${studentNo}` — `addDoc` değil `setDoc`. İki iş
+ * birden yapıyor:
+ *
+ * 1. **Yeniden gönderim kopya üretmiyor.** `addDoc` her çağrıda yeni bir
+ *    doküman açardı; yazma Firestore'a ulaşıp `synced` bayrağı diske
+ *    yazılmadan uygulama ölürse öğrenci listede iki kez görünürdü.
+ * 2. **Aynı öğrenci numarası aynı etkinliğe iki kez yazılamıyor.** İkinci
+ *    cihazdan gelen kayıt var olan dokümana denk gelir ve kural onu reddeder.
+ *    Sunucuda sayım yok, okuma yok — kimlik zaten benzersizliği taşıyor.
+ *
+ * Koltuk jetonu ayrı ve rastgele: `eventSeats` listesi herkese açık, oraya
+ * içinde öğrenci numarası geçen bir kimlik konamaz.
+ */
 export async function pushRegistration(payload: RegistrationPayload): Promise<string> {
   const db = getDb();
-  const ref = await withTimeout(
-    addDoc(collection(db, COLLECTIONS.registrations), { ...payload, createdAt: serverTimestamp() }),
-    'registration',
+
+  // Kayıt ve koltuk tek batch'te: Firestore batch'i atomik, yani ya ikisi de
+  // yazılır ya hiçbiri. Ayrı yazsaydık kayıt gidip koltuk gitmeyebilir ve
+  // etkinlik dolmadığı hâlde dolmuş görünmeyebilirdi.
+  //
+  // `arrayUnion` idempotent: aynı jeton ikinci kez eklenmez. Yeniden gönderim
+  // ne kopya kayıt üretiyor (doküman kimliği `regId`) ne de sayıyı şişiriyor.
+  const batch = writeBatch(db);
+  batch.set(doc(db, COLLECTIONS.registrations, payload.regId), {
+    ...payload,
+    createdAt: serverTimestamp(),
+  });
+  batch.set(
+    doc(db, COLLECTIONS.eventSeats, payload.eventId),
+    { eventId: payload.eventId, seatIds: arrayUnion(payload.seatId) },
+    { merge: true },
   );
-  return ref.id;
+
+  await withTimeout(batch.commit(), 'registration');
+  return payload.regId;
 }
 
 export type DeviceRecord = {
