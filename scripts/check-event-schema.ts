@@ -9,11 +9,14 @@
  */
 import {
   buildEvent,
+  isPast,
   joinLocal,
   monthGrids,
   monthOrder,
+  splitByDate,
   splitLocal,
   toInput,
+  todayLocal,
   type EventInput,
 } from '../src/eventSchema';
 import type { ClubEvent } from '../src/data';
@@ -204,6 +207,71 @@ for (const iso of [
 // Ayrıştırılamayan değer tahmin edilmiyor; form boş geliyor ve buildEvent zaten
 // reddediyor.
 assert('bozuk startsAt boş dönüyor', splitLocal('bozuk').date === '' && splitLocal('bozuk').time === '');
+
+// 8. Katılımcı sayısı: etkinlikten sonra girilen, isteğe bağlı alan.
+assert('katılımcı sayısı boş kabul', buildEvent({ ...EV1_INPUT, attendance: '' }).ok);
+const withCount = buildEvent({ ...EV1_INPUT, attendance: '42' });
+assert('katılımcı sayısı yazılıyor', withCount.ok && withCount.event.attendance === 42);
+// Boşken alan hiç yazılmamalı: Firestore `undefined` kabul etmez ve `0` da
+// "kimse gelmedi" demek olurdu.
+const noCount = buildEvent(EV1_INPUT);
+assert(
+  'boşken alan hiç yok',
+  noCount.ok && !('attendance' in noCount.event),
+  noCount.ok ? JSON.stringify(noCount.event.attendance) : 'kurulamadı',
+);
+assert('ondalık ret', !buildEvent({ ...EV1_INPUT, attendance: '4.5' }).ok);
+assert('negatif ret', !buildEvent({ ...EV1_INPUT, attendance: '-3' }).ok);
+assert('harf ret', !buildEvent({ ...EV1_INPUT, attendance: 'çok' }).ok);
+assert('gidiş-dönüş katılımcı', withCount.ok && toInput(withCount.event).attendance === '42');
+
+// 9. todayLocal cihazın saat diliminden değil, +03:00'tan okuyor. Yurt dışındaki
+//    bir telefon, kulübün takviminde hâlâ bugün olan etkinliği arşivde
+//    göstermemeli.
+assert(
+  'gece yarısını geçen an ertesi gün',
+  todayLocal(new Date('2026-03-12T21:30:00Z')) === '2026-03-13',
+  todayLocal(new Date('2026-03-12T21:30:00Z')),
+);
+assert(
+  'gece yarısından önce aynı gün',
+  todayLocal(new Date('2026-03-12T20:30:00Z')) === '2026-03-12',
+  todayLocal(new Date('2026-03-12T20:30:00Z')),
+);
+
+// 10. Takvim/arşiv bölmesi. Sınır gün bazında: etkinliğin kendi günü boyunca
+//     takvimde kalıyor, ertesi gün arşive geçiyor. Başlangıç anına göre bölmek
+//     üç saatlik bir etkinliği daha başlarken arşive atardı.
+const onDay = buildEvent({ ...EV1_INPUT, id: 'bugun', startsAt: '2026-03-12T18:00:00+03:00' });
+const dayBefore = buildEvent({ ...EV1_INPUT, id: 'dun', startsAt: '2026-03-11T18:00:00+03:00' });
+const later = buildEvent({ ...EV1_INPUT, id: 'sonra', startsAt: '2026-04-20T10:00:00+03:00' });
+
+if (onDay.ok && dayBefore.ok && later.ok) {
+  assert('kendi günü boyunca takvimde', !isPast(onDay.event, '2026-03-12'));
+  assert('ertesi gün arşivde', isPast(onDay.event, '2026-03-13'));
+  assert('dünkü arşivde', isPast(dayBefore.event, '2026-03-12'));
+
+  const split = splitByDate([later.event, dayBefore.event, onDay.event], '2026-03-12');
+  assert(
+    'yaklaşanlar en yakından',
+    JSON.stringify(split.upcoming.map((e) => e.id)) === JSON.stringify(['bugun', 'sonra']),
+    split.upcoming.map((e) => e.id).join(','),
+  );
+  assert(
+    'arşiv en yeniden',
+    JSON.stringify(split.past.map((e) => e.id)) === JSON.stringify(['dun']),
+    split.past.map((e) => e.id).join(','),
+  );
+}
+
+// Tarihi okunamayan etkinlik yaklaşan sayılıyor: arşive atmak onu olmuş gibi
+// gösterir ve kayıt düğmesini de kaldırır.
+const unreadable = { ...EV1, id: 'bozuk', startsAt: 'bozuk' } as ClubEvent;
+assert('bozuk tarih geçmiş sayılmıyor', !isPast(unreadable, '2026-03-12'));
+assert(
+  'bozuk tarih takvimde kalıyor',
+  splitByDate([unreadable], '2026-03-12').upcoming.length === 1,
+);
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

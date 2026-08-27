@@ -8,7 +8,8 @@ https://docs.expo.dev/versions/v57.0.0/ before writing any code — Expo has cha
 - `app/` — expo-router routes. `app/(tabs)/` holds the four root screens plus a custom
   tab bar; everything else is a stack route.
 - `src/theme.ts` — the only place colours, gradients, fonts, radii and spacing live.
-- `src/data.ts` — seed content. Swap for a real API when the backend exists.
+- `src/data.ts` — types, fixed lists and the offline fallback. Content lives in
+  Firestore; the admin panel writes it.
 - `src/store.tsx` — registrations and notification prefs, persisted via AsyncStorage.
 
 ## Conventions
@@ -164,3 +165,18 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   is an unauthenticated client and the rules are the only thing standing between it and
   the data. Publish with `npm run rules:deploy`; no local check can tell you what is
   live, only that a rule was written at all.
+- **The archive was never separate data.** `ArchiveEntry` was `{title, date, cat, year,
+  count}` — every field except `count` already existed on `ClubEvent`, so a second
+  collection meant entering the same real event twice and letting the two drift. It is
+  now the past half of one `events` list (`splitByDate`), and `count` turned out to be a
+  *photo* count, not attendance.
+- **When a number is on screen, find the thing that produces it.** The archive header
+  read "2023'ten bugüne 38 etkinlik · 412 fotoğraf" and each card claimed "24 foto",
+  behind a four-photo lightbox. There is no photo storage anywhere in this app — all
+  four slots were the same gradient placeholder and 412 counted nothing. Fiction with a
+  UI around it is much harder to spot than fiction in a variable.
+- The calendar/archive boundary is **the day, not the instant**. Splitting on the start
+  time would move a three-hour event into the archive while it is still running; an
+  event stays on the calendar through its own day and moves the next morning. `today`
+  comes from `todayLocal`, which reads +03:00 rather than the device clock — a phone
+  abroad otherwise archives an event the club still has on today's calendar.

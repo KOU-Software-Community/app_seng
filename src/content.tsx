@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { ARCHIVE, ArchiveEntry, ClubEvent, EVENTS, sortArchive } from './data';
+import { ClubEvent, EVENTS } from './data';
+import { splitByDate, todayLocal } from './eventSchema';
 import { isFirebaseConfigured } from './firebaseConfig';
 import type { Raffle } from './raffleSchema';
 
 /**
- * Events and archive entries — from Firestore when it is reachable, and from the
- * bundled `src/data.ts` copy when it is not.
+ * Events — from Firestore when it is reachable, and from the bundled
+ * `src/data.ts` copy when it is not.
+ *
+ * Arşiv ayrı bir kaynak değil: aynı listenin tarihi geçmiş yarısı. Ayrı tutmak,
+ * aynı gerçek etkinliği iki kez girmek ve ikisinin kayması demekti.
  *
  * The fallback is deliberate: a club app that shows a blank screen because the
  * network blipped is worse than one showing slightly stale content. `source`
@@ -15,8 +19,10 @@ import type { Raffle } from './raffleSchema';
 export type ContentSource = 'firestore' | 'local';
 
 type ContentValue = {
+  /** Bugün ve sonrası. Takvim bunu gösteriyor. */
   events: ClubEvent[];
-  archive: ArchiveEntry[];
+  /** Dünü ve öncesi, en yeniden eskiye. */
+  archive: ClubEvent[];
   /**
    * Çekiliş tanımları, etkinlik kimliğine göre. Bir etkinliğin çekiliş olup
    * olmadığı `tag`'inden değil buradan anlaşılıyor: kategori sadece bir etiket,
@@ -40,8 +46,7 @@ type ContentValue = {
 const Ctx = createContext<ContentValue | null>(null);
 
 export function ContentProvider({ children }: { children: React.ReactNode }) {
-  const [events, setEvents] = useState<ClubEvent[]>(EVENTS);
-  const [archive, setArchive] = useState<ArchiveEntry[]>(() => sortArchive(ARCHIVE));
+  const [all, setAll] = useState<ClubEvent[]>(EVENTS);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [source, setSource] = useState<ContentSource>('local');
   const [loading, setLoading] = useState(isFirebaseConfigured);
@@ -60,7 +65,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     // Dynamic import keeps the Firestore SDK out of the startup bundle.
     import('./firebase')
       .then(({ fetchContent }) => fetchContent())
-      .then(({ events: remoteEvents, archive: remoteArchive, raffles: remoteRaffles }) => {
+      .then(({ events: remoteEvents, raffles: remoteRaffles }) => {
         if (cancelled) return;
 
         // Reaching Firestore and finding it empty is an answer, not a failure:
@@ -70,14 +75,11 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         // made sense while src/data.ts still shipped four events. It no longer
         // does, so there was nothing to fall back to and an ordinary empty
         // calendar was being reported to the user as a connection problem.
-        setEvents(remoteEvents);
-        if (remoteArchive.length) setArchive(sortArchive(remoteArchive));
+        setAll(remoteEvents);
         setRaffles(remoteRaffles);
         setSource('firestore');
         setError(null);
-        console.log(
-          `[content] Firestore bağlı — ${remoteEvents.length} etkinlik, ${remoteArchive.length} arşiv kaydı.`,
-        );
+        console.log(`[content] Firestore bağlı — ${remoteEvents.length} etkinlik.`);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -95,10 +97,15 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     };
   }, [nonce]);
 
+  // Bölme her render'da değil, liste değiştikçe. `nonce` de bağımlılık: elle
+  // yenilemek gün dönmüşse bölmeyi de tazelemeli, yoksa dün açılıp açık kalan
+  // uygulama dünkü etkinliği hâlâ takvimde gösterir.
+  const { upcoming, past } = useMemo(() => splitByDate(all, todayLocal(new Date())), [all, nonce]);
+
   const value = useMemo<ContentValue>(
     () => ({
-      events,
-      archive,
+      events: upcoming,
+      archive: past,
       raffles,
       getRaffle: (eventId) => raffles.find((r) => r.eventId === eventId),
       source,
@@ -107,13 +114,15 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       refresh: () => setNonce((n) => n + 1),
       getEvent: (id) => {
         const key = Array.isArray(id) ? id[0] : id;
+        // Tüm liste taranıyor, sadece yaklaşanlar değil: arşivden açılan bir
+        // etkinliğin detay ekranı da çalışmalı.
         // No falling back to the first event. That turned "this id does not
         // exist" into "here is some other event", which is a harder bug to spot
         // than a missing-event screen.
-        return events.find((e) => e.id === key);
+        return all.find((e) => e.id === key);
       },
     }),
-    [events, archive, raffles, source, loading, error],
+    [upcoming, past, all, raffles, source, loading, error],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

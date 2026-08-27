@@ -370,6 +370,10 @@ export function eventForm(
           <label>Etiketler <span class="hint">(virgülle)</span>
             <input type="text" name="tags" value="${v('tags')}" placeholder="Başlangıç seviye, Laptop getir">
           </label>
+          <label>Katılımcı sayısı <span class="hint">(etkinlikten sonra)</span>
+            <input type="number" name="attendance" min="0" max="999999" value="${v('attendance')}">
+            ${e('attendance')}
+          </label>
         </div>
 
         <div class="row">

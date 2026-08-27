@@ -1,3 +1,4 @@
+import { EVENT_CATEGORIES } from './eventSchema';
 import { IconName } from './icons';
 
 export type EventFact = { icon: IconName; label: string; value: string };
@@ -27,6 +28,11 @@ export type ClubEvent = {
   speaker: string;
   speakerRole: string;
   facts: EventFact[];
+  /**
+   * Kaç kişi katıldı. Etkinlik olmadan bilinemeyeceği için isteğe bağlı —
+   * arşiv kartındaki rozeti bu besliyor ve boşsa rozet çizilmiyor.
+   */
+  attendance?: number;
 };
 
 /**
@@ -57,63 +63,26 @@ export const getEvent = (id?: string | string[]): ClubEvent | undefined => {
  * hand-curated list that nobody had maintained since the design was adapted.
  */
 
-export type ArchiveEntry = {
-  title: string;
-  date: string;
-  cat: string;
-  year: string;
-  count: number;
-};
-
-const TR_MONTHS = [
-  'Ocak',
-  'Şubat',
-  'Mart',
-  'Nisan',
-  'Mayıs',
-  'Haziran',
-  'Temmuz',
-  'Ağustos',
-  'Eylül',
-  'Ekim',
-  'Kasım',
-  'Aralık',
-];
-
-/**
- * Newest first.
+/*
+ * ARCHIVE, ARCHIVE_TOTALS, ArchiveEntry ve sortArchive buradaydı: altı uydurma
+ * etkinlik ve "2023'ten bugüne 38 etkinlik · 412 fotoğraf" diye iki uydurma
+ * sayı. İkincisi daha kötüydü — uygulamada fotoğraf deposu hiç yok, yani 412
+ * hiçbir şeyi saymıyordu.
  *
- * Firestore returns documents in document-id order unless told otherwise, which
- * for slug ids is alphabetical and meaningless. `date` is a display string
- * ("Aralık 2025"), so ordering is derived from it here rather than relying on
- * whatever order the source happened to use.
+ * Arşiv artık ayrı bir veri değil: tarihi geçmiş etkinlik. `ArchiveEntry`
+ * alanlarının (title, date, cat, year) hepsi zaten `ClubEvent`'te vardı; tek
+ * eksik katılımcı sayısıydı, o da artık `ClubEvent.attendance`. Ayrı tutmak,
+ * aynı gerçek etkinliği iki kez girmek demekti.
+ *
+ * Bölme `splitByDate` içinde — src/eventSchema.ts.
  */
-export function sortArchive(entries: ArchiveEntry[]): ArchiveEntry[] {
-  const weight = (e: ArchiveEntry) => {
-    const [month, year] = e.date.split(' ');
-    const monthIndex = TR_MONTHS.indexOf(month);
-    return Number(year) * 12 + (monthIndex >= 0 ? monthIndex : 0);
-  };
-  return [...entries].sort((a, b) => weight(b) - weight(a));
-}
-
-export const ARCHIVE: ArchiveEntry[] = [
-  { title: 'Kış Kampı: Backend 101', date: 'Aralık 2025', cat: 'Atölye', year: '2025', count: 24 },
-  { title: 'Teknoloji Gecesi', date: 'Kasım 2025', cat: 'Söyleşi', year: '2025', count: 63 },
-  { title: 'TÜBİTAK Teknopark Gezisi', date: 'Ekim 2025', cat: 'Teknik Gezi', year: '2025', count: 41 },
-  { title: 'Oyun Geliştirme Atölyesi', date: 'Mayıs 2025', cat: 'Atölye', year: '2025', count: 18 },
-  { title: 'Mezunlarla Buluşma', date: 'Nisan 2025', cat: 'Söyleşi', year: '2025', count: 37 },
-  { title: 'Yazılım Zirvesi Ziyareti', date: 'Mart 2024', cat: 'Teknik Gezi', year: '2024', count: 52 },
-];
 
 /**
- * Club-wide archive totals quoted in the header and home stats. The `ARCHIVE`
- * array above is the recent slice that is actually browsable.
+ * Arşiv filtre çipleri, panelin sunduğu kategorilerden türüyor. Elle yazılmış
+ * hâlinde 'Çekiliş' ve 'Duyuru' yoktu — o kategorideki geçmiş bir etkinlik
+ * arşive düşer ama hiçbir çip onu göstermezdi.
  */
-export const ARCHIVE_TOTALS = { events: 38, photos: 412 };
-
-/** "Yarışma" has no archived events yet — that is what drives the empty state. */
-export const ARCHIVE_CATEGORIES = ['Tümü', 'Atölye', 'Söyleşi', 'Teknik Gezi', 'Yarışma'];
+export const ARCHIVE_CATEGORIES = ['Tümü', ...EVENT_CATEGORIES];
 
 export const DEPARTMENTS = ['Yazılım Müh.', 'Bilgisayar Müh.', 'Elektronik', 'Diğer'];
 export const YEARS = ['Haz.', '1', '2', '3', '4'];

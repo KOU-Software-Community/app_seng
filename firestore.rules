@@ -21,17 +21,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Etkinlikler ve arşiv herkese açık okunur; yazma sadece konsoldan veya
-    // seed script'inden (aşağıdaki nota bakın).
+    // Etkinlikler herkese açık okunur; yazma yalnızca yönetim panelinden
+    // (Admin SDK, bu kuralları görmez). Arşiv de burada: tarihi geçmiş etkinlik.
     match /events/{eventId} {
       allow read: if true;
       allow write: if false;
     }
 
-    match /archive/{entryId} {
-      allow read: if true;
-      allow write: if false;
-    }
+    // `archive` koleksiyonu buradaydı. Arşiv artık ayrı bir veri değil: tarihi
+    // geçmiş `events` kaydının kendisi. Ayrı tutmak aynı gerçek etkinliği iki
+    // kez girmek demekti.
 
     // Kayıtlar: öğrenci kendi kaydını oluşturabilir, ama kimse başkasının
     // kaydını okuyamaz veya değiştiremez. Kulüp yönetimi kayıtları konsoldan
