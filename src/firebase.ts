@@ -1,7 +1,6 @@
 import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
 import {
   Firestore,
-  addDoc,
   collection,
   doc,
   getDocs,
@@ -112,6 +111,7 @@ export async function pushRaffleEntry(entry: {
 }
 
 export type RegistrationPayload = {
+  regId: string;
   eventId: string;
   code: string;
   name: string;
@@ -120,14 +120,28 @@ export type RegistrationPayload = {
   year: string;
 };
 
-/** Writes one registration. Throws on failure so the caller can mark it unsynced. */
+/**
+ * Writes one registration. Throws on failure so the caller can mark it unsynced.
+ *
+ * Doküman kimliği kaydın kendi `regId`'si — `addDoc` değil `setDoc`. Fark
+ * yeniden denemede ortaya çıkıyor: yazma Firestore'a ulaşıp `synced` bayrağı
+ * diske yazılmadan uygulama ölürse, kayıt beklemede görünür ve tekrar
+ * gönderilir. `addDoc` her seferinde yeni bir doküman üretir, yani öğrenci
+ * kayıt listesinde iki kez görünürdü. Aynı kimliğe `setDoc` ikinci kez de aynı
+ * dokümanın üzerine gelir.
+ *
+ * Çekiliş katılımlarında bu baştan böyleydi; kayıtlarda açık duruyordu.
+ */
 export async function pushRegistration(payload: RegistrationPayload): Promise<string> {
   const db = getDb();
-  const ref = await withTimeout(
-    addDoc(collection(db, COLLECTIONS.registrations), { ...payload, createdAt: serverTimestamp() }),
+  await withTimeout(
+    setDoc(doc(db, COLLECTIONS.registrations, payload.regId), {
+      ...payload,
+      createdAt: serverTimestamp(),
+    }),
     'registration',
   );
-  return ref.id;
+  return payload.regId;
 }
 
 export type DeviceRecord = {

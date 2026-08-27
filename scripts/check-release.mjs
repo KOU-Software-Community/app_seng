@@ -113,6 +113,36 @@ check(
 );
 
 check(
+  'kayıt yeniden gönderimi kopya üretmiyor',
+  'pushRegistration `addDoc` kullanıyordu. Yazma Firestore’a ulaşıp `synced` bayrağı ' +
+    'diske yazılmadan uygulama ölürse kayıt beklemede görünür ve yeniden gönderilir — ' +
+    '`addDoc` her denemede yeni bir doküman üretir, yani öğrenci kayıt listesinde iki ' +
+    'kez çıkardı. Çekiliş katılımlarında baştan `setDoc` vardı; kayıtlarda açıktı.',
+  () => {
+    const fb = read('src/firebase.ts');
+    // Yorumlar hariç: açıklama metinlerinde `addDoc` geçiyor ve tek başına
+    // eşleşse kontrol kırmızı kalırdı.
+    if (/addDoc/.test(fb.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, ''))) {
+      return 'src/firebase.ts hâlâ addDoc kullanıyor';
+    }
+    if (!/setDoc\(doc\(db, COLLECTIONS\.registrations, payload\.regId\)/.test(fb)) {
+      return 'kayıt kendi kimliğine yazılmıyor';
+    }
+    // Kimlik cihazda üretilip saklanmazsa her denemede yenisi çıkar ve setDoc da
+    // addDoc gibi davranır.
+    const store = read('src/store.tsx');
+    if (!/regId: makeEntryId\(\)/.test(store)) return 'regId cihazda üretilmiyor';
+    // regId sonradan eklendi: onsuz kaydedilmiş bir kayıt cihazda duruyor olabilir
+    // ve kimliksiz gönderilemez.
+    if (!/r\.regId \? r :/.test(store)) return 'eski kayıtlar için hidrasyon göçü yok';
+    if (!/request\.resource\.data\.regId == registrationId/.test(read('firestore.rules'))) {
+      return 'kural doküman kimliğinin kaydın kimliği olmasını zorunlu kılmıyor';
+    }
+    return null;
+  },
+);
+
+check(
   'bildirim wiring bağlı',
   'NotificationSync mount edilmezse token da alınmaz, hatırlatma da kurulmaz — ' +
     'özellik hiçbir hata vermeden ölür.',

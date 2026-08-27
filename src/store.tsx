@@ -17,6 +17,12 @@ const STORAGE_KEY = 'kyk.state.v1';
 
 export type Registration = {
   eventId: string;
+  /**
+   * Firestore doküman kimliği. `code` değil, çünkü kod kullanıcıya gösterilmek
+   * için kısa tutuldu ve iki öğrencinin aynı kodu alması ihtimal dahilinde;
+   * aynı kodu alan ikinci kayıt birincinin üzerine yazardı.
+   */
+  regId: string;
   code: string;
   name: string;
   studentNo: string;
@@ -88,7 +94,7 @@ type AppStore = PersistedState & {
   /** False until the persisted state has been read back from disk. */
   hydrated: boolean;
   registrationFor: (eventId: string) => Registration | undefined;
-  register: (input: Omit<Registration, 'code'>) => Registration;
+  register: (input: Omit<Registration, 'code' | 'regId'>) => Registration;
   /** Bu etkinliğin çekilişine katılım, varsa. */
   raffleEntryFor: (eventId: string) => RaffleEntry | undefined;
   /** Katılımı önce cihaza yazar, gönderimi `syncPending` üstlenir. */
@@ -177,9 +183,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           const saved = JSON.parse(raw) as Partial<PersistedState>;
           setState({
             onboardingSeen: saved.onboardingSeen ?? defaultState.onboardingSeen,
-            registrations: (saved.registrations ?? defaultState.registrations).filter(
-              (r) => !isDemoRegistration(r),
-            ),
+            registrations: (saved.registrations ?? defaultState.registrations)
+              .filter((r) => !isDemoRegistration(r))
+              // `regId` sonradan geldi. Onsuz kaydedilmiş bir kayıt cihazda
+              // duruyor olabilir; kimliksiz gönderilemez, bir tane veriyoruz.
+              .map((r) => (r.regId ? r : { ...r, regId: makeEntryId() })),
             raffleEntries: saved.raffleEntries ?? defaultState.raffleEntries,
             notifications: {
               ...defaultNotifications,
@@ -250,6 +258,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         for (const entry of pending) {
           try {
             await pushRegistration({
+              regId: entry.regId,
               eventId: entry.eventId,
               code: entry.code,
               name: entry.name,
@@ -260,7 +269,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             setState((s) => ({
               ...s,
               registrations: s.registrations.map((r) =>
-                r.code === entry.code ? { ...r, synced: true } : r,
+                r.regId === entry.regId ? { ...r, synced: true } : r,
               ),
             }));
             console.log(`[kayit] ${entry.code} Firestore'a yazıldı.`);
@@ -361,7 +370,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         // Saved locally first so the confirmation screen is instant and works
         // offline. The pending-sync effect sends it as soon as the state lands
         // and keeps retrying until it does.
-        const entry: Registration = { ...input, code: makeCode(), synced: false };
+        const entry: Registration = {
+          ...input,
+          regId: makeEntryId(),
+          code: makeCode(),
+          synced: false,
+        };
         setState((s) => ({ ...s, registrations: [...s.registrations, entry] }));
         return entry;
       },

@@ -42,8 +42,11 @@ service cloud.firestore {
       allow create: if
         // Beklenen alanlar dışında bir şey yazılamasın.
         request.resource.data.keys().hasOnly(
-          ['eventId', 'code', 'name', 'studentNo', 'department', 'year', 'createdAt']
+          ['regId', 'eventId', 'code', 'name', 'studentNo', 'department', 'year', 'createdAt']
         )
+        // Doküman kimliği kaydın kendi kimliği: yeniden deneme aynı dokümanın
+        // üzerine gelsin diye. Başka bir kimliğe yazılamasın.
+        && request.resource.data.regId == registrationId
         && request.resource.data.eventId is string
         && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
         && request.resource.data.name is string
