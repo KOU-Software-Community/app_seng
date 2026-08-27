@@ -6,7 +6,7 @@
  * HTML'e girmez.** Etkinlik başlıkları ve öğrenci adları serbest metin; kaçış
  * atlanırsa panel kendi kendine XSS taşır.
  */
-import { EVENT_CATEGORIES } from '../src/eventSchema';
+import { EVENT_CATEGORIES, MAX_PHOTOS } from '../src/eventSchema';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -57,6 +57,20 @@ input:not([type=checkbox]), textarea, select {
 textarea { min-height: 96px; resize: vertical; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--blue); }
 .hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+.photo { position: relative; width: 118px; }
+.photo img {
+  width: 100%; height: 84px; object-fit: cover;
+  border-radius: 8px; border: 1.5px solid var(--border); display: block;
+}
+.photo-drop {
+  display: flex; align-items: center; gap: 5px; margin: 6px 0 0;
+  font-size: 12px; font-weight: 600; color: var(--danger);
+}
+.photo-tag {
+  position: absolute; top: 6px; left: 6px; background: rgba(0,27,74,0.78);
+  color: #fff; font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 4px;
+}
 .err { color: var(--danger); font-size: 12.5px; font-weight: 600; margin-top: 5px; }
 .banner {
   background: #FDECEA; border: 1px solid #F5C6C2; color: var(--danger);
@@ -273,6 +287,32 @@ export function winnersForm(
 }
 
 /**
+ * Yüklü görseller: küçük önizleme + silme kutusu.
+ *
+ * Var olanlar gizli alan olarak geri gönderiliyor — form gönderilince sunucu
+ * neyin kaldığını ancak böyle biliyor. Silme ayrı bir kutu: bir görseli
+ * kaldırmak, kalanların sırasını bozmadan olmalı.
+ */
+function photoRows(photos: unknown): string {
+  const list = Array.isArray(photos) ? photos.map(String).filter(Boolean) : [];
+  if (!list.length) return '<p class="hint" style="margin:0 0 16px">Henüz görsel yok.</p>';
+
+  return `<div class="photos">${list
+    .map(
+      (url, i) => `<div class="photo">
+        <img src="${esc(url)}" alt="">
+        <input type="hidden" name="photo" value="${esc(url)}">
+        <label class="photo-drop">
+          <input type="checkbox" name="dropPhoto" value="${esc(url)}" style="width:auto">
+          Sil
+        </label>
+        ${i === 0 ? '<span class="photo-tag">Kapak</span>' : ''}
+      </div>`,
+    )
+    .join('')}</div>`;
+}
+
+/**
  * Kategori seçenekleri. Kayıtlı değer listede yoksa başa ekleniyor: panelin
  * menüsü değişti diye var olan bir etkinliğin kategorisi sessizce başka bir şeye
  * dönmemeli.
@@ -311,7 +351,7 @@ export function eventForm(
       <h2>${opts.editing ? 'Etkinliği düzenle' : 'Yeni etkinlik'}</h2>
       ${Object.keys(errors).length ? '<div class="banner">Form kaydedilmedi — aşağıdaki alanları düzeltin.</div>' : ''}
 
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <div class="row">
           <label>Kimlik <span class="hint">(URL'de görünür, sonradan değiştirilemez)</span>
             <input type="text" name="id" value="${v('id')}" ${opts.editing ? 'readonly' : ''} placeholder="git-atolyesi" required>
@@ -382,6 +422,17 @@ export function eventForm(
             ${e('attendance')}
           </label>
         </div>
+
+        <label>Görseller <span class="hint">(ilki kapak — en fazla ${MAX_PHOTOS})</span>
+          <input type="file" name="photos" accept="image/*" multiple>
+        </label>
+        <p class="hint" style="margin:-8px 0 14px">
+          Yüklenen görseller 1600 px'e küçültülüp JPEG'e çevriliyor; telefondan
+          çıktığı gibi atabilirsiniz. Kapak arşiv kartında ve etkinlik detayının
+          üstünde, kalanı detaydaki galeride görünür.
+        </p>
+        ${e('photos')}
+        ${photoRows(values.photos)}
 
         <div class="row">
           <label>Rozet metni <span class="hint">(boşsa rozet çıkmaz)</span>

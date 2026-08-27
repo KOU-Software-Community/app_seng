@@ -203,6 +203,17 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   you meant. Deleting the retry branch from `registrations` left the check green because
   `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
   one block out before matching.
+- **Upload after validating, never before.** A rejected form that has already written
+  its files leaves objects in Storage that no event points at — quota is paid for them
+  and nobody ever notices. The panel validates, then uploads, and deletes what it
+  uploaded if the second build fails.
+- `makePublic()` throws on a bucket with uniform bucket-level access, which new Firebase
+  projects turn on by default. The download URL with a `firebaseStorageDownloadTokens`
+  metadata value works under both settings and does not make the bucket listable.
+- A multer `fileFilter` that answers `cb(null, false)` **drops the file silently**: the
+  event saves, the operator believes the photo uploaded, and it is nowhere. Pass an
+  error instead, and translate multer's codes — an unexplained "Bir şeyler ters gitti"
+  after picking seven photos tells the operator nothing.
 - **A check that reads comments finds its own rationale.** A guard has now gone red
   against correct code three times because the comment explaining *why* something was
   removed still contains its name — `addDoc`, `increment(1)`, `HOLD_MS`. Strip comments

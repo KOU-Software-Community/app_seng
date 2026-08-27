@@ -99,6 +99,8 @@ export type EventInput = {
    * etkinliğin katılımcı sayısı yok.
    */
   attendance?: string;
+  /** Görsel adresleri, sıralı. İlki kapak. Paneldeki yükleme üretiyor. */
+  photos?: string[];
 };
 
 export type BuildResult =
@@ -218,6 +220,15 @@ export function splitLocal(startsAt: string): { date: string; time: string } {
  * already stored with something off this list keeps it — this is the panel's
  * menu, not a rule the data model enforces.
  */
+/**
+ * Bir etkinliğin taşıyabileceği görsel sayısı.
+ *
+ * Kapak + küçük bir galeri. Sınır keyfi değil: arşiv ekranı kapağı, detay ise
+ * hepsini indiriyor — sınırsız bırakmak mobil veride bir etkinliği açmayı
+ * pahalı hâle getirirdi.
+ */
+export const MAX_PHOTOS = 6;
+
 export const EVENT_CATEGORIES = [
   'Atölye',
   'Söyleşi',
@@ -253,6 +264,16 @@ export function buildEvent(input: EventInput): BuildResult {
     const start = parsed.hour * 60 + parsed.minute;
     const [eh, em] = text(input.endsAt).split(':').map(Number);
     if (eh * 60 + em <= start) errors.endsAt = 'Bitiş saati başlangıçtan sonra olmalı.';
+  }
+
+  const photos = (input.photos ?? []).map(text).filter(Boolean);
+  if (photos.length > MAX_PHOTOS) {
+    errors.photos = `En fazla ${MAX_PHOTOS} görsel olabilir.`;
+  } else if (photos.some((url) => !/^https:\/\/\S+$/.test(url))) {
+    // Adresleri panel üretiyor; buraya başka bir şey düşerse yükleme yolunda
+    // bir şey bozulmuş demektir ve kaydedip uygulamada kırık görsel
+    // göstermektense burada durmak daha iyi.
+    errors.photos = 'Görsel adresleri geçersiz.';
   }
 
   const capacity = text(input.capacity ?? '');
@@ -311,6 +332,7 @@ export function buildEvent(input: EventInput): BuildResult {
       speaker: text(input.speaker),
       speakerRole: text(input.speakerRole),
       facts,
+      ...(photos.length ? { photos } : {}),
       // 0 ile boş aynı şey: ikisi de sınırsız. Alan hiç yazılmıyor ki
       // "kontenjan 0" gibi okunmasın.
       ...(capacity && Number(capacity) > 0 ? { capacity: Number(capacity) } : {}),
@@ -346,6 +368,7 @@ export function toInput(event: ClubEvent): EventInput {
     soon: event.soon,
     badge: event.badge,
     attendance: event.attendance === undefined ? '' : String(event.attendance),
+    photos: event.photos ?? [],
   };
 }
 

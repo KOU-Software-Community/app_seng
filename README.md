@@ -123,7 +123,8 @@ bu kuralları hiç görmüyor; yazmak için kural gevşetmek gerekmez.
 | Etkinlikler | Firestore `events` → yoksa `src/data.ts` |
 | Arşiv | Aynı `events` listesinin tarihi geçmiş yarısı (`splitByDate`) |
 | Kayıtlar | Önce cihaza yazılır, sonra Firestore `registrations` |
-| Kalan kontenjan | `events.capacity` − `eventSeats/{id}.regIds.length` |
+| Kalan kontenjan | `events.capacity` − `eventSeats/{id}.seatIds.length` |
+| Görseller | Firebase Storage → adresler `events.photos` içinde |
 | Duyurular | `https://api.kouseng.com/announcements` |
 | Bildirim tercihleri | Sadece cihaz (AsyncStorage) |
 
@@ -269,12 +270,22 @@ servis hesabı anahtarını kullanıyor (`.env.example` içindeki
 başa BOM konuyor, yoksa Excel UTF-8'i Windows-1254 sanıp Türkçe karakterleri
 bozuyor.
 
+## Görseller
+
+Panelden yükleniyor, Firebase Storage'da duruyor. Etkinlik başına en fazla altı
+görsel: ilki kapak (arşiv kartı ve etkinlik detayının üstü), kalanı detaydaki
+galeri. Tek görsel varsa galeri hiç çıkmıyor.
+
+Yüklenen dosya 1600 px'e küçültülüp JPEG'e çevriliyor — telefondan çıktığı gibi
+atılabilir. Uygulama Storage SDK'sını hiç kullanmıyor; elinde bir adres var ve
+`<Image>` ile çekiyor.
+
+Panelin çalıştığı yerde `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` tanımlı olmalı ve
+projede Storage açık olmalı. Yoksa yükleme hata verir — etkinlik kaydı etkilenmez.
+
 ## Kalan işler
 
-1. **Fotoğraflar** — uygulamada fotoğraf deposu **yok**. `PhotoSlot` bir `uri`
-   prop'u alıyor, yani görseller Storage'a yüklenip URL'ler etkinlik dokümanlarına
-   eklendiğinde placeholder kendiliğinden düşer. O gün gelene kadar arşivde
-   fotoğraf sayısı gösterilmiyor — sayacak bir şey yok.
+1. **Mağaza ekran görüntüleri** ve EAS build/submit.
 
 ## Mağazaya çıkarma
 

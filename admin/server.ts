@@ -26,7 +26,23 @@ import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import type { ClubEvent } from '../src/data';
-import { buildEvent, joinLocal, splitLocal, toInput, type EventInput } from '../src/eventSchema';
+import multer from 'multer';
+
+import {
+  MAX_PHOTOS,
+  buildEvent,
+  joinLocal,
+  splitLocal,
+  toInput,
+  type EventInput,
+} from '../src/eventSchema';
+import {
+  ACCEPTED_TYPES,
+  MAX_UPLOAD_BYTES,
+  deleteEventPhotos,
+  deletePhotos,
+  uploadEventPhoto,
+} from './photos';
 import {
   csvColumns,
   DEFAULT_FIELDS,
@@ -67,11 +83,74 @@ function loadServiceAccount() {
   }
 }
 
-initializeApp({ credential: cert(loadServiceAccount()) });
+initializeApp({
+  credential: cert(loadServiceAccount()),
+  // Görseller buraya yükleniyor. Uygulamanın bağlandığı bucket'ın aynısı —
+  // ayrışırsa panel bir yere yükler, uygulama başka yerden okumaya çalışır.
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+});
 const db = getFirestore();
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
+
+/**
+ * Görsel yükleme. Bellekte tutuluyor: dosyalar küçültülüp Storage'a gidiyor,
+ * diskte hiç durmuyorlar.
+ *
+ * Sınırlar burada, `sharp`'tan önce: kabul edilmeyecek bir dosyayı çözmenin
+ * anlamı yok ve bir sunucuyu 100 MB'lık bir yüklemeyle meşgul etmenin hiç yok.
+ */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: MAX_PHOTOS },
+  fileFilter: (_req, file, cb) => {
+    if (ACCEPTED_TYPES.includes(file.mimetype)) return cb(null, true);
+    // `cb(null, false)` dosyayı sessizce düşürürdü: etkinlik kaydedilir,
+    // yönetici görselini yüklediğini sanır ve hiçbir yerde göremez.
+    cb(new Error(`Desteklenmeyen dosya türü: ${file.mimetype}`));
+  },
+});
+
+/**
+ * Yükleme hatalarını okunur hâle getirir.
+ *
+ * Sarmalanmazsa multer'ın hatası genel hata yakalayıcıya düşüyor ve yönetici
+ * "Bir şeyler ters gitti" görüyor — yedi görsel yüklediği için mi, dosya çok
+ * büyük olduğu için mi, bilmiyor. Form yeniden çizilmiyor çünkü hata anında
+ * gövdenin ne kadarının çözüldüğü belli değil; onun yerine ne olduğunu söyleyip
+ * geri dönüş bırakıyoruz.
+ */
+function photoUpload(req: Request, res: Response, next: NextFunction): void {
+  upload.array('photos', MAX_PHOTOS)(req, res, (err: unknown) => {
+    if (!err) return next();
+
+    const code = (err as { code?: string }).code;
+    const message =
+      code === 'LIMIT_FILE_COUNT'
+        ? `Bir seferde en fazla ${MAX_PHOTOS} görsel yükleyebilirsiniz.`
+        : code === 'LIMIT_FILE_SIZE'
+          ? `Görsel çok büyük — en fazla ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`
+          : err instanceof Error
+            ? err.message
+            : 'Görsel yüklenemedi.';
+
+    console.error('[panel] görsel yükleme reddedildi:', err);
+    res
+      .status(400)
+      .type('html')
+      .send(
+        page(
+          'Görsel yüklenemedi',
+          `<div class="card">
+             <div class="banner">${esc(message)}</div>
+             <p class="hint">Formdaki diğer bilgiler kaydedilmedi.</p>
+             <div class="actions"><a class="btn btn-ghost" href="/">Etkinliklere dön</a></div>
+           </div>`,
+        ),
+      );
+  });
+}
 
 // ---------------------------------------------------------------- oturum
 
@@ -148,6 +227,23 @@ function formDateTime(body: Record<string, unknown>): { date: string; time: stri
   };
 }
 
+/**
+ * Formda duran görsellerden silinmek üzere işaretlenmeyenler.
+ *
+ * Var olanlar gizli alan olarak geri geliyor, silinecekler ayrı bir onay kutusu
+ * listesiyle. Sıra korunuyor: ilk görsel kapak ve yönetici sıralamayı bilerek
+ * kuruyor.
+ */
+function keptPhotos(body: Record<string, unknown>): string[] {
+  const raw = body.photo;
+  const all = (Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]).map(String);
+  const dropRaw = body.dropPhoto;
+  const drop = new Set(
+    (Array.isArray(dropRaw) ? dropRaw : dropRaw === undefined ? [] : [dropRaw]).map(String),
+  );
+  return all.filter((url) => url && !drop.has(url));
+}
+
 function formToInput(body: Record<string, unknown>): EventInput {
   const s = (k: string) => String(body[k] ?? '').trim();
   const { date, time } = formDateTime(body);
@@ -167,6 +263,7 @@ function formToInput(body: Record<string, unknown>): EventInput {
     soon: !!body.soon,
     badge: s('badge'),
     attendance: s('attendance'),
+    photos: keptPhotos(body),
   };
 }
 
@@ -261,44 +358,94 @@ async function rebuildSeats(eventId: string): Promise<number> {
   return seatIds.length;
 }
 
+/**
+ * Etkinliği kaydeder; gelen dosyaları yükler, silinenleri temizler.
+ *
+ * Sıra önemli: doğrulama önce, yükleme sonra. Ters olsaydı geçersiz bir formda
+ * dosyalar Storage'a gider ve hiçbir etkinliğin işaret etmediği yetimler
+ * kalırdı.
+ */
+async function saveEventWithPhotos(
+  req: Request,
+  res: Response,
+  opts: { editing: boolean; id?: string },
+): Promise<void> {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const base = formToInput(req.body);
+  const input = opts.id ? { ...base, id: opts.id } : base;
+  const form = () => inputToForm(input, formDateTime(req.body));
+
+  if (input.photos!.length + files.length > MAX_PHOTOS) {
+    res
+      .status(400)
+      .type('html')
+      .send(
+        eventForm(
+          form(),
+          { photos: `En fazla ${MAX_PHOTOS} görsel olabilir; ${input.photos!.length} tanesi zaten yüklü.` },
+          { editing: opts.editing },
+        ),
+      );
+    return;
+  }
+
+  // Görseller olmadan doğrula. Hata varsa hiçbir dosya yüklenmemiş oluyor.
+  const checked = buildEvent(input);
+  if (!checked.ok) {
+    res.status(400).type('html').send(eventForm(form(), checked.errors, { editing: opts.editing }));
+    return;
+  }
+
+  const ref = db.collection('events').doc(checked.event.id);
+  const existing = await ref.get();
+  if (!opts.editing && existing.exists) {
+    res
+      .status(409)
+      .type('html')
+      .send(eventForm(form(), { id: 'Bu kimlik zaten kullanılıyor.' }, { editing: false }));
+    return;
+  }
+
+  // Kayıttan *önce* okunuyor: `set()` dokümanı değiştirdikten sonra bakmak
+  // hep yeni listeyi görür ve silinen hiçbir dosya temizlenmezdi.
+  const before = ((existing.data()?.photos as string[] | undefined) ?? []).filter(Boolean);
+
+  const uploaded: string[] = [];
+  for (const file of files) {
+    uploaded.push(await uploadEventPhoto(checked.event.id, file.buffer));
+  }
+
+  const built = buildEvent({ ...input, photos: [...input.photos!, ...uploaded] });
+  if (!built.ok) {
+    // Buraya ancak yüklemenin ürettiği adres beklenmedikse düşülür. Yüklenenleri
+    // geri alıyoruz ki yetim dosya kalmasın.
+    await deletePhotos(uploaded);
+    res.status(400).type('html').send(eventForm(form(), built.errors, { editing: opts.editing }));
+    return;
+  }
+
+  const { id, ...rest } = built.event;
+  await Promise.all([
+    ref.set({ ...rest, published: true }),
+    // Koltuk dokümanı etkinlikle birlikte doğuyor; düzenlemede zaten var.
+    opts.editing
+      ? Promise.resolve()
+      : db.collection('eventSeats').doc(id).set({ eventId: id, seatIds: [] }),
+  ]);
+
+  // Formdan çıkarılan görsellerin dosyaları da gitsin.
+  const removed = before.filter((url) => !built.event.photos?.includes(url));
+  if (removed.length) await deletePhotos(removed);
+
+  res.redirect('/');
+}
+
 app.get('/events/new', (_req, res) => {
   res.type('html').send(eventForm({}, {}, { editing: false }));
 });
 
-app.post('/events/new', async (req, res) => {
-  const input = formToInput(req.body);
-  const built = buildEvent(input);
-
-  if (!built.ok) {
-    return res
-      .status(400)
-      .type('html')
-      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: false }));
-  }
-
-  const ref = db.collection('events').doc(built.event.id);
-  if ((await ref.get()).exists) {
-    return res
-      .status(409)
-      .type('html')
-      .send(
-        eventForm(
-          inputToForm(input, formDateTime(req.body)),
-          { id: 'Bu kimlik zaten kullanılıyor.' },
-          { editing: false },
-        ),
-      );
-  }
-
-  const { id, ...rest } = built.event;
-  // Koltuk dokümanı etkinlikle birlikte doğuyor. Uygulama ona `merge` ile
-  // yazıyor, yani yokken de çalışırdı — ama o zaman kural "var olan sayıya +1"
-  // diyemezdi ve ilk kaydı doğrulayamazdı.
-  await Promise.all([
-    ref.set({ ...rest, published: true }),
-    db.collection('eventSeats').doc(id).set({ eventId: id, seatIds: [] }),
-  ]);
-  res.redirect('/');
+app.post('/events/new', photoUpload, async (req, res) => {
+  await saveEventWithPhotos(req, res, { editing: false });
 });
 
 app.get('/events/:id', async (req, res) => {
@@ -318,26 +465,17 @@ app.get('/events/:id', async (req, res) => {
   );
 });
 
-app.post('/events/:id', async (req, res) => {
+app.post('/events/:id', photoUpload, async (req, res) => {
   // Kimlik dokümanın kendisi; formdan gelene güvenmiyoruz.
-  const input = { ...formToInput(req.body), id: req.params.id };
-  const built = buildEvent(input);
-
-  if (!built.ok) {
-    return res
-      .status(400)
-      .type('html')
-      .send(eventForm(inputToForm(input, formDateTime(req.body)), built.errors, { editing: true }));
-  }
-
-  const { id, ...rest } = built.event;
-  await db.collection('events').doc(id).set({ ...rest, published: true });
-  res.redirect('/');
+  await saveEventWithPhotos(req, res, { editing: true, id: String(req.params.id) });
 });
 
 app.post('/events/:id/delete', async (req, res) => {
   await Promise.all([
     db.collection('events').doc(req.params.id).delete(),
+    // Görseller de gitsin, yoksa bucket'ta kimsenin işaret etmediği dosyalar
+    // birikir ve kota onlara da ödeniyor.
+    deleteEventPhotos(req.params.id),
     // Sahipsiz koltuk dokümanı bırakmıyoruz: aynı kimlikle yeni bir etkinlik
     // açılırsa eski kayıtların koltuklarıyla dolu başlardı.
     db.collection('eventSeats').doc(req.params.id).delete(),

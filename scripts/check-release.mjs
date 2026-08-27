@@ -261,6 +261,64 @@ check(
 );
 
 check(
+  'görseller gerçek, sayaç uydurma değil',
+  'Arşivde dört fotoğraflık bir görüntüleyici ve "24 foto" rozeti vardı; arkasında ' +
+    'hiçbir dosya yoktu, dördü de aynı gradyan yer tutucuydu. Galeri geri geldi ama ' +
+    'bu sefer gerçek dosyalarla: sayaç `photos.length`, yani ne varsa o.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    const gallery = strip(read('src/components/PhotoGallery.tsx'));
+    // Sabit bir adet, arkasında dosya olup olmadığına bakmadan sayı gösterir.
+    if (/PHOTOS_PER_ENTRY|length: 4|\{ length: \d/.test(gallery)) {
+      return 'galeri sabit bir görsel sayısı taşıyor';
+    }
+    // Sayaç ifadesinin kendisi aranıyor. Sadece `photos.length` aramak yetmiyor:
+    // dosyada başka yerlerde de geçiyor ve payda sabitlense bile eşleşirdi —
+    // yani kontrol tam korumak istediği şeyi kaçırıyordu.
+    if (!/\} \/ \$\{photos\.length\}/.test(gallery)) {
+      return 'sayacın paydası gerçek görsel sayısı değil';
+    }
+    // Tek görsel varsa gezilecek bir şey yok; yine de bir görüntüleyici açmak
+    // eski sahte lightbox’ın aynısı olurdu.
+    if (!/photos\.length < 2/.test(gallery)) return 'tek görselde galeri gizlenmiyor';
+
+    // Kapaklar gerçekten veriye bağlı mı, yoksa yine yer tutucu mu?
+    for (const f of ['app/(tabs)/arsiv.tsx', 'app/etkinlik/[id].tsx']) {
+      if (!/uri=\{event\.photos\?\.\[0\]\}/.test(read(f))) return `${f} kapağı veriden almıyor`;
+    }
+
+    // Sınırsız görsel, detay ekranını mobil veride pahalı hâle getirir.
+    if (!/MAX_PHOTOS/.test(strip(read('admin/server.ts')))) return 'panel görsel sayısını sınırlamıyor';
+    if (!/errors\.photos/.test(strip(read('src/eventSchema.ts')))) {
+      return 'şema görselleri doğrulamıyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'yükleme yetim dosya bırakmıyor',
+  'Doğrulama başarısız olursa yüklenen dosyalar Storage’da kalır ve hiçbir etkinlik ' +
+    'onlara işaret etmez — kota onlara da ödenir ve kimse fark etmez. Silinen görsel ' +
+    've silinen etkinlik için de aynısı geçerli.',
+  () => {
+    const server = read('admin/server.ts').replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    // Doğrulama yüklemeden önce olmalı: `checked` başarısızsa hiçbir dosya
+    // Storage’a gitmemiş oluyor.
+    const validateAt = server.indexOf('const checked = buildEvent(input)');
+    const uploadAt = server.indexOf('uploadEventPhoto(');
+    if (validateAt < 0 || uploadAt < 0) return 'kaydetme yolu beklenen sırayı taşımıyor';
+    if (validateAt > uploadAt) return 'doğrulama yüklemeden sonra yapılıyor';
+
+    if (!/deletePhotos\(uploaded\)/.test(server)) return 'başarısız kayıtta yüklenenler geri alınmıyor';
+    if (!/deletePhotos\(removed\)/.test(server)) return 'formdan çıkarılan görseller silinmiyor';
+    if (!/deleteEventPhotos\(/.test(server)) return 'etkinlik silinince görselleri kalıyor';
+    return null;
+  },
+);
+
+check(
   'yapay gecikme yok',
   'Açılış ekranı hidrasyon bittikten *sonra* 1900 ms daha bekliyordu, ve her etkinlik ' +
     'detayı 460 ms’lik bir perdenin arkasından açılıyordu. İkisi de hiçbir şeyi ' +

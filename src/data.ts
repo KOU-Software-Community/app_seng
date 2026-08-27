@@ -36,6 +36,14 @@ export type ClubEvent = {
   speakerRole: string;
   facts: EventFact[];
   /**
+   * Etkinlik görselleri, sıralı. İlki kapak: arşiv kartı ve detay hero'su onu
+   * gösteriyor. Kalanı detaydaki galeri.
+   *
+   * Panelden yükleniyor ve Firebase Storage'da duruyor; buradaki değerler indirme
+   * adresleri. Boşsa `PhotoSlot` kendi gradyan yer tutucusunu çiziyor.
+   */
+  photos?: string[];
+  /**
    * Kaç kişi katıldı. Etkinlik olmadan bilinemeyeceği için isteğe bağlı —
    * arşiv kartındaki rozeti bu besliyor ve boşsa rozet çizilmiyor.
    */
