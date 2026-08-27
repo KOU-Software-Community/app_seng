@@ -9,6 +9,7 @@
  * veriyi silmemesi** (gizlenen alan formdan da düşerse kaydetmek onu sessizce
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
+import { parseServiceAccount } from '../admin/credentials';
 import { isBucketMissing, keyProblem } from '../admin/photos';
 import { archiveList, eventForm } from '../admin/views';
 
@@ -159,6 +160,43 @@ assert('eski service_role JWT geçiyor', keyProblem('eyJhbGciOiJIUzI1NiIsInR5cCI
 
 // Çözülemeyen bir şey için karar vermiyoruz; isteğin kendisi konuşsun.
 assert('anlamsız değer engellenmiyor', keyProblem('bir-sey') === null);
+
+// 9. Servis hesabı anahtarı. Yerelde dosya, sunucuda ortam değişkeni —
+//    PaaS'te diske dosya koymak ya mümkün değil ya da her deploy'da kayboluyor.
+const SA = { type: 'service_account', project_id: 'x', private_key: '-----BEGIN\nabc\n-----' };
+const json = JSON.stringify(SA);
+
+/**
+ * Fırlatan bir çağrı `assert`'e hiç ulaşmıyor: script çöküyor, ne ✓ ne ✗
+ * yazılıyor. base64 desteğini kaldırıp denediğimde tam olarak bu oldu — kontrol
+ * "geçti" de demedi, "kaldı" da; sadece sustu.
+ */
+function parsed(value: string) {
+  try {
+    return parseServiceAccount(value);
+  } catch {
+    return null;
+  }
+}
+
+assert('düz JSON çözülüyor', parsed(json)?.project_id === 'x');
+// base64 gerekiyor çünkü private_key gerçek satır sonları taşıyor ve çok
+// satırlı değerler panolarda/panellerde bozuluyor.
+const b64 = Buffer.from(json).toString('base64');
+assert('base64 JSON çözülüyor', parsed(b64)?.project_id === 'x');
+// Satır sonlarının base64 turunda sağ kalması asıl mesele.
+assert('private_key satır sonları korunuyor', parsed(b64)?.private_key === SA.private_key);
+
+// Yol gibi görünen bir değer base64 sanılmamalı, yoksa hata mesajı yanlış yeri
+// gösterir.
+let pathError = '';
+try {
+  parseServiceAccount('./olmayan-dosya.json');
+} catch (err) {
+  pathError = err instanceof Error ? err.message : String(err);
+}
+assert('olmayan dosya yol olarak raporlanıyor', /olmayan-dosya\.json/.test(pathError), pathError);
+assert('hata üç biçimi de anlatıyor', /base64/.test(pathError) && /JSON/.test(pathError));
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

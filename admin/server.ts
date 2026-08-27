@@ -17,12 +17,10 @@
  * anahtarı.
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import '../scripts/load-env';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { cert, initializeApp } from 'firebase-admin/app';
+import { cert, initializeApp, type ServiceAccount } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import type { ClubEvent } from '../src/data';
@@ -55,6 +53,7 @@ import {
   type RaffleField,
   type RaffleFieldType,
 } from '../src/raffleSchema';
+import { parseServiceAccount } from './credentials';
 import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
 const PORT = Number(process.env.ADMIN_PORT ?? 4000);
@@ -74,21 +73,20 @@ if (!PASSWORD) {
 }
 
 function loadServiceAccount() {
-  const path = resolve(process.env.FIREBASE_SERVICE_ACCOUNT ?? './service-account.json');
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    console.error(
-      `Servis hesabı anahtarı okunamadı: ${path}\n` +
-        'Firebase Console → Project settings → Service accounts → Generate new key',
-    );
+    return parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 }
 
 // Görseller Firebase'de değil Supabase'de duruyor (bkz. admin/photos.ts), o
 // yüzden burada storageBucket yok. Firebase yalnızca Firestore için.
-initializeApp({ credential: cert(loadServiceAccount()) });
+// `cert()` tip imzası camelCase (`projectId`) istiyor ama çalışma anında
+// Firebase Console'dan indirilen snake_case JSON'u olduğu gibi kabul ediyor —
+// dosyayı elle çevirmek gereksiz ve hataya açık olurdu.
+initializeApp({ credential: cert(loadServiceAccount() as unknown as ServiceAccount) });
 const db = getFirestore();
 
 const app = express();

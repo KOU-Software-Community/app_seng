@@ -250,6 +250,21 @@ gün (31 Şubat), başlangıçtan önceki bitiş saati, boş başlık, boşluk i
 kimlik. `npm run check:schema` bunları ve türetilen metinlerin doğruluğunu
 sınıyor.
 
+### Panelin ortam değişkenleri
+
+| Değişken | Zorunlu | Ne için |
+| --- | --- | --- |
+| `ADMIN_PASSWORD` | ✅ | Panel girişi. Tanımsızsa panel başlamaz. |
+| `FIREBASE_SERVICE_ACCOUNT` | ✅ | Admin SDK anahtarı. Yol, JSON ya da base64. |
+| `SUPABASE_URL` | görseller için | `https://<ref>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | görseller için | `sb_secret_…` — publishable **değil** |
+| `SUPABASE_STORAGE_BUCKET` | hayır | Varsayılan `event-photos` |
+| `ADMIN_PORT` | hayır | Varsayılan 4000 |
+| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `rules:deploy` için | Kuralların hangi projeye gideceği |
+
+Panelin **hiçbir `EXPO_PUBLIC_*` değişkene ihtiyacı yok** (kural yayınlama hariç),
+uygulamanın da hiçbir panel değişkenine. İki taraf ayrı.
+
 ### Sunucuya koyarken
 
 Panel HTTP konuşuyor; parola ve kayıtlar açık ağdan geçmemeli. Bir reverse proxy
