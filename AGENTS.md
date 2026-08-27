@@ -208,6 +208,11 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   that appears whether or not a bucket exists. Event photos live in Supabase Storage
   instead; Firestore stays where it is. The app never touched a storage SDK — it renders
   a URL — so swapping providers was one file.
+- A publishable Supabase key in the panel's secret slot fails as
+  `row-level security policy`, which never names the actual cause. The key type is
+  visible in the value itself — `sb_publishable_` prefix, or `role: anon` in a legacy
+  JWT payload — so the panel refuses before the first request instead of relaying a
+  message about policies.
 - **An error branch you never triggered is a branch you never wrote.** The panel's
   "Storage bucket not found" message matched `err.code === 404`; gaxios 6 puts the
   number in `err.status` and leaves `code` unset, so the branch never ran and the

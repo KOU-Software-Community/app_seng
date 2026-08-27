@@ -41,6 +41,32 @@ function bucketName(): string {
   return process.env.SUPABASE_STORAGE_BUCKET || DEFAULT_BUCKET;
 }
 
+/**
+ * Anahtar yanlış türden mi?
+ *
+ * Publishable anahtar istemciye gömülmek için var ve yazma yetkisi yok: onunla
+ * yüklemeye çalışmak RLS hatasına düşüyor ve hata "row-level security policy"
+ * diyor — yani asıl sorunu (yanlış anahtar) hiç söylemiyor.
+ *
+ * Önek bakmak ağa çıkmadan, ilk istekten önce cevap veriyor. İki anahtar
+ * sistemi de kapsanıyor: yeni `sb_publishable_` / `sb_secret_` öneki ve eski
+ * JWT'ler (payload'da `role`).
+ */
+export function keyProblem(key: string): string | null {
+  if (key.startsWith('sb_publishable_')) return 'publishable';
+
+  const parts = key.split('.');
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      if (payload?.role === 'anon') return 'anon';
+    } catch {
+      // Çözülemeyen bir JWT: karar veremiyoruz, isteğe bırakıyoruz.
+    }
+  }
+  return null;
+}
+
 let client: SupabaseClient | undefined;
 
 /**
@@ -60,6 +86,19 @@ function storage() {
         '  SUPABASE_SERVICE_ROLE_KEY=...\n\n' +
         'İkisi de Supabase Dashboard → Project Settings → API altında.\n' +
         'service_role anahtarı gizlidir: EXPO_PUBLIC_ öneki almaz ve uygulamaya girmez.',
+    );
+  }
+
+  if (keyProblem(key)) {
+    throw new PhotoUploadError(
+      'SUPABASE_SERVICE_ROLE_KEY bir **publishable** anahtar taşıyor.\n\n' +
+        'Publishable anahtar istemciye gömülmek için: okuyabilir, yazamaz. ' +
+        'Yükleme RLS’e takılır.\n\n' +
+        'Gereken gizli anahtar: Dashboard → Project Settings → API Keys → ' +
+        'Secret keys → Reveal.\n' +
+        '  Yeni sistemde `sb_secret_…` ile başlar.\n' +
+        '  Eski sistemde `service_role` JWT’si (`eyJ…`).\n\n' +
+        'Bu anahtar gizlidir: .env.local içine yazın, EXPO_PUBLIC_ öneki almaz.',
     );
   }
 

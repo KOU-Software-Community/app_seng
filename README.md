@@ -314,11 +314,14 @@ Supabase **yalnızca dosyaları** tutuyor. İki servis biraz çirkin ama alterna
 1. Supabase Dashboard → **Storage → New bucket**
    - Ad: `event-photos`
    - **Public bucket: açık** (uygulama görselleri adresle çekiyor)
-2. Project Settings → API → `.env.local` dosyasına:
+2. Project Settings → **API Keys → Secret keys → Reveal** → `.env.local`:
    ```
    SUPABASE_URL=https://<proje-ref>.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=...
+   SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
    ```
+   **`sb_publishable_…` değil.** O anahtar istemciye gömülmek için var: okur,
+   yazamaz. Panel yanlış türü ilk istekten önce yakalayıp söylüyor — yoksa
+   Supabase "row-level security policy" der ve asıl sebebi hiç söylemez.
 
 `service_role` anahtarı Firebase servis hesabı anahtarıyla aynı sınıfta: RLS'i
 tamamen aşar, `EXPO_PUBLIC_` öneki almaz, uygulamaya girmez. `.env.local`

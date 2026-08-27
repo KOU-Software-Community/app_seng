@@ -9,7 +9,7 @@
  * veriyi silmemesi** (gizlenen alan formdan da düşerse kaydetmek onu sessizce
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
-import { isBucketMissing } from '../admin/photos';
+import { isBucketMissing, keyProblem } from '../admin/photos';
 import { archiveList, eventForm } from '../admin/views';
 
 let failed = 0;
@@ -143,6 +143,22 @@ assert(
     !isBucketMissing({ message: 'row-level security policy' }) &&
     !isBucketMissing(new Error('fetch failed')),
 );
+
+// 8. Anahtar türü. Panel bir kez yanlış anahtarla denendi ve Supabase
+//    "row-level security policy" dedi — yani asıl sorunu (publishable anahtar
+//    yazamaz) hiç söylemedi. Önek kontrolü ağa çıkmadan cevap veriyor.
+assert(
+  'publishable önek yakalanıyor',
+  keyProblem('sb_publishable_FR-7VBv8Y_A6q3FlFzQfug_6u7IVEdY') === 'publishable',
+);
+assert('secret önek geçiyor', keyProblem('sb_secret_ornek123') === null);
+
+// Eski sistem: rol JWT payload'ında.
+assert('eski anon JWT yakalanıyor', keyProblem('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiAic3VwYWJhc2UiLCAicm9sZSI6ICJhbm9uIn0.imza') === 'anon');
+assert('eski service_role JWT geçiyor', keyProblem('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiAic3VwYWJhc2UiLCAicm9sZSI6ICJzZXJ2aWNlX3JvbGUifQ.imza') === null);
+
+// Çözülemeyen bir şey için karar vermiyoruz; isteğin kendisi konuşsun.
+assert('anlamsız değer engellenmiyor', keyProblem('bir-sey') === null);
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);
