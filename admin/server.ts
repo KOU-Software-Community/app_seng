@@ -252,9 +252,13 @@ async function trueRegisteredCount(eventId: string): Promise<number> {
  */
 async function rebuildSeats(eventId: string): Promise<number> {
   const snap = await db.collection('registrations').where('eventId', '==', eventId).get();
-  const regIds = snap.docs.map((d) => d.id);
-  await db.collection('eventSeats').doc(eventId).set({ eventId, regIds });
-  return regIds.length;
+  // Doküman kimliği değil, kaydın kendi koltuk jetonu: kimlikte öğrenci
+  // numarası geçiyor ve bu liste herkese açık.
+  const seatIds = snap.docs
+    .map((d) => (d.data() as { seatId?: unknown }).seatId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  await db.collection('eventSeats').doc(eventId).set({ eventId, seatIds });
+  return seatIds.length;
 }
 
 app.get('/events/new', (_req, res) => {
@@ -292,7 +296,7 @@ app.post('/events/new', async (req, res) => {
   // diyemezdi ve ilk kaydı doğrulayamazdı.
   await Promise.all([
     ref.set({ ...rest, published: true }),
-    db.collection('eventSeats').doc(id).set({ eventId: id, regIds: [] }),
+    db.collection('eventSeats').doc(id).set({ eventId: id, seatIds: [] }),
   ]);
   res.redirect('/');
 });
@@ -303,7 +307,7 @@ app.get('/events/:id', async (req, res) => {
 
   const event = { id: doc.id, ...(doc.data() as Omit<ClubEvent, 'id'>) } as ClubEvent;
   const seats = await db.collection('eventSeats').doc(req.params.id).get();
-  const shown = (seats.data()?.regIds as string[] | undefined)?.length ?? 0;
+  const shown = (seats.data()?.seatIds as string[] | undefined)?.length ?? 0;
 
   res.type('html').send(
     eventForm(inputToForm(toInput(event)), {}, {

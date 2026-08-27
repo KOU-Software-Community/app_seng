@@ -27,7 +27,7 @@ export default function EventDetailRoute() {
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
   const { getRaffle, registeredCount } = useContent();
-  const { registrationFor, raffleEntryFor } = useAppStore();
+  const { registrationFor, raffleEntryFor, syncPending } = useAppStore();
 
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
@@ -186,7 +186,15 @@ export default function EventDetailRoute() {
       >
         <View style={{ flex: 1 }}>
           <Txt weight="semibold" size={11.5} color={colors.faint}>
-            {past ? 'Tamamlandı' : raffle ? 'Çekiliş' : registration ? 'Kayıt kodun' : 'Kontenjan'}
+            {past
+              ? 'Tamamlandı'
+              : raffle
+                ? 'Çekiliş'
+                : registration
+                  ? registration.blocked && !registration.synced
+                    ? 'Kayıt kabul edilmedi'
+                    : 'Kayıt kodun'
+                  : 'Kontenjan'}
           </Txt>
           <Txt weight="extrabold" size={14} color={colors.navy900}>
             {past
@@ -198,7 +206,9 @@ export default function EventDetailRoute() {
                   ? 'Sonuçlandı'
                   : `${raffle.winnerCount} kişi kazanacak`
                 : registration
-                  ? registration.code
+                  ? registration.blocked && !registration.synced
+                    ? 'Bu numarayla zaten kayıt olunmuş olabilir'
+                    : registration.code
                   : seatsLabel(event, registered)}
           </Txt>
         </View>
@@ -230,11 +240,23 @@ export default function EventDetailRoute() {
             </View>
           )
         ) : registration ? (
-          <View style={styles.registered}>
-            <Txt weight="bold" size={15.5} color={colors.blue500}>
-              {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor…'}
-            </Txt>
-          </View>
+          registration.blocked && !registration.synced ? (
+            // Kural reddetti ve yeniden denemek bunu değiştirmiyor. En olası
+            // sebep aynı numarayla zaten kayıt olunmuş olması — ama Firestore
+            // sebebi söylemediği için iddia etmiyoruz, elle tekrar deneme
+            // bırakıyoruz.
+            <PrimaryButton
+              label="Tekrar dene"
+              onPress={syncPending}
+              style={{ flex: 1.3 }}
+            />
+          ) : (
+            <View style={styles.registered}>
+              <Txt weight="bold" size={15.5} color={colors.blue500}>
+                {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor…'}
+              </Txt>
+            </View>
+          )
         ) : full ? (
           // Kayıtlı olan öğrenci bu dala hiç düşmüyor: kontenjan dolduktan
           // sonra kendi kaydını görmeye devam ediyor.

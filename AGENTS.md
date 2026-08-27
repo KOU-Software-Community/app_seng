@@ -185,6 +185,24 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   `set(..., {merge: true})` does not degrade — it fails the whole write. `eventSeats`
   docs are born in the panel, but an event predating them would have had *no* student
   able to register, so the rule allows a first-seat create against an existing event.
+- **A document id can carry a uniqueness rule that no query can.** One student number
+  per event is enforced by making the registration's id `eventId__studentNo`: a second
+  device writing the same student hits an existing document, and the rule only lets a
+  write through that changes nothing but `createdAt`. No count, no read, nothing to race
+  against — but the id is now personal data, so what goes in the public seat list is a
+  separate random token.
+- `set()` on a document that already exists is an **update** to Firestore rules, not a
+  create. `allow create` alone therefore rejects the very retry that `setDoc` exists to
+  make safe, and the registration retries forever getting denied every time. The narrow
+  `affectedKeys().hasOnly(['createdAt'])` update branch is what lets an identical resend
+  through while still refusing a different one.
+- **Only retry what a retry can fix.** `permission-denied` is a rules decision and will
+  be the same next launch, so it stops the background retry and surfaces a manual one
+  instead of burning a write per app open behind a "Gönderiliyor…" that never resolves.
+- Grepping `firestore.rules` as one string finds a line in *some* block, not the block
+  you meant. Deleting the retry branch from `registrations` left the check green because
+  `raffleEntries` still had the identical line — `rulesBlock()` in `check:release` slices
+  one block out before matching.
 - The calendar/archive boundary is **the day, not the instant**. Splitting on the start
   time would move a three-hour event into the archive while it is still running; an
   event stays on the calendar through its own day and moves the next morning. `today`

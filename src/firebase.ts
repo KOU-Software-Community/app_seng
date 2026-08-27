@@ -50,14 +50,17 @@ export const COLLECTIONS = {
   events: 'events',
   registrations: 'registrations',
   /**
-   * Etkinlik başına kayıt kimlikleri. Kayıtların kendisi istemciye kapalı —
+   * Etkinlik başına koltuk jetonları. Kayıtların kendisi istemciye kapalı —
    * kim kaydolduğu kimseyi ilgilendirmiyor — ama kaç kişi kaydolduğu ekranda
    * gösteriliyor, dolayısıyla sayının okunabilir bir yerde durması gerekiyor.
    *
-   * Sayaç yerine kimlik listesi: `arrayUnion` aynı kimliği ikinci kez eklemez,
-   * yani yeniden gönderim sayıyı şişirmez. Bir sayaç `increment(1)` ile
-   * artsaydı, kayıt yazması idempotent olduktan sonra bile aynı çökme
-   * penceresinde iki kez artabilirdi.
+   * Jetonlar rastgele ve hiçbir şey söylemiyor. Kayıt dokümanının kimliği
+   * kullanılamazdı: içinde öğrenci numarası geçiyor ve bu liste herkese açık.
+   *
+   * Sayaç yerine liste: `arrayUnion` aynı jetonu ikinci kez eklemez, yani
+   * yeniden gönderim sayıyı şişirmez. Bir sayaç `increment(1)` ile artsaydı,
+   * kayıt yazması idempotent olduktan sonra bile aynı çökme penceresinde iki
+   * kez artabilirdi.
    */
   eventSeats: 'eventSeats',
   devices: 'devices',
@@ -102,7 +105,7 @@ export async function fetchContent(): Promise<{
 
   const registered: Record<string, number> = {};
   for (const d of seatsSnap.docs) {
-    const ids = (d.data() as { regIds?: unknown }).regIds;
+    const ids = (d.data() as { seatIds?: unknown }).seatIds;
     registered[d.id] = Array.isArray(ids) ? ids.length : 0;
   }
 
@@ -138,6 +141,7 @@ export async function pushRaffleEntry(entry: {
 
 export type RegistrationPayload = {
   regId: string;
+  seatId: string;
   eventId: string;
   code: string;
   name: string;
@@ -149,14 +153,18 @@ export type RegistrationPayload = {
 /**
  * Writes one registration. Throws on failure so the caller can mark it unsynced.
  *
- * Doküman kimliği kaydın kendi `regId`'si — `addDoc` değil `setDoc`. Fark
- * yeniden denemede ortaya çıkıyor: yazma Firestore'a ulaşıp `synced` bayrağı
- * diske yazılmadan uygulama ölürse, kayıt beklemede görünür ve tekrar
- * gönderilir. `addDoc` her seferinde yeni bir doküman üretir, yani öğrenci
- * kayıt listesinde iki kez görünürdü. Aynı kimliğe `setDoc` ikinci kez de aynı
- * dokümanın üzerine gelir.
+ * Doküman kimliği `${eventId}__${studentNo}` — `addDoc` değil `setDoc`. İki iş
+ * birden yapıyor:
  *
- * Çekiliş katılımlarında bu baştan böyleydi; kayıtlarda açık duruyordu.
+ * 1. **Yeniden gönderim kopya üretmiyor.** `addDoc` her çağrıda yeni bir
+ *    doküman açardı; yazma Firestore'a ulaşıp `synced` bayrağı diske
+ *    yazılmadan uygulama ölürse öğrenci listede iki kez görünürdü.
+ * 2. **Aynı öğrenci numarası aynı etkinliğe iki kez yazılamıyor.** İkinci
+ *    cihazdan gelen kayıt var olan dokümana denk gelir ve kural onu reddeder.
+ *    Sunucuda sayım yok, okuma yok — kimlik zaten benzersizliği taşıyor.
+ *
+ * Koltuk jetonu ayrı ve rastgele: `eventSeats` listesi herkese açık, oraya
+ * içinde öğrenci numarası geçen bir kimlik konamaz.
  */
 export async function pushRegistration(payload: RegistrationPayload): Promise<string> {
   const db = getDb();
@@ -165,7 +173,7 @@ export async function pushRegistration(payload: RegistrationPayload): Promise<st
   // yazılır ya hiçbiri. Ayrı yazsaydık kayıt gidip koltuk gitmeyebilir ve
   // etkinlik dolmadığı hâlde dolmuş görünmeyebilirdi.
   //
-  // `arrayUnion` idempotent: aynı `regId` ikinci kez eklenmez. Yeniden gönderim
+  // `arrayUnion` idempotent: aynı jeton ikinci kez eklenmez. Yeniden gönderim
   // ne kopya kayıt üretiyor (doküman kimliği `regId`) ne de sayıyı şişiriyor.
   const batch = writeBatch(db);
   batch.set(doc(db, COLLECTIONS.registrations, payload.regId), {
@@ -174,7 +182,7 @@ export async function pushRegistration(payload: RegistrationPayload): Promise<st
   });
   batch.set(
     doc(db, COLLECTIONS.eventSeats, payload.eventId),
-    { eventId: payload.eventId, regIds: arrayUnion(payload.regId) },
+    { eventId: payload.eventId, seatIds: arrayUnion(payload.seatId) },
     { merge: true },
   );
 

@@ -37,16 +37,35 @@ service cloud.firestore {
     // veya Admin SDK ile görür.
     match /registrations/{registrationId} {
       allow read: if false;
-      allow update, delete: if false;
+      allow delete: if false;
+
+      // Yeniden gönderim. Yazma Firestore'a ulaşıp `synced` bayrağı cihaza
+      // yazılmadan uygulama ölürse aynı kayıt tekrar gönderiliyor ve doküman
+      // artık var olduğu için bu bir *update*. Kapalı olsaydı o kayıt her
+      // açılışta yeniden denenip her seferinde reddedilirdi.
+      //
+      // İzin verilen tek fark `createdAt` — o da sunucu saati olduğu için her
+      // yazmada değişiyor. İsim, numara, kod: hiçbiri değiştirilemiyor. Yani
+      // başka bir cihazdan gelen *farklı* bir kayıt bu dala düşemiyor.
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt']);
 
       allow create: if
         // Beklenen alanlar dışında bir şey yazılamasın.
         request.resource.data.keys().hasOnly(
-          ['regId', 'eventId', 'code', 'name', 'studentNo', 'department', 'year', 'createdAt']
+          ['regId', 'seatId', 'eventId', 'code', 'name', 'studentNo', 'department', 'year', 'createdAt']
         )
-        // Doküman kimliği kaydın kendi kimliği: yeniden deneme aynı dokümanın
-        // üzerine gelsin diye. Başka bir kimliğe yazılamasın.
+        // Doküman kimliği öğrenci numarasından türüyor: aynı numara aynı
+        // etkinliğe ikinci kez yazılamasın. İkinci yazma var olan dokümana denk
+        // gelir ve yukarıdaki update dalı yalnızca birebir aynı kaydı geçirir.
+        //
+        // Bu kontrol olmadan istemci kimliği kendi seçer ve benzersizlik diye
+        // bir şey kalmaz.
+        && registrationId == request.resource.data.eventId + '__' + request.resource.data.studentNo
         && request.resource.data.regId == registrationId
+        && request.resource.data.seatId is string
+        && request.resource.data.seatId.size() >= 8
+        && request.resource.data.seatId.size() <= 64
         && request.resource.data.eventId is string
         && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
         && request.resource.data.name is string
@@ -59,13 +78,15 @@ service cloud.firestore {
         && request.resource.data.year is string;
     }
 
-    // Koltuklar: etkinlik başına kayıt kimlikleri.
+    // Koltuklar: etkinlik başına koltuk jetonları.
     //
     // Okuma açık — uygulama kalan yeri buradan hesaplıyor. Sızan tek şey rastgele
-    // üretilmiş kimliklerin listesi; kayıtların kendisi (isim, öğrenci no) hâlâ
-    // tamamen kapalı.
+    // üretilmiş jetonların listesi; kayıtların kendisi (isim, öğrenci no) hâlâ
+    // tamamen kapalı. Kayıt dokümanının kimliği buraya konamazdı: içinde
+    // öğrenci numarası geçiyor ve dokuz haneli bir numara kaba kuvvetle
+    // bulunabilir.
     //
-    // Sayaç yerine liste tutmanın sebebi: `arrayUnion` aynı kimliği ikinci kez
+    // Sayaç yerine liste tutmanın sebebi: `arrayUnion` aynı jetonu ikinci kez
     // eklemiyor. Yeniden gönderim sayıyı şişirmiyor. `increment(1)` olsaydı,
     // kayıt yazması idempotent olduktan sonra bile aynı çökme penceresinde iki
     // kez artabilirdi.
@@ -81,25 +102,25 @@ service cloud.firestore {
       // olur ve kapalı olsaydı o etkinliğe hiç kimse kayıt olamazdı — sessiz
       // değil, tam bir çökme. İlk koltuk, var olan bir etkinlik için.
       allow create: if
-        request.resource.data.keys().hasOnly(['eventId', 'regIds'])
+        request.resource.data.keys().hasOnly(['eventId', 'seatIds'])
         && request.resource.data.eventId == eventId
-        && request.resource.data.regIds is list
-        && request.resource.data.regIds.size() == 1
+        && request.resource.data.seatIds is list
+        && request.resource.data.seatIds.size() == 1
         && exists(/databases/$(database)/documents/events/$(eventId));
 
       allow update: if
-        request.resource.data.keys().hasOnly(['eventId', 'regIds'])
+        request.resource.data.keys().hasOnly(['eventId', 'seatIds'])
         && request.resource.data.eventId == eventId
-        && request.resource.data.regIds is list
+        && request.resource.data.seatIds is list
         // Hiçbir kimlik silinemesin: başkasının koltuğunu boşaltmak, kontenjanı
         // dolmuş bir etkinliğe yer açmak demek olurdu.
-        && request.resource.data.regIds.hasAll(resource.data.regIds)
+        && request.resource.data.seatIds.hasAll(resource.data.seatIds)
         // Tek seferde en fazla bir koltuk. `arrayUnion` var olan kimliği
         // eklemediği için aynı kalması da geçerli.
-        && request.resource.data.regIds.size() <= resource.data.regIds.size() + 1
+        && request.resource.data.seatIds.size() <= resource.data.seatIds.size() + 1
         // Sınır yok değil: 5000 koltuk hiçbir kulüp etkinliğinde olmaz ve
         // dokümanın 1 MiB sınırının çok altında.
-        && request.resource.data.regIds.size() <= 5000;
+        && request.resource.data.seatIds.size() <= 5000;
     }
     // KALAN AÇIK: bu kural bir koltuğun gerçekten bir kayda karşılık geldiğini
     // doğrulamıyor. Elle istek atan biri uydurma kimlikler ekleyip etkinliği
@@ -153,7 +174,12 @@ service cloud.firestore {
     // katılımları panelden CSV olarak indirir.
     match /raffleEntries/{entryId} {
       allow read: if false;
-      allow update, delete: if false;
+      allow delete: if false;
+
+      // Kayıtlardaki ile aynı gerekçe: yeniden gönderim var olan dokümana denk
+      // geliyor ve update sayılıyor. Birebir aynı katılım geçiyor, başkası yok.
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt']);
 
       allow create: if
         request.resource.data.keys().hasOnly(['entryId', 'eventId', 'values', 'createdAt'])

@@ -28,6 +28,21 @@ function check(name, why, run) {
   results.push({ name, why, problem });
 }
 
+/**
+ * firestore.rules içindeki tek bir `match` bloğunu ayıklar.
+ *
+ * Dosyanın tamamında regex aramak yetmiyor: aynı satır birden çok blokta
+ * geçiyor ve bir bloktan silinse bile kontrol öbüründe bulup yeşil veriyordu.
+ * Bir kere tam olarak bu oldu.
+ */
+function rulesBlock(collection) {
+  const rules = read('firestore.rules');
+  const start = rules.indexOf(`match /${collection}/`);
+  if (start < 0) return '';
+  const next = rules.indexOf('\n    match /', start + 1);
+  return rules.slice(start, next < 0 ? rules.length : next);
+}
+
 const app = json('app.json').expo;
 const pkg = json('package.json');
 const store = read('src/store.tsx');
@@ -138,19 +153,63 @@ check(
     if (/increment\(/.test(code)) {
       return 'koltuk sayısı increment ile artıyor — yeniden gönderimde şişer';
     }
-    if (!/regIds: arrayUnion\(payload\.regId\)/.test(fb)) {
-      return 'koltuk kaydın kimliğiyle arrayUnion edilmiyor';
+    // Kayıt dokümanının kimliğinde öğrenci numarası var ve koltuk listesi
+    // herkese açık. İkisi karışırsa dokuz haneli numaralar kaba kuvvetle
+    // çözülebilir hâle gelir.
+    if (/arrayUnion\(payload\.regId\)/.test(code)) {
+      return 'öğrenci numarası taşıyan kimlik herkese açık listeye giriyor';
+    }
+    if (!/seatIds: arrayUnion\(payload\.seatId\)/.test(fb)) {
+      return 'koltuk jetonu arrayUnion edilmiyor';
     }
     // Kimlik cihazda üretilip saklanmazsa her denemede yenisi çıkar ve setDoc da
     // addDoc gibi davranır.
     const store = read('src/store.tsx');
-    if (!/regId: makeEntryId\(\)/.test(store)) return 'regId cihazda üretilmiyor';
-    // regId sonradan eklendi: onsuz kaydedilmiş bir kayıt cihazda duruyor olabilir
-    // ve kimliksiz gönderilemez.
-    if (!/r\.regId \? r :/.test(store)) return 'eski kayıtlar için hidrasyon göçü yok';
+    if (!/seatId: makeEntryId\(\)/.test(store)) return 'koltuk jetonu cihazda üretilmiyor';
+    // Kimlikler sonradan eklendi: onlarsız kaydedilmiş bir kayıt cihazda
+    // duruyor olabilir ve kimliksiz gönderilemez.
+    if (!/regId: r\.regId \?\?/.test(store) || !/seatId: r\.seatId \?\?/.test(store)) {
+      return 'eski kayıtlar için hidrasyon göçü yok';
+    }
     if (!/request\.resource\.data\.regId == registrationId/.test(read('firestore.rules'))) {
       return 'kural doküman kimliğinin kaydın kimliği olmasını zorunlu kılmıyor';
     }
+    return null;
+  },
+);
+
+check(
+  'aynı öğrenci numarası bir etkinliğe iki kez kaydolamıyor',
+  'Kayıt dokümanının kimliği rastgeleydi, yani ikinci bir cihazdan aynı numarayla ' +
+    'yeniden kayıt olmak serbestti — hem kontenjandan iki yer götürür hem listede iki ' +
+    'kez görünürdü. Cihazdaki kontrol sadece o cihazı kapsıyor; silip yeniden kuran ' +
+    'öğrenciyi durdurmuyor.',
+  () => {
+    const store = read('src/store.tsx');
+    if (!/regId: `\$\{input\.eventId\}__\$\{input\.studentNo\}`/.test(store)) {
+      return 'kimlik öğrenci numarasından türetilmiyor';
+    }
+    // Dosyanın tamamında değil, kendi bloğunda arıyoruz: aynı satır
+    // raffleEntries bloğunda da var ve orada bulup yeşil vermek işe yaramaz.
+    const block = rulesBlock('registrations');
+    if (!block) return 'firestore.rules registrations bloğu taşımıyor';
+    // Kimliği istemci seçebilseydi benzersizlik diye bir şey kalmazdı.
+    if (!/registrationId == request\.resource\.data\.eventId \+ '__' \+ request\.resource\.data\.studentNo/.test(block)) {
+      return 'kural doküman kimliğinin numaradan türemesini zorunlu kılmıyor';
+    }
+    // Update tamamen kapalı olsaydı yeniden gönderim sonsuza kadar reddedilirdi;
+    // sınırsız açık olsaydı ikinci cihaz birincinin üzerine yazardı.
+    if (!/affectedKeys\(\)\.hasOnly\(\['createdAt'\]\)/.test(block)) {
+      return 'yeniden gönderim için dar update dalı yok';
+    }
+    // Çekiliş katılımları aynı yoldan geçiyor ve aynı deliğe düşerdi.
+    if (!/affectedKeys\(\)\.hasOnly\(\['createdAt'\]\)/.test(rulesBlock('raffleEntries'))) {
+      return 'çekiliş katılımlarında yeniden gönderim dalı yok';
+    }
+    // Reddedilen kayıt sonsuza kadar denenirse her açılış bir yazma harcar ve
+    // ekranda "Gönderiliyor…" kalır.
+    if (!/isRulesRejection/.test(store)) return 'kural reddi ağ hatasından ayrılmıyor';
+    if (!/!r\.synced && !r\.blocked/.test(store)) return 'reddedilen kayıt yeniden denenmeye devam ediyor';
     return null;
   },
 );
@@ -177,7 +236,7 @@ check(
     const rules = read('firestore.rules');
     if (!/match \/eventSeats\//.test(rules)) return 'eventSeats kuralı yok';
     // Kimlik silinebilirse dolu bir etkinliğe yer açılabilir.
-    if (!/regIds\.hasAll\(resource\.data\.regIds\)/.test(rules)) {
+    if (!/seatIds\.hasAll\(resource\.data\.seatIds\)/.test(rules)) {
       return 'kural koltukların silinmesini engellemiyor';
     }
     return null;
