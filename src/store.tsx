@@ -429,41 +429,13 @@ export function useAppStore() {
   return ctx;
 }
 
-/**
- * Drives the pixel loading overlay the design shows while an event detail opens.
- * Kept separate from the persisted store since it is pure UI state.
+/*
+ * LoadingProvider, useLoading ve runWithLoader buradaydı: etkinlik detayı
+ * açılırken 460 ms perde gösteren makine. Perdenin arkasında hiçbir şey
+ * yüklenmiyordu — `useEvent(id)` bellekteki listeden okuyor — ve tek çağıran
+ * `useOpenEvent`'ti. Perde kalkınca makine de kimsesiz kaldı.
+ *
+ * `PixelLoader` duruyor (açılış ekranı ve kayıt onayı kullanıyor); gerçekten
+ * beklenen bir şey çıkarsa perdeyi geri kurmak küçük iş.
  */
-const LoadingCtx = createContext<{
-  loading: boolean;
-  runWithLoader: (fn: () => void, ms?: number) => void;
-} | null>(null);
 
-export function LoadingProvider({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const runWithLoader = useCallback((fn: () => void, ms = 460) => {
-    if (timer.current) clearTimeout(timer.current);
-    setLoading(true);
-    timer.current = setTimeout(() => {
-      setLoading(false);
-      fn();
-    }, ms);
-  }, []);
-
-  const value = useMemo(() => ({ loading, runWithLoader }), [loading, runWithLoader]);
-  return <LoadingCtx.Provider value={value}>{children}</LoadingCtx.Provider>;
-}
-
-export function useLoading() {
-  const ctx = useContext(LoadingCtx);
-  if (!ctx) throw new Error('useLoading must be used inside <LoadingProvider>');
-  return ctx;
-}

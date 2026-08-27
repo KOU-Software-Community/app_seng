@@ -175,6 +175,10 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   behind a four-photo lightbox. There is no photo storage anywhere in this app — all
   four slots were the same gradient placeholder and 412 counted nothing. Fiction with a
   UI around it is much harder to spot than fiction in a variable.
+- **A check that reads comments finds its own rationale.** A guard has now gone red
+  against correct code three times because the comment explaining *why* something was
+  removed still contains its name — `addDoc`, `increment(1)`, `HOLD_MS`. Strip comments
+  before matching source; `check:release` has a `strip()` for exactly this.
 - The calendar/archive boundary is **the day, not the instant**. Splitting on the start
   time would move a three-hour event into the archive while it is still running; an
   event stays on the calendar through its own day and moves the next morning. `today`

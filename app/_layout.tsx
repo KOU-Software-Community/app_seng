@@ -15,11 +15,10 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnnouncementsProvider } from '../src/announcements';
-import { LoadingOverlay } from '../src/components/LoadingOverlay';
 import { ContentProvider } from '../src/content';
 import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
 import { NotificationSync } from '../src/notifications';
-import { AppStoreProvider, LoadingProvider, useLoading } from '../src/store';
+import { AppStoreProvider } from '../src/store';
 import { colors } from '../src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -55,13 +54,11 @@ export default function RootLayout() {
       <AppStoreProvider>
         <ContentProvider>
           <AnnouncementsProvider>
-            <LoadingProvider>
-              <StatusBar style="light" />
-              {/* Inside both providers: it needs events, registrations and prefs
-                  together to keep the reminder schedule current. Renders nothing. */}
-              <NotificationSync />
-              <RootStack />
-            </LoadingProvider>
+            <StatusBar style="light" />
+            {/* Inside both providers: it needs events, registrations and prefs
+                together to keep the reminder schedule current. Renders nothing. */}
+            <NotificationSync />
+            <RootStack />
           </AnnouncementsProvider>
         </ContentProvider>
       </AppStoreProvider>
@@ -70,7 +67,6 @@ export default function RootLayout() {
 }
 
 function RootStack() {
-  const { loading } = useLoading();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack
@@ -94,7 +90,6 @@ function RootStack() {
           options={{ animation: 'fade', gestureEnabled: false }}
         />
       </Stack>
-      {loading ? <LoadingOverlay /> : null}
     </View>
   );
 }
