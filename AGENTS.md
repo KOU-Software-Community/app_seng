@@ -325,3 +325,18 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   **Unverified from this repo:** none of it can be observed here — `eas-cli` has no
   credentials in the container and App Store Connect has no read path. Treat the above
   as where to look, not as a diagnosis, and never assert which one it was.
+- **EAS's remote version counter and Play's used-code list are two separate ledgers.**
+  With `appVersionSource: "remote"`, `autoIncrement` bumps a number EAS keeps for the
+  project — initialised from the local config and updated only by EAS builds. It has no
+  idea what Play already holds. So a fresh build can auto-increment perfectly and still
+  land on a `versionCode` Play has seen, and the error reads as though autoIncrement had
+  failed when it did exactly what it promises. `eas build:version:get --platform android`
+  shows the counter; `eas build:version:set` moves it above what the store holds. A
+  rebuild alone does not fix a counter that is behind — it just burns another number.
+- **`releaseStatus` lives in `submit`, so changing it does not need a new build.** The
+  artifact is unaffected by anything under `eas.json` → `submit`; only `eas submit` reads
+  it. When that setting stranded a build as a draft in Play, the fix was to publish the
+  draft already uploaded there (Internal testing → the draft → review → roll out), not
+  to rebuild. Saying "the config only affects future submits" invited exactly the
+  unnecessary build it was meant to prevent — say which command reads a setting, not
+  just when it takes effect.
