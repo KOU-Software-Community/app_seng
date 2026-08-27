@@ -1,22 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
-import { useLoading } from './store';
-
 /**
- * Opens an event detail behind the pixel loading scrim.
+ * Etkinlik detayını açar.
  *
- * The design deliberately holds a short beat before the detail appears — it is
- * where a real fetch of the event would go, so the timing is kept as-is.
+ * Eskiden 460 ms'lik bir yükleme perdesinin arkasından açılıyordu; yorumda
+ * "gerçek bir fetch buraya gelecek" yazıyordu. Gelmedi ve gelmeyecek —
+ * `useEvent(id)` zaten bellekteki listeden okuyor, ortada beklenecek bir şey
+ * yok. Perde her dokunuşa yarım saniye ekliyordu.
  */
 export function useOpenEvent() {
   const router = useRouter();
-  const { runWithLoader } = useLoading();
-
-  return useCallback(
-    (id: string) => {
-      runWithLoader(() => router.push(`/etkinlik/${id}`));
-    },
-    [router, runWithLoader],
-  );
+  return useCallback((id: string) => router.push(`/etkinlik/${id}`), [router]);
 }

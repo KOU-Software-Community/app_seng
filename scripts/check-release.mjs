@@ -261,6 +261,36 @@ check(
 );
 
 check(
+  'yapay gecikme yok',
+  'Açılış ekranı hidrasyon bittikten *sonra* 1900 ms daha bekliyordu, ve her etkinlik ' +
+    'detayı 460 ms’lik bir perdenin arkasından açılıyordu. İkisi de hiçbir şeyi ' +
+    'beklemiyordu: perdenin yorumunda "gerçek fetch buraya gelecek" yazıyordu ama ' +
+    '`useEvent(id)` bellekteki listeden okuyor. Kullanıcı her dokunuşta bekletiliyordu.',
+  () => {
+    // Yorumlar hariç, her seferinde: açıklamalar kaldırılan şeyin adını anıyor
+    // ve onlara bakan kontrol kendi gerekçesini bulup kırmızı kalıyor. Bu
+    // dosyada üçüncü kez oluyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    const splash = strip(read('app/index.tsx'));
+    if (/HOLD_MS/.test(splash)) return 'açılışta sabit bekleme sabiti duruyor';
+    // Kalan gecikme animasyonun kendi süresi olmalı — yani geçiş animasyonun
+    // bitmesine bağlı, bir sayaca değil.
+    if (!/introDone/.test(splash)) return 'geçiş animasyonun bitmesine bağlı değil';
+
+    const open = strip(read('src/useOpenEvent.ts'));
+    if (/runWithLoader/.test(open)) return 'etkinlik detayı hâlâ perde arkasından açılıyor';
+    if (/setTimeout/.test(open)) return 'useOpenEvent hâlâ bekletiyor';
+    // Perde kalktıysa onu süren makine de kalmalı, yoksa ölü kod olarak durur
+    // ve bir sonraki oturum "bu ne işe yarıyor" diye geri bağlar.
+    if (/runWithLoader/.test(strip(read('src/store.tsx')))) {
+      return 'store hâlâ runWithLoader taşıyor';
+    }
+    return null;
+  },
+);
+
+check(
   'sahte okunmamış rozeti yok',
   'Zildeki kırmızı nokta koşulsuz render ediliyordu; okunmamış bir şey yokken ' +
     'varmış gibi gösteriyordu ve okunma durumunu tutan hiçbir şey yok.',

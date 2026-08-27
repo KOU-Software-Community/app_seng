@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 
@@ -9,7 +9,15 @@ import { Txt } from '../src/components/ui';
 import { useAppStore } from '../src/store';
 import { gradientDirection, gradients } from '../src/theme';
 
-const HOLD_MS = 1900;
+/**
+ * Giriş animasyonu. Eskiden buranın yanında `HOLD_MS = 1900` vardı ve
+ * hidrasyon bittikten *sonra* iki saniye daha beklenirdi — hiçbir şeyi
+ * beklemeyen, sadece bekleten bir sayı.
+ *
+ * Kalan gecikme animasyonun kendi süresi: logo belirip anında kaybolursa açılış
+ * bozuk görünüyor. Yani bekleme artık gerçekten olan bir şeye bağlı.
+ */
+const INTRO_MS = 500;
 
 export default function SplashRoute() {
   const router = useRouter();
@@ -17,23 +25,22 @@ export default function SplashRoute() {
 
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const [introDone, setIntroDone] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(scale, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start();
+      Animated.timing(scale, { toValue: 1, duration: INTRO_MS, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: INTRO_MS, useNativeDriver: true }),
+    ]).start(() => setIntroDone(true));
   }, [scale, opacity]);
 
   useEffect(() => {
-    // Wait for the persisted flag before deciding, otherwise a returning user
-    // would flash the onboarding they already finished.
-    if (!hydrated) return;
-    const t = setTimeout(() => {
-      router.replace(onboardingSeen ? '/(tabs)' : '/onboarding');
-    }, HOLD_MS);
-    return () => clearTimeout(t);
-  }, [hydrated, onboardingSeen, router]);
+    // İki koşul da gerçek: kalıcı bayrak okunmadan karar verilemez (yoksa
+    // onboarding'i bitirmiş kullanıcı onu bir an görür), ve animasyon
+    // bitmeden geçilirse logo yanıp söner.
+    if (!hydrated || !introDone) return;
+    router.replace(onboardingSeen ? '/(tabs)' : '/onboarding');
+  }, [hydrated, introDone, onboardingSeen, router]);
 
   return (
     <LinearGradient
