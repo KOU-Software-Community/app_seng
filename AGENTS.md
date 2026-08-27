@@ -308,9 +308,20 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   bulunamadı". Play needs draft for the *first* upload of an app that has never had a
   release; leaving it there afterwards is a test channel with no testers. `check:release`
   now refuses it, so turning it back on has to be deliberate.
-- TestFlight's "the requested app is not available or doesn't exist" is never the
-  build's export compliance here — `ITSAppUsesNonExemptEncryption: false` is already in
-  `app.json`, so no build ever waits on that question. It is a distribution fact: the
-  build is still processing, it was not added to a tester group, or the device is signed
-  into a different Apple ID than the invitation. Nothing in this repo can cause or fix
-  it, and nothing in this repo can observe it either — checking means App Store Connect.
+- **TestFlight's "the requested app is not available or doesn't exist" is an App Store
+  Connect availability fact, not a build fact.** The EAS xcodebuild log settles the
+  build side on its own: `ARCHIVE SUCCEEDED`, zero errors, `beta-reports-active = 1`
+  (an entitlement only App Store distribution profiles carry), no `ProvisionedDevices`
+  (so not ad-hoc), `get-task-allow = 0`, minimum iOS 15.1. A binary that signs like that
+  cannot be the reason a tester cannot install it. Do not go looking in `app.json` —
+  export compliance is already answered there, and it produces a "Missing Compliance"
+  banner, not this error.
+  The reported cause that matches the signature — *visible in TestFlight, notification
+  arrives, install fails instantly* — is the app's **Pricing and Availability →
+  App Availability** left with countries in `Processing`, which is account-shaped: it
+  hits every app at once and survives new builds, which is why it looks like a build
+  problem and is not one. Next is Agreements, Tax and Banking pending account-wide.
+  Beyond that it is a known Apple-side bug that only Developer Support clears.
+  **Unverified from this repo:** none of it can be observed here — `eas-cli` has no
+  credentials in the container and App Store Connect has no read path. Treat the above
+  as where to look, not as a diagnosis, and never assert which one it was.
