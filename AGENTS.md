@@ -211,6 +211,11 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   that appears whether or not a bucket exists. Event photos live in Supabase Storage
   instead; Firestore stays where it is. The app never touched a storage SDK — it renders
   a URL — so swapping providers was one file.
+- **Metro's transform cache survives an `.env` change.** Measuring whether
+  `EXPO_PUBLIC_*` values are inlined gave "not in the bundle" three times, because
+  earlier exports in the same session had run with no `.env` and the transformed module
+  was cached. `npx expo export --clear` reversed the answer. Any measurement of what a
+  build contains has to clear the cache first, or it measures an older build.
 - **`.env.local` is an Expo convention, not a dotenv one.** `import 'dotenv/config'`
   loads `.env` and nothing else, so a key placed exactly where the docs said belongs
   produced no error at all — just an undefined variable and a panel that did not work.
