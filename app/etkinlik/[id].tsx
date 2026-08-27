@@ -16,7 +16,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { useContent, useEvent } from '../../src/content';
-import { isPast, todayLocal } from '../../src/eventSchema';
+import { isFull, isPast, seatsLabel, todayLocal } from '../../src/eventSchema';
 import { entriesOpen } from '../../src/raffleSchema';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius } from '../../src/theme';
@@ -26,7 +26,7 @@ export default function EventDetailRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const event = useEvent(id);
-  const { getRaffle } = useContent();
+  const { getRaffle, registeredCount } = useContent();
   const { registrationFor, raffleEntryFor } = useAppStore();
 
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
@@ -35,6 +35,11 @@ export default function EventDetailRoute() {
   // Geçmiş etkinliğe kayıt olunamaz. Arşiv kartı buraya geldiği için bu ekran
   // artık olmuş etkinlikleri de gösteriyor ve "Kayıt Ol" düğmesi orada anlamsız.
   const past = isPast(event, todayLocal(new Date()));
+  // Kaç kişi kaydolduğu Firestore'dan geliyor, kontenjan da etkinliğin kendi
+  // alanı — yani yönetici kontenjanı yükselttiğinde kalan yer bir sonraki
+  // okumada kendiliğinden artıyor. Eskiden burası elle yazılmış bir cümleydi.
+  const registered = registeredCount(event.id);
+  const full = isFull(event, registered);
   // A raffle is an ordinary event with a definition attached. The tag is only a
   // label; what decides whether this screen collects entries is the definition.
   const raffle = getRaffle(event.id);
@@ -194,7 +199,7 @@ export default function EventDetailRoute() {
                   : `${raffle.winnerCount} kişi kazanacak`
                 : registration
                   ? registration.code
-                  : event.spots}
+                  : seatsLabel(event, registered)}
           </Txt>
         </View>
 
@@ -228,6 +233,14 @@ export default function EventDetailRoute() {
           <View style={styles.registered}>
             <Txt weight="bold" size={15.5} color={colors.blue500}>
               {registration.synced ? 'Kayıtlısın' : 'Gönderiliyor…'}
+            </Txt>
+          </View>
+        ) : full ? (
+          // Kayıtlı olan öğrenci bu dala hiç düşmüyor: kontenjan dolduktan
+          // sonra kendi kaydını görmeye devam ediyor.
+          <View style={styles.registered}>
+            <Txt weight="bold" size={15.5} color={colors.muted}>
+              Kontenjan doldu
             </Txt>
           </View>
         ) : (

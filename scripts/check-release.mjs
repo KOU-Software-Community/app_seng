@@ -120,13 +120,26 @@ check(
     'kez çıkardı. Çekiliş katılımlarında baştan `setDoc` vardı; kayıtlarda açıktı.',
   () => {
     const fb = read('src/firebase.ts');
-    // Yorumlar hariç: açıklama metinlerinde `addDoc` geçiyor ve tek başına
-    // eşleşse kontrol kırmızı kalırdı.
-    if (/addDoc/.test(fb.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, ''))) {
-      return 'src/firebase.ts hâlâ addDoc kullanıyor';
-    }
-    if (!/setDoc\(doc\(db, COLLECTIONS\.registrations, payload\.regId\)/.test(fb)) {
+    // Yorumlar hariç. Açıklama metinleri `addDoc` ve `increment(1)` diye neyin
+    // neden kullanılmadığını anlatıyor; onlara bakarsak kontrol kendi
+    // gerekçesini bulup kırmızı kalır.
+    const code = fb.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (/addDoc/.test(code)) return 'src/firebase.ts hâlâ addDoc kullanıyor';
+    if (!/doc\(db, COLLECTIONS\.registrations, payload\.regId\)/.test(fb)) {
       return 'kayıt kendi kimliğine yazılmıyor';
+    }
+    // Kayıt ve koltuk aynı batch'te olmalı. Ayrı yazılırsa biri gidip öteki
+    // gitmeyebilir ve etkinlik dolmadığı hâlde dolmuş görünebilir.
+    if (!/writeBatch\(db\)/.test(fb) || !/batch\.commit\(\)/.test(fb)) {
+      return 'kayıt ile koltuk aynı batch’te yazılmıyor';
+    }
+    // arrayUnion idempotent; increment değil. Yeniden gönderim sayıyı
+    // şişirmemeli.
+    if (/increment\(/.test(code)) {
+      return 'koltuk sayısı increment ile artıyor — yeniden gönderimde şişer';
+    }
+    if (!/regIds: arrayUnion\(payload\.regId\)/.test(fb)) {
+      return 'koltuk kaydın kimliğiyle arrayUnion edilmiyor';
     }
     // Kimlik cihazda üretilip saklanmazsa her denemede yenisi çıkar ve setDoc da
     // addDoc gibi davranır.
@@ -137,6 +150,35 @@ check(
     if (!/r\.regId \? r :/.test(store)) return 'eski kayıtlar için hidrasyon göçü yok';
     if (!/request\.resource\.data\.regId == registrationId/.test(read('firestore.rules'))) {
       return 'kural doküman kimliğinin kaydın kimliği olmasını zorunlu kılmıyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'kontenjan elle yazılmıyor, kayıtlardan çıkıyor',
+  'Kontenjan `spots` diye serbest metindi: "12 / 60 yer kaldı". Kimse kayıt oldukça ' +
+    'değişmiyordu, yönetici kontenjanı yükselttiğinde de değişmiyordu — cümleyi ' +
+    'yeniden yazmak gerekiyordu. Ve hiçbir şey sınırı uygulamıyordu: dolu bir ' +
+    'etkinliğe kayıt olmak serbestti.',
+  () => {
+    const schema = read('src/eventSchema.ts');
+    if (/\bspots\b/.test(schema)) return 'eventSchema hâlâ spots taşıyor';
+    if (!/export function seatsLeft/.test(schema)) return 'kalan yer türetilmiyor';
+
+    const detail = read('app/etkinlik/[id].tsx');
+    if (!/registeredCount\(/.test(detail)) return 'detay ekranı gerçek kayıt sayısını okumuyor';
+    if (!/isFull\(/.test(detail)) return 'dolunca kayıt düğmesi kapanmıyor';
+    // Detayda düğme gizlense de forma derin bağlantıyla gelinebiliyor.
+    if (!/isFull\(/.test(read('app/kayit/[id].tsx'))) return 'kayıt formunda kontenjan kontrolü yok';
+
+    if (!/COLLECTIONS\.eventSeats/.test(read('src/firebase.ts'))) return 'koltuklar okunmuyor';
+
+    const rules = read('firestore.rules');
+    if (!/match \/eventSeats\//.test(rules)) return 'eventSeats kuralı yok';
+    // Kimlik silinebilirse dolu bir etkinliğe yer açılabilir.
+    if (!/regIds\.hasAll\(resource\.data\.regIds\)/.test(rules)) {
+      return 'kural koltukların silinmesini engellemiyor';
     }
     return null;
   },

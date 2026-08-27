@@ -175,6 +175,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   behind a four-photo lightbox. There is no photo storage anywhere in this app — all
   four slots were the same gradient placeholder and 412 counted nothing. Fiction with a
   UI around it is much harder to spot than fiction in a variable.
+- **A retry is only safe if every write in it is idempotent.** `pushRegistration` was
+  fixed to `setDoc(registrations/{regId})` so a resend lands on the same document — and
+  then the seat count was almost added as `increment(1)` in the same batch, which would
+  have reopened the identical hole one field over: the batch is atomic, but a resend
+  after a lost `synced` flag runs it again. The count is a list of registration ids
+  written with `arrayUnion`, which ignores an id it already holds.
+- A Firestore rule that denies `create` on a document the client writes with
+  `set(..., {merge: true})` does not degrade — it fails the whole write. `eventSeats`
+  docs are born in the panel, but an event predating them would have had *no* student
+  able to register, so the rule allows a first-seat create against an existing event.
 - The calendar/archive boundary is **the day, not the instant**. Splitting on the start
   time would move a three-hour event into the archive while it is still running; an
   event stays on the calendar through its own day and moves the next morning. `today`

@@ -59,6 +59,59 @@ service cloud.firestore {
         && request.resource.data.year is string;
     }
 
+    // Koltuklar: etkinlik başına kayıt kimlikleri.
+    //
+    // Okuma açık — uygulama kalan yeri buradan hesaplıyor. Sızan tek şey rastgele
+    // üretilmiş kimliklerin listesi; kayıtların kendisi (isim, öğrenci no) hâlâ
+    // tamamen kapalı.
+    //
+    // Sayaç yerine liste tutmanın sebebi: `arrayUnion` aynı kimliği ikinci kez
+    // eklemiyor. Yeniden gönderim sayıyı şişirmiyor. `increment(1)` olsaydı,
+    // kayıt yazması idempotent olduktan sonra bile aynı çökme penceresinde iki
+    // kez artabilirdi.
+    //
+    // Doküman panelden doğuyor (Admin SDK); istemci sadece kendi kimliğini
+    // ekleyebiliyor, silemiyor.
+    match /eventSeats/{eventId} {
+      allow read: if true;
+      allow delete: if false;
+
+      // Doküman normalde panelden doğuyor. Yine de create açık: eski bir
+      // etkinliğin koltuk dokümanı yoksa `set(..., {merge:true})` bir create
+      // olur ve kapalı olsaydı o etkinliğe hiç kimse kayıt olamazdı — sessiz
+      // değil, tam bir çökme. İlk koltuk, var olan bir etkinlik için.
+      allow create: if
+        request.resource.data.keys().hasOnly(['eventId', 'regIds'])
+        && request.resource.data.eventId == eventId
+        && request.resource.data.regIds is list
+        && request.resource.data.regIds.size() == 1
+        && exists(/databases/$(database)/documents/events/$(eventId));
+
+      allow update: if
+        request.resource.data.keys().hasOnly(['eventId', 'regIds'])
+        && request.resource.data.eventId == eventId
+        && request.resource.data.regIds is list
+        // Hiçbir kimlik silinemesin: başkasının koltuğunu boşaltmak, kontenjanı
+        // dolmuş bir etkinliğe yer açmak demek olurdu.
+        && request.resource.data.regIds.hasAll(resource.data.regIds)
+        // Tek seferde en fazla bir koltuk. `arrayUnion` var olan kimliği
+        // eklemediği için aynı kalması da geçerli.
+        && request.resource.data.regIds.size() <= resource.data.regIds.size() + 1
+        // Sınır yok değil: 5000 koltuk hiçbir kulüp etkinliğinde olmaz ve
+        // dokümanın 1 MiB sınırının çok altında.
+        && request.resource.data.regIds.size() <= 5000;
+    }
+    // KALAN AÇIK: bu kural bir koltuğun gerçekten bir kayda karşılık geldiğini
+    // doğrulamıyor. Elle istek atan biri uydurma kimlikler ekleyip etkinliği
+    // dolu gösterebilir. Kayıtların kendisine erişemez, sadece sayıyı şişirir
+    // ve panelden "sayacı gerçek kayıtlara eşitle" ile geri alınır.
+    //
+    // Kapatmanın yolu, koltuk dokümanına eklenen kimliğin aynı batch'te yazılan
+    // kaydı işaret etmesini şart koşmak (`getAfter` ile). Yazılmadı çünkü yanlış
+    // yazılmış bir `getAfter` bütün kayıtları engeller ve bu depoda kuralları
+    // çalıştırıp doğrulayacak bir ortam yok. Eklenecekse önce Firestore
+    // emülatöründe denenmeli.
+
     // Cihazlar: push token'ı ve bildirim tercihleri. `npm run push` kimin neyi
     // istediğini buradan okur.
     //

@@ -86,7 +86,8 @@ export type EventInput = {
   title: string;
   tag: string;
   desc: string;
-  spots: string;
+  /** Kontenjan, metin olarak (formdan öyle geliyor). Boş ya da 0 = sınırsız. */
+  capacity?: string;
   speaker: string;
   speakerRole: string;
   tags: string[];
@@ -254,6 +255,11 @@ export function buildEvent(input: EventInput): BuildResult {
     if (eh * 60 + em <= start) errors.endsAt = 'Bitiş saati başlangıçtan sonra olmalı.';
   }
 
+  const capacity = text(input.capacity ?? '');
+  if (capacity && !/^\d{1,6}$/.test(capacity)) {
+    errors.capacity = 'Kontenjan 0 veya daha büyük bir tam sayı olmalı. Boş bırakırsanız sınırsız.';
+  }
+
   const attendance = text(input.attendance ?? '');
   if (attendance && !/^\d{1,6}$/.test(attendance)) {
     errors.attendance = 'Katılımcı sayısı 0 veya daha büyük bir tam sayı olmalı.';
@@ -300,12 +306,14 @@ export function buildEvent(input: EventInput): BuildResult {
       tag: text(input.tag),
       soon: !!input.soon,
       badge: text(input.badge),
-      spots: text(input.spots),
       desc: text(input.desc),
       tags: (input.tags ?? []).map(text).filter(Boolean),
       speaker: text(input.speaker),
       speakerRole: text(input.speakerRole),
       facts,
+      // 0 ile boş aynı şey: ikisi de sınırsız. Alan hiç yazılmıyor ki
+      // "kontenjan 0" gibi okunmasın.
+      ...(capacity && Number(capacity) > 0 ? { capacity: Number(capacity) } : {}),
       // Boşsa alan hiç yazılmıyor: Firestore'da `attendance: undefined` yazmak
       // hata verir ve `attendance: 0` "sıfır kişi geldi" demek olurdu.
       ...(attendance ? { attendance: Number(attendance) } : {}),
@@ -331,7 +339,7 @@ export function toInput(event: ClubEvent): EventInput {
     title: event.title,
     tag: event.tag,
     desc: event.desc,
-    spots: event.spots,
+    capacity: event.capacity === undefined ? '' : String(event.capacity),
     speaker: event.speaker,
     speakerRole: event.speakerRole,
     tags: event.tags ?? [],
@@ -339,6 +347,33 @@ export function toInput(event: ClubEvent): EventInput {
     badge: event.badge,
     attendance: event.attendance === undefined ? '' : String(event.attendance),
   };
+}
+
+/**
+ * Kalan yer.
+ *
+ * `capacity` yoksa ya da 0 ise sınırsız demek ve `null` dönüyor. Sayı döndürmek
+ * "sınırsız" ile "sıfır yer kaldı"yı aynı değere indirirdi ve kayıt düğmesi
+ * sınırsız bir etkinlikte kapanırdı.
+ *
+ * `registered` gerçek kayıt sayısı — `eventSeats` dokümanındaki kimlik
+ * listesinin uzunluğu. Elle yazılan bir cümle değil.
+ */
+export function seatsLeft(event: ClubEvent, registered: number): number | null {
+  if (!event.capacity || event.capacity <= 0) return null;
+  return Math.max(0, event.capacity - Math.max(0, registered));
+}
+
+export function isFull(event: ClubEvent, registered: number): boolean {
+  return seatsLeft(event, registered) === 0;
+}
+
+/** Detay ekranındaki kontenjan satırı — tek yerde, iki ekran aynı şeyi desin. */
+export function seatsLabel(event: ClubEvent, registered: number): string {
+  const left = seatsLeft(event, registered);
+  if (left === null) return 'Sınırsız';
+  if (left === 0) return 'Kontenjan doldu';
+  return `${left} / ${event.capacity} yer kaldı`;
 }
 
 /**
