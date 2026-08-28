@@ -349,3 +349,21 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   to rebuild. Saying "the config only affects future submits" invited exactly the
   unnecessary build it was meant to prevent — say which command reads a setting, not
   just when it takes effect.
+- **Deploying the panel needs `nixpacks.toml`, and both lines in it are load-bearing.**
+  Nixpacks recognises this repo as a Node app and would run `npm start` — which here is
+  `expo start`, the mobile dev server. The panel would never come up and the deploy
+  would still report success. And the panel's runtime packages (`express`,
+  `firebase-admin`, `multer`, `sharp`, `@supabase/supabase-js`, `tsx`) sit in
+  `devDependencies`, which is right for the mobile side — Metro never reaches them — but
+  the lockfile marks all seven `dev: true`, so an install under `NODE_ENV=production`
+  (what Nixpacks sets) skips every one. Both failures land in the same place: the build
+  goes green and the container dies on boot with `Cannot find module 'express'`.
+  `check:release` fails if either the `--include=dev` or the start command disappears.
+- **A session cookie without `Secure` is the deploy turning a local convenience into an
+  exposure.** The panel ran on `localhost` for months, where `Secure` would have
+  prevented login outright — browsers do not store it over plain HTTP. Put the same
+  panel behind Coolify and it holds student names and numbers on the open internet.
+  The flag is decided per request from `req.secure`, which needs `trust proxy` because
+  a reverse proxy terminates TLS and forwards plain HTTP. `cookieHeader` lives in its
+  own module for one reason: importing `server.ts` starts `app.listen`, so nothing in
+  it can be asserted without standing a server up.

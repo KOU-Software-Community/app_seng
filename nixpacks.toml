@@ -1,0 +1,26 @@
+# Yönetim paneli — Coolify'ın Nixpacks derleyicisi için.
+#
+# Bu dosya olmadan Nixpacks depoyu bir Node uygulaması olarak tanıyıp
+# `npm start` çalıştırır — ve buradaki `npm start`, `expo start`. Yani mobil
+# geliştirme sunucusunu açmaya çalışır, panel hiç ayağa kalkmaz. Bu depo asıl
+# olarak bir mobil uygulama, panel içinde yaşayan ikinci bir şey; onun için
+# başlatma komutunun açıkça yazılması gerekiyor.
+#
+# `--include=dev` de aynı sebepten zorunlu: panelin çalışma zamanı paketleri
+# (express, firebase-admin, multer, sharp, supabase-js, tsx) devDependencies
+# altında. Bu mobil taraf için doğru — hiçbiri uygulama paketine girmiyor,
+# Metro onlara hiç ulaşmıyor. Ama Nixpacks kurulumu NODE_ENV=production ile
+# yapıyor ve npm o hâlde devDependencies'i atlıyor: derleme yeşil geçiyor,
+# konteyner `Cannot find module 'express'` ile ölüyor. Hata derlemede değil,
+# ilk açılışta ve sunucuda görünüyor.
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+# Derleme adımı yok: panel TypeScript'i tsx ile doğrudan çalıştırıyor, derlenmiş
+# bir çıktı üretmiyor. Boş bırakılmazsa Nixpacks `npm run build` arar ve bulamaz.
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx admin/server.ts"

@@ -54,9 +54,12 @@ import {
   type RaffleFieldType,
 } from '../src/raffleSchema';
 import { parseServiceAccount } from './credentials';
+import { cookieHeader } from './session';
 import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
-const PORT = Number(process.env.ADMIN_PORT ?? 4000);
+// ADMIN_PORT bu projenin kendi adı ve açıkça verildiyse kazanır; PORT ise
+// konteyner platformlarının (Coolify, Render, Fly) enjekte ettiği isim.
+const PORT = Number(process.env.ADMIN_PORT ?? process.env.PORT ?? 4000);
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 const COOKIE = 'kyk_admin';
 /** Yeniden başlatınca herkes düşer — küçük bir panel için doğru varsayılan. */
@@ -90,6 +93,11 @@ initializeApp({ credential: cert(loadServiceAccount() as unknown as ServiceAccou
 const db = getFirestore();
 
 const app = express();
+// Coolify/Traefik gibi bir ters proxy arkasında HTTPS proxy'de sonlanıyor ve
+// uygulamaya istek düz HTTP olarak geliyor. Bu ayar olmadan `req.secure`
+// sunucuda da hep false döner ve oturum çerezi `Secure` almazdı.
+// `1`: yalnızca en yakın proxy'ye güven — istemcinin uydurduğu başlığa değil.
+app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: false }));
 
 /**
@@ -193,17 +201,15 @@ app.post('/login', (req, res) => {
   if (!sameSecret(given, PASSWORD)) {
     return res.status(401).type('html').send(loginPage('Parola yanlış.'));
   }
-  // SameSite=Strict siteler arası POST'ların çerezi taşımasını engelliyor, bu
-  // ölçekte CSRF için yeterli koruma. HttpOnly çerezi JS'ten okunamaz kılıyor.
   res.setHeader(
     'Set-Cookie',
-    `${COOKIE}=${sign('ok')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`,
+    cookieHeader({ name: COOKIE, value: sign('ok'), secure: req.secure, maxAge: 43200 }),
   );
   res.redirect('/');
 });
 
-app.post('/logout', (_req, res) => {
-  res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+app.post('/logout', (req, res) => {
+  res.setHeader('Set-Cookie', cookieHeader({ name: COOKIE, value: '', secure: req.secure, maxAge: 0 }));
   res.redirect('/login');
 });
 
