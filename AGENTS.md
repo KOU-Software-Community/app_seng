@@ -320,7 +320,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   arrives, install fails instantly* — is the app's **Pricing and Availability →
   App Availability** left with countries in `Processing`, which is account-shaped: it
   hits every app at once and survives new builds, which is why it looks like a build
-  problem and is not one. Next is Agreements, Tax and Banking pending account-wide.
+  problem and is not one.
+  **But an amber clock on that page is not by itself that state.** The summary shows
+  `🕐 1 Available / 🕐 174 Not Available`, which reads like something pending; opening
+  the detail shows the per-country status is `Available on App Release`, and that is the
+  correct, settled state for an app whose first version has not shipped yet. Reading the
+  summary clock as "stuck processing" cost a wrong diagnosis here and nearly cost the
+  operator a pointless change to their deliberate single-country setting. Judge it from
+  the per-country status, never from the clock. Narrowing availability is also not a
+  testing problem in itself: TestFlight has no territory restriction, a tester in any
+  territory is eligible. Next is Agreements, Tax and Banking pending account-wide.
   Beyond that it is a known Apple-side bug that only Developer Support clears.
   **Unverified from this repo:** none of it can be observed here — `eas-cli` has no
   credentials in the container and App Store Connect has no read path. Treat the above
