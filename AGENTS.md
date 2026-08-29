@@ -375,3 +375,13 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   more dangerous way round — green against a config that cannot boot. It strips `#` to
   end of line now, counting quotes first, because a `#` inside a command is not a
   comment and truncating there would fail a correct file.
+- **`??` does not catch an empty environment variable, and a deploy panel makes empty
+  the easy mistake.** `Number(process.env.ADMIN_PORT ?? process.env.PORT ?? 4000)` reads
+  0 when `ADMIN_PORT` exists and is blank — `''` is not nullish, so the fallback never
+  runs, and `Number('')` is 0. `listen(0)` is not an error: the kernel hands out a random
+  free port, the container reports healthy, the log is clean, and the reverse proxy never
+  reaches it. This repo's own `.env.example` ships `ADMIN_PORT=` empty under a comment
+  promising 4000, so the documented path produced the broken case. The decision lives in
+  `resolvePort` (`admin/port.ts`) now — blank, non-numeric, zero and out-of-range all
+  fall through — and `check:release` asserts `server.ts` still goes through it, because a
+  pure function nobody calls guards nothing.

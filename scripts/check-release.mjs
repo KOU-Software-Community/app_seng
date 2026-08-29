@@ -200,6 +200,26 @@ check(
 );
 
 check(
+  'panel portu saf çözücüden geçiyor',
+  'Port kararı `admin/port.ts` içinde ve `check:panel` orayı sınıyor — ama server.ts ' +
+    'bir satırla yeniden `process.env`\u2019i okumaya dönerse o sınavın koruduğu bir şey ' +
+    'kalmıyor. Yanlış çözülen port sessiz: `listen(0)` hata vermiyor, rastgele bir ' +
+    'port açıyor, konteyner sağlıklı görünüyor ve ters proxy hiç ulaşamıyor.',
+  () => {
+    // Yorumları at: bu dosyanın kendi açıklamaları da ADMIN_PORT/PORT yazıyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const server = strip(read('admin/server.ts'));
+    if (!/resolvePort\(/.test(server)) {
+      return 'admin/server.ts portu resolvePort ile çözmüyor';
+    }
+    if (/process\.env\.(ADMIN_)?PORT/.test(server)) {
+      return 'admin/server.ts portu hâlâ doğrudan process.env\u2019den okuyor';
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

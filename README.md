@@ -259,7 +259,7 @@ sınıyor.
 | `SUPABASE_URL` | görseller için | `https://<ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | görseller için | `sb_secret_…` — publishable **değil** |
 | `SUPABASE_STORAGE_BUCKET` | hayır | Varsayılan `event-photos` |
-| `ADMIN_PORT` | hayır | Varsayılan 4000 |
+| `ADMIN_PORT` | hayır | Varsayılan 4000. Boş ya da geçersizse platformun enjekte ettiği `PORT`'a, o da yoksa 4000'e düşer |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `rules:deploy` için | Kuralların hangi projeye gideceği |
 
 Panelin **hiçbir `EXPO_PUBLIC_*` değişkene ihtiyacı yok** (kural yayınlama hariç),
