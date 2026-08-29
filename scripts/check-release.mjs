@@ -160,7 +160,31 @@ check(
     const dev = needed.filter((n) => pkg.devDependencies?.[n]);
     if (!dev.length) return null;
 
-    const cfg = read('nixpacks.toml');
+    // TOML yorumu `#` ile başlıyor ve bu dosya baştan aşağı yorum: aradığımız
+    // iki metin de gerekçesiyle birlikte orada yazıyor. Ham metinde arayınca
+    // gerçek ayarlar silinse bile kontrol yeşil kalıyor — sınandı. Aynı tuzağın
+    // JS tarafı için `strip()` var ama o yalnızca `//` ve `/* */` biliyor.
+    // Tırnak içindeki `#` yorum değil, o yüzden satır tırnak sayılarak taranıyor.
+    const stripToml = (src) =>
+      src
+        .split('\n')
+        .map((line) => {
+          let quote = null;
+          for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (quote) {
+              if (c === quote) quote = null;
+            } else if (c === '"' || c === "'") {
+              quote = c;
+            } else if (c === '#') {
+              return line.slice(0, i);
+            }
+          }
+          return line;
+        })
+        .join('\n');
+
+    const cfg = stripToml(read('nixpacks.toml'));
     if (!/npm ci[^\n]*--include=dev/.test(cfg)) {
       return `nixpacks.toml devDependencies kurmuyor ama panel onlara bağlı: ${dev.join(', ')}`;
     }

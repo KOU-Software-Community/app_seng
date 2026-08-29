@@ -367,3 +367,11 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   a reverse proxy terminates TLS and forwards plain HTTP. `cookieHeader` lives in its
   own module for one reason: importing `server.ts` starts `app.listen`, so nothing in
   it can be asserted without standing a server up.
+- **`strip()` knows `//` and `/* */`; `nixpacks.toml` is commented in `#`.** The guard
+  above read the raw TOML — and that file explains, in its own comments, both of the
+  strings it searches for. Delete the real `--include=dev` and the whole `[start]`
+  block, leave the prose describing them, and the check still passed: verified, it did.
+  Same trap as the JS one already in this log, one file format over, and it fails the
+  more dangerous way round — green against a config that cannot boot. It strips `#` to
+  end of line now, counting quotes first, because a `#` inside a command is not a
+  comment and truncating there would fail a correct file.
