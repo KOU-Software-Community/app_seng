@@ -12,6 +12,7 @@
 import { parseServiceAccount } from '../admin/credentials';
 import { cookieHeader } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
+import { resolvePort } from '../admin/port';
 import { archiveList, eventForm } from '../admin/views';
 
 let failed = 0;
@@ -218,6 +219,27 @@ assert('HTTP’te de HttpOnly var', /HttpOnly/.test(local));
 const out = cookieHeader({ name: 'kyk_admin', value: '', secure: true, maxAge: 0 });
 assert('çıkış çerezi süresi sıfır', /Max-Age=0/.test(out));
 assert('çıkış çerezi de Secure', /Secure/.test(out));
+
+// 11. Dinlenen port. Yanlış çözülürse hata çıkmıyor: `listen(0)` rastgele bir
+//     port açıyor, konteyner sağlıklı görünüyor ve ters proxy hiç ulaşamıyor.
+assert('ADMIN_PORT okunuyor', resolvePort({ ADMIN_PORT: '4100' }) === 4100);
+assert('PORT geri düşüşü çalışıyor', resolvePort({ PORT: '3000' }) === 3000);
+assert('ADMIN_PORT PORT’u yeniyor', resolvePort({ ADMIN_PORT: '4100', PORT: '3000' }) === 4100);
+assert('hiçbiri yoksa 4000', resolvePort({}) === 4000);
+
+// Asıl mesele: `??` boş metni yakalamıyor ve `.env.example` ADMIN_PORT'u boş
+// gönderiyor — yani varsayılan yoldan kurulan her panel bu satıra çarpıyor.
+assert('boş ADMIN_PORT PORT’a düşüyor', resolvePort({ ADMIN_PORT: '', PORT: '3000' }) === 3000);
+assert('ikisi de boşken 4000', resolvePort({ ADMIN_PORT: '', PORT: '' }) === 4000);
+assert('yalnızca boşluk da boş sayılıyor', resolvePort({ ADMIN_PORT: '   ' }) === 4000);
+assert('boşluklu sayı okunuyor', resolvePort({ ADMIN_PORT: ' 4000 ' }) === 4000);
+
+// `Number('abc')` NaN, `Number('0')` sıfır: ikisi de `listen`'e gidince aynı
+// sessiz sonucu veriyor, o yüzden ikisi de geçersiz sayılıyor.
+assert('sayı olmayan değer 4000’e düşüyor', resolvePort({ ADMIN_PORT: 'abc' }) === 4000);
+assert('sıfır kabul edilmiyor', resolvePort({ ADMIN_PORT: '0' }) === 4000);
+assert('aralık dışı kabul edilmiyor', resolvePort({ ADMIN_PORT: '70000' }) === 4000);
+assert('ondalık kabul edilmiyor', resolvePort({ ADMIN_PORT: '40.5' }) === 4000);
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

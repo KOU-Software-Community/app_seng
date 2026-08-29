@@ -54,12 +54,11 @@ import {
   type RaffleFieldType,
 } from '../src/raffleSchema';
 import { parseServiceAccount } from './credentials';
+import { resolvePort } from './port';
 import { cookieHeader } from './session';
 import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
-// ADMIN_PORT bu projenin kendi adı ve açıkça verildiyse kazanır; PORT ise
-// konteyner platformlarının (Coolify, Render, Fly) enjekte ettiği isim.
-const PORT = Number(process.env.ADMIN_PORT ?? process.env.PORT ?? 4000);
+const PORT = resolvePort(process.env);
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 const COOKIE = 'kyk_admin';
 /** Yeniden başlatınca herkes düşer — küçük bir panel için doğru varsayılan. */
