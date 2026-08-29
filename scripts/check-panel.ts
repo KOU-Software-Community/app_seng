@@ -10,6 +10,7 @@
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
 import { parseServiceAccount } from '../admin/credentials';
+import { cookieHeader } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
 import { archiveList, eventForm } from '../admin/views';
 
@@ -197,6 +198,26 @@ try {
 }
 assert('olmayan dosya yol olarak raporlanıyor', /olmayan-dosya\.json/.test(pathError), pathError);
 assert('hata üç biçimi de anlatıyor', /base64/.test(pathError) && /JSON/.test(pathError));
+
+// 10. Oturum çerezi. Panel açık bir sunucuda, öğrenci kayıtlarının önünde
+//     duruyor: `Secure` taşımayan bir oturum çerezi, panele bir kez düz HTTP ile
+//     ulaşılabildiği anda ağdaki herkese açık demek.
+const prod = cookieHeader({ name: 'kyk_admin', value: 'abc', secure: true, maxAge: 43200 });
+assert('HTTPS’te Secure var', /; Secure$/.test(prod), prod);
+assert('HttpOnly her zaman var', /HttpOnly/.test(prod));
+assert('SameSite=Strict her zaman var', /SameSite=Strict/.test(prod));
+
+// Yerelde panel düz HTTP: `Secure` çerezi tarayıcı hiç saklamaz, yani sabit
+// koymak yerel girişi tamamen kırardı.
+const local = cookieHeader({ name: 'kyk_admin', value: 'abc', secure: false, maxAge: 43200 });
+assert('HTTP’te Secure yok', !/Secure/.test(local), local);
+assert('HTTP’te de HttpOnly var', /HttpOnly/.test(local));
+
+// Çıkış çerezi de aynı bayrakları taşımalı: tarayıcı bayrakları uymayan bir
+// çerezi silmek yerine ikincisini yazabiliyor.
+const out = cookieHeader({ name: 'kyk_admin', value: '', secure: true, maxAge: 0 });
+assert('çıkış çerezi süresi sıfır', /Max-Age=0/.test(out));
+assert('çıkış çerezi de Secure', /Secure/.test(out));
 
 console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
 process.exit(failed ? 1 : 0);

@@ -147,6 +147,59 @@ check(
 );
 
 check(
+  'panel sunucuda ayağa kalkabilir',
+  'Panelin çalışma zamanı paketleri (express, firebase-admin, multer, sharp, ' +
+    'supabase-js, tsx) devDependencies altında ve bu mobil uygulama için doğru — ' +
+    'hiçbiri uygulama paketine girmiyor. Ama Nixpacks kurulumu NODE_ENV=production ' +
+    'ile yapıyor ve npm o hâlde devDependencies’i atlıyor. Kaçırılırsa derleme ' +
+    'yeşil geçiyor, konteyner `Cannot find module \'express\'` ile ölüyor — yani ' +
+    'hata derlemede değil, ilk açılışta ve sunucuda görünüyor.',
+  () => {
+    const needed = ['express', 'firebase-admin', 'multer', 'sharp', '@supabase/supabase-js', 'tsx'];
+    // dependencies'e taşınmışlarsa imajın ayrıca bir şey yapmasına gerek yok.
+    const dev = needed.filter((n) => pkg.devDependencies?.[n]);
+    if (!dev.length) return null;
+
+    // TOML yorumu `#` ile başlıyor ve bu dosya baştan aşağı yorum: aradığımız
+    // iki metin de gerekçesiyle birlikte orada yazıyor. Ham metinde arayınca
+    // gerçek ayarlar silinse bile kontrol yeşil kalıyor — sınandı. Aynı tuzağın
+    // JS tarafı için `strip()` var ama o yalnızca `//` ve `/* */` biliyor.
+    // Tırnak içindeki `#` yorum değil, o yüzden satır tırnak sayılarak taranıyor.
+    const stripToml = (src) =>
+      src
+        .split('\n')
+        .map((line) => {
+          let quote = null;
+          for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (quote) {
+              if (c === quote) quote = null;
+            } else if (c === '"' || c === "'") {
+              quote = c;
+            } else if (c === '#') {
+              return line.slice(0, i);
+            }
+          }
+          return line;
+        })
+        .join('\n');
+
+    const cfg = stripToml(read('nixpacks.toml'));
+    if (!/npm ci[^\n]*--include=dev/.test(cfg)) {
+      return `nixpacks.toml devDependencies kurmuyor ama panel onlara bağlı: ${dev.join(', ')}`;
+    }
+
+    // Başlatma komutu da burada olmak zorunda: `[start]` düşerse Nixpacks
+    // `npm start`'a geri dönüyor ve o komut bu depoda `expo start` — yani mobil
+    // geliştirme sunucusu. Deploy başarılı görünür, panel hiç açılmaz.
+    if (!/admin\/server\.ts/.test(cfg)) {
+      return 'nixpacks.toml paneli başlatmıyor — Nixpacks `npm start`’a düşer, o da `expo start`';
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',
