@@ -181,7 +181,7 @@ sonraki faz başlamıyor.
 | P1 ✅ | Bağımlılıklar + env seam + ikinci Supabase istemcisi; SDK 54→57 farkının ölçümü | `check:all` + `expo export` yeşil, ekran yok |
 | P2 ✅ | Saf katman: `domain` + `data-access` + `storage` + `format`, testleriyle | Jest devrede, taşınan testler yeşil |
 | P3 ✅ | Sağlayıcılar: QueryProvider + AsyncStorage persister + user-state + sorgu kancaları | 12 suite / 159 test yeşil, ekran yok |
-| P4 | Akış ekranı + makale detayı, bu deponun tasarımıyla; 5. sekme belirir | cihazda akış ve özet görünüyor |
+| P4 ✅ | Akış ekranı + makale detayı, bu deponun tasarımıyla; 5. sekme belirdi | 14 suite / 173 test, `expo export` yeşil (cihaz denemesi yapılmadı) |
 | P5 | Bülten ekranı + bildirim birleştirme | bildirim planlanıyor, sessiz saat sınandı |
 | P6 | Kaydedilenler + arama | alt ekranlar tam |
 | P7 | Ayarların `bildirim` ekranına katılması, boş/hata durumları, çevrimdışı akış | görsel tutarlılık |
@@ -201,9 +201,10 @@ görsel yarısı yeniden yazılıyor, mantık yarısı korunuyor.
   gerçek bir legacy anon JWT var; tasarımı gereği istemciye gömülen bir anahtar,
   yani sızıntı değil — ama koruma tamamen RLS'e bağlı. Taşımadan önce RLS'in
   gerçekten kapalı olduğu doğrulanmalı.
-- **Uygulama boyutu.** P1'de ölçüldü: `@supabase/supabase-js` grafiğe girince
-  iOS paketi **4,2 MB → 4,8 MB** (+600 KB). RN 0.86'da polyfill gerekmeden
-  paketlendi. TanStack ve taşınacak 7.500 satır henüz grafikte değil.
+- **Uygulama boyutu.** P4'te ölçüldü: akış ve makale ekranı bağlandıktan sonra
+  iOS paketi **4,2 MB → 5,1 MB** (+900 KB). Bunun 600 KB'ı P1'de ölçülen
+  `@supabase/supabase-js`, kalanı TanStack ve taşınan katmanlar. Kalan ekranlar
+  (P6) henüz grafikte değil.
 - **Kaynak depodaki bilinen borçlar:** Jest paralel koşuda bir worker'ı
   force-exit ediyor; istek gövdesi byte sınırı yok.
 
