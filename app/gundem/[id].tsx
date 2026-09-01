@@ -1,0 +1,187 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
+
+import {
+  Card,
+  ContentNotice,
+  DottedRule,
+  GradientHeader,
+  PixelTxt,
+  PrimaryButton,
+  Segmented,
+  Tag,
+  Txt,
+} from '../../src/components/ui';
+import { bodyFor, segmentState, type Segment } from '../../src/gundem/article/segment';
+import { useArticle, useEnrichment } from '../../src/gundem/data-access/hooks';
+import { relativeTimeTr } from '../../src/gundem/format/relativeTime';
+import { colors, gradients, radius } from '../../src/theme';
+
+export default function GundemArticleRoute() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const articleId = id ?? '';
+  const router = useRouter();
+
+  const query = useArticle(articleId);
+  const enrichment = useEnrichment(articleId, { enabled: Boolean(articleId) });
+
+  const article = query.data;
+  const result = enrichment.data;
+  const summary = result?.status === 'ready' ? result.summary : article?.summary;
+
+  const segment = segmentState(article, summary);
+  const [chosen, setChosen] = useState<Segment>('tr');
+  // Çeviri hazır değilken seçim "orijinal"e sabitleniyor: kullanıcı olmayan bir
+  // metne geçemesin ama düğme de kaybolmasın — neden kapalı olduğu görünsün.
+  const active: Segment = segment.enabled ? chosen : 'en';
+
+  if (query.isPending) {
+    return (
+      <View style={styles.center}>
+        <PixelTxt size={9} style={{ color: colors.faint }}>
+          YUKLENIYOR
+        </PixelTxt>
+      </View>
+    );
+  }
+
+  if (!article) {
+    return (
+      <View style={styles.screen}>
+        <GradientHeader gradient={gradients.form} style={{ paddingBottom: 16 }}>
+          <Txt weight="extrabold" size={20} color="#fff">
+            Haber bulunamadı
+          </Txt>
+        </GradientHeader>
+        <ContentNotice onRetry={() => void query.refetch()} retrying={query.isFetching} />
+        <PrimaryButton label="Geri dön" onPress={() => router.back()} style={styles.back} />
+      </View>
+    );
+  }
+
+  const pending = result?.status === 'queued' || (!summary && !result);
+  const unavailable = result?.status === 'unavailable';
+  const body = bodyFor(article, summary, active);
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+        <GradientHeader gradient={gradients.form} style={{ paddingBottom: 16 }}>
+          <Txt size={12} color={colors.blue200}>
+            {article.sourceName} · {relativeTimeTr(article.publishedAt)}
+          </Txt>
+          <Txt weight="extrabold" size={21} color="#fff" tracking={-0.4} style={{ marginTop: 6 }}>
+            {article.title}
+          </Txt>
+          <DottedRule style={{ marginTop: 12 }} />
+        </GradientHeader>
+
+        <View style={styles.tagRow}>
+          <Tag label={article.category} />
+          {article.language !== 'tr' ? <Tag label="EN→TR" /> : null}
+        </View>
+
+        <Card style={styles.summary}>
+          <View style={styles.summaryHead}>
+            <PixelTxt size={8}>AI TR OZET</PixelTxt>
+            {pending || unavailable ? null : (
+              <Txt size={11.5} color={colors.muted}>
+                {summary?.bullets.length ?? 3} madde
+              </Txt>
+            )}
+          </View>
+
+          {unavailable ? (
+            // Beklemekle değişmeyecek: bir kez söylüyor ve aşağıdaki "Kaynağa
+            // git"i işaret ediyor. Dönen bir gösterge burada yalan olurdu.
+            <Txt size={13.5} color={colors.textBody} style={{ marginTop: 10 }}>
+              Bu haber için özet üretilemiyor; kaynağa gidebilirsiniz.
+            </Txt>
+          ) : pending ? (
+            <View style={styles.pendingRow}>
+              <ActivityIndicator size="small" color={colors.blue500} />
+              <Txt size={13.5} color={colors.textBody}>
+                Özet hazırlanıyor
+              </Txt>
+            </View>
+          ) : (
+            summary?.bullets.map((bullet, index) => (
+              <View key={`${index}-${bullet}`} style={styles.bulletRow}>
+                <View style={styles.bulletDot} />
+                <Txt size={13.5} color={colors.textBody} style={styles.bulletText}>
+                  {bullet}
+                </Txt>
+              </View>
+            ))
+          )}
+        </Card>
+
+        {segment.visible ? (
+          <View style={styles.segmentWrap}>
+            <Segmented
+              options={[
+                { label: 'Orijinal', value: 'en' },
+                { label: 'Çeviri', value: 'tr' },
+              ]}
+              value={active}
+              onChange={(value) => {
+                if (segment.enabled) setChosen(value as Segment);
+              }}
+            />
+            {segment.enabled ? null : (
+              <Txt size={11.5} color={colors.faint} style={{ marginTop: 6 }}>
+                Çeviri hazırlanıyor.
+              </Txt>
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.bodyWrap}>
+          <Txt size={11.5} color={colors.faint}>
+            {body.label}
+          </Txt>
+          <Txt size={14.5} color={colors.textBody} style={styles.bodyText}>
+            {body.text}
+          </Txt>
+        </View>
+
+        <PrimaryButton
+          label="Kaynağa git"
+          onPress={() => {
+            void Linking.openURL(article.url);
+          }}
+          style={styles.cta}
+        />
+
+        <Txt size={11} color={colors.faint} style={styles.credit}>
+          Özet ve çeviri yapay zekâ ile üretildi.
+        </Txt>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  tagRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14 },
+  summary: { marginHorizontal: 16, marginTop: 14 },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  bulletRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  bulletDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.blue500,
+    marginTop: 7,
+  },
+  bulletText: { flex: 1, lineHeight: 20 },
+  segmentWrap: { paddingHorizontal: 16, marginTop: 16 },
+  bodyWrap: { paddingHorizontal: 16, marginTop: 16, gap: 6 },
+  bodyText: { lineHeight: 22 },
+  cta: { marginHorizontal: 16, marginTop: 20 },
+  back: { marginHorizontal: 16, marginTop: 16 },
+  credit: { textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
+});

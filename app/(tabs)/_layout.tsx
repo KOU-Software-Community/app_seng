@@ -18,6 +18,7 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'index', label: 'Ana Sayfa', icon: 'home' },
   { name: 'takvim', label: 'Takvim', icon: 'cal' },
   { name: 'arsiv', label: 'Arşiv', icon: 'grid' },
+  { name: 'gundem', label: 'AI Gündem', icon: 'lines' },
   { name: 'bildirim', label: 'Bildirim', icon: 'bell' },
 ];
 

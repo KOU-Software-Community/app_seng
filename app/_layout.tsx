@@ -18,6 +18,7 @@ import { AnnouncementsProvider } from '../src/announcements';
 import { ContentProvider } from '../src/content';
 import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
 import { NotificationSync } from '../src/notifications';
+import { QueryProvider } from '../src/gundem/providers/QueryProvider';
 import { AppStoreProvider } from '../src/store';
 import { colors } from '../src/theme';
 
@@ -54,11 +55,16 @@ export default function RootLayout() {
       <AppStoreProvider>
         <ContentProvider>
           <AnnouncementsProvider>
+            {/* AI Gündem'in sunucu durumu. Kulüp tarafı buna dokunmuyor; burada
+                duruyor çünkü hem sekme hem makale rotası aynı önbelleği
+                paylaşıyor ve kalıcı önbellek açılışta bir kez geri yükleniyor. */}
             <StatusBar style="light" />
             {/* Inside both providers: it needs events, registrations and prefs
                 together to keep the reminder schedule current. Renders nothing. */}
             <NotificationSync />
-            <RootStack />
+            <QueryProvider>
+              <RootStack />
+            </QueryProvider>
           </AnnouncementsProvider>
         </ContentProvider>
       </AppStoreProvider>
@@ -83,6 +89,7 @@ function RootStack() {
         <Stack.Screen name="kayit/[id]" />
         <Stack.Screen name="duyuru/[id]" />
         <Stack.Screen name="cekilis/[id]" />
+        <Stack.Screen name="gundem/[id]" />
         <Stack.Screen
           name="kayit-basarili"
           // The confirmation is a terminal state — swiping back into the form
