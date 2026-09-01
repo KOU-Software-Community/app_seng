@@ -177,10 +177,10 @@ sonraki faz başlamıyor.
 
 | faz | iş | kapı |
 |---|---|---|
-| P0 | Hazırlık: hook'a Supabase skill kurulumu, bu plan, graph | hook yeşil, plan işlendi |
-| P1 | Bağımlılıklar + env seam + ikinci Supabase istemcisi; SDK 54→57 farkının ölçümü | `check:all` + `expo export` yeşil, ekran yok |
-| P2 | Saf katman: `domain` + `data-access` + `storage` + `format`, testleriyle | Jest devrede, taşınan testler yeşil |
-| P3 | Sağlayıcılar: QueryProvider + AsyncStorage persister + cihaz kimliği + user-state | veri çekiliyor, ekran yok |
+| P0 ✅ | Hazırlık: hook'a Supabase skill kurulumu, bu plan, graph | hook yeşil, plan işlendi |
+| P1 ✅ | Bağımlılıklar + env seam + ikinci Supabase istemcisi; SDK 54→57 farkının ölçümü | `check:all` + `expo export` yeşil, ekran yok |
+| P2 ✅ | Saf katman: `domain` + `data-access` + `storage` + `format`, testleriyle | Jest devrede, taşınan testler yeşil |
+| P3 ✅ | Sağlayıcılar: QueryProvider + AsyncStorage persister + user-state + sorgu kancaları | 12 suite / 159 test yeşil, ekran yok |
 | P4 | Akış ekranı + makale detayı, bu deponun tasarımıyla; 5. sekme belirir | cihazda akış ve özet görünüyor |
 | P5 | Bülten ekranı + bildirim birleştirme | bildirim planlanıyor, sessiz saat sınandı |
 | P6 | Kaydedilenler + arama | alt ekranlar tam |
