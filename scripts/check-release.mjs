@@ -220,6 +220,30 @@ check(
 );
 
 check(
+  'AI Gündem yapılandırması pakete gömülüyor',
+  'Expo\u2019nun babel eklentisi `process.env.EXPO_PUBLIC_*` ifadesini ancak statik ' +
+    'üye erişimi olarak GÖRÜRSE değeri pakete gömüyor. `process.env`\u2019i bir nesne ' +
+    'gibi dolaştırmak ya da anahtarı hesaplamak üretim derlemesinde `undefined` ' +
+    'üretiyor — ve sonuç "yapılandırma yok" gibi görünüyor, "kod yanlış" gibi değil. ' +
+    'Sürüm derlemesinde konsol da olmadığı için bölüm sessizce boş açılır.',
+  () => {
+    // Yorumları at: env.ts bu üç ifadeyi kendi açıklamasında da yazıyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const env = strip(read('src/gundem/config/env.ts'));
+    const needed = [
+      'process.env.EXPO_PUBLIC_AIGUNDEM_DATA_MODE',
+      'process.env.EXPO_PUBLIC_AIGUNDEM_SUPABASE_URL',
+      'process.env.EXPO_PUBLIC_AIGUNDEM_SUPABASE_ANON_KEY',
+    ];
+    const missing = needed.filter((name) => !env.includes(name));
+    if (missing.length) {
+      return `env.ts bu okumaları harfi harfine yapmıyor: ${missing.join(', ')}`;
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

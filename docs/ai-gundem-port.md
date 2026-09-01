@@ -151,10 +151,24 @@ aktaran 31 dosya ve modül yüklenirken değerlendirilen `StyleSheet.create`
 Kaynak repo SDK 54'te bilinçli kilitliydi. Taşınan kod 57'ye uyarlanıyor. Elle
 sürüm yazılmıyor — `npm run deps:sync`.
 
-Bilinen değişim noktaları: `expo-notifications` foreground handler
-(`shouldShowAlert` SDK 57'de kalktı — bu depo düzeltmiş, taşınan kod
-düzeltmemiş), expo-router 6 → 57 tip imzaları, React 19.1 → 19.2. **Farkın kodda
-nereye çarptığı ölçülmedi**; P1'in ilk işi bu.
+**Fark P1'de ölçüldü ve beklenenden küçük çıktı:**
+
+- Taşınacak kapsamın ihtiyaç duyduğu her native modül bu depoda **zaten kurulu
+  ve SDK 57 sürümünde**: `react-native`, `expo-router`, `react-native-safe-area-context`,
+  `react-native-svg`, `expo-status-bar`, `expo-splash-screen`, `expo-linking`,
+  `expo-constants`. Yeni Expo modülü gerekmiyor.
+- Kullanılan dört `expo-router` API'si (`Stack`, `Tabs`, `useLocalSearchParams`,
+  `useRouter`) bu deponun **zaten kullandığı** dört API. Bir probe dosyası
+  expo-router 57.0.17 altında temiz derlendi.
+- `expo-notifications` kod tabanında doğrudan içe aktarılmıyor: enjekte edilen
+  bir `NotificationsApi` arayüzünün arkasında ve tek bir uyarlama noktası var
+  (`src/notifications/index.ts`, tembel `require`). Yani SDK 57'nin foreground
+  handler değişikliği (`shouldShowAlert` → banner/list) **tek dosyaya** dokunuyor
+  ve bu deponun `src/notifications.tsx`'i doğrusunu zaten yapıyor.
+- Düşenler: `expo-sqlite` (K6), `@expo-google-fonts/inter` (K8).
+
+Geriye kalan risk ekran katmanında: React 19.1 → 19.2 ve RN 0.81 → 0.86 tip
+imzaları ancak kod taşınırken typecheck'e çarpınca görünür. P2 ve P4'te ölçülecek.
 
 ## Fazlar
 
@@ -187,7 +201,9 @@ görsel yarısı yeniden yazılıyor, mantık yarısı korunuyor.
   gerçek bir legacy anon JWT var; tasarımı gereği istemciye gömülen bir anahtar,
   yani sızıntı değil — ama koruma tamamen RLS'e bağlı. Taşımadan önce RLS'in
   gerçekten kapalı olduğu doğrulanmalı.
-- **Uygulama boyutu.** Dört yeni paket + 7.500 satır; ölçülmedi.
+- **Uygulama boyutu.** P1'de ölçüldü: `@supabase/supabase-js` grafiğe girince
+  iOS paketi **4,2 MB → 4,8 MB** (+600 KB). RN 0.86'da polyfill gerekmeden
+  paketlendi. TanStack ve taşınacak 7.500 satır henüz grafikte değil.
 - **Kaynak depodaki bilinen borçlar:** Jest paralel koşuda bir worker'ı
   force-exit ediyor; istek gövdesi byte sınırı yok.
 
