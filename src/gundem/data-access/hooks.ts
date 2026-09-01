@@ -117,10 +117,48 @@ export function useDigest() {
   });
 }
 
-/** Default seconds between enrichment polls when the server does not say. */
-export const ENRICHMENT_POLL_SECONDS = 5;
-/** Stop after this many polls; without a key the job never leaves the queue. */
-export const ENRICHMENT_MAX_POLLS = 6;
+/**
+ * Yoklama takvimi (saniye). Sabit aralık yerine artan bir dizi, ve uzunluğu
+ * keyfi değil.
+ *
+ * **Cihazda ölçüldü:** eski hâli 6 yoklamayı 5 saniye arayla yapıp 30 saniyede
+ * pes ediyordu. Sunucudaki özetleme worker'ı ise iki dakikada bir çalışan bir cron'da
+ * koşuyor (`every 2 minutes`) — yani istemci, işi alacak worker daha bir kez bile çalışmadan
+ * vazgeçiyordu. Kullanıcının gördüğü şey "Özet hazırlanıyor" yazısının sonsuza
+ * kadar orada kalmasıydı; logdaki satır da "still queued after 6 polls (no
+ * reason given)" diyordu — çünkü söylenecek bir sebep yoktu, iş sırasını
+ * bekliyordu.
+ *
+ * Yeni takvim iki cron periyodunu kapsıyor (290 saniye, ~4,8 dakika) ama bunu az
+ * istekle yapıyor: 8 yoklama. Toplamı testin kendisi doğruluyor — ilk yazdığım
+ * takvim 230 saniyeydi ve "iki periyot" iddiasını hesaplamadan yazmıştım; test
+ * kırmızı verdi ve düzeltilen takvim oldu, iddia değil. Her yoklama sunucuda cihaz başına bir
+ * hız-sınırı kovasına yazıyor, o yüzden pencereyi genişletmenin doğru yolu
+ * sıklığı artırmak değil aralığı açmak.
+ *
+ * İlk iki yoklama yine hızlı: özet önbellekte olabilir ya da worker tam o an
+ * çalışıyor olabilir.
+ */
+export const ENRICHMENT_POLL_SCHEDULE_SECONDS = [5, 10, 20, 30, 45, 60, 60, 60];
+
+/**
+ * `pollCount` kadar yoklama yapıldıktan sonraki bekleme (ms), ya da takvim
+ * bittiyse `null`.
+ *
+ * Saf ve dışa açık: yoklama davranışı ekranı ya da ağı ayağa kaldırmadan
+ * sınanabilecek tek şey, ve yanlış olduğunda kimse hata görmüyor — sadece özet
+ * hiç gelmiyor.
+ */
+export function enrichmentPollDelayMs(pollCount: number): number | null {
+  const seconds = ENRICHMENT_POLL_SCHEDULE_SECONDS[pollCount];
+  return seconds === undefined ? null : seconds * 1000;
+}
+
+/** Toplam pencere, saniye — takvimin kendisinden türetiliyor. */
+export const ENRICHMENT_POLL_WINDOW_SECONDS = ENRICHMENT_POLL_SCHEDULE_SECONDS.reduce(
+  (total, seconds) => total + seconds,
+  0,
+);
 
 /**
  * Ask for an article's summary and keep asking while it is `queued`.
@@ -135,7 +173,7 @@ export function useEnrichment(
   options: { enabled?: boolean; maxPolls?: number } = {},
 ) {
   const repos = useRepositories();
-  const maxPolls = options.maxPolls ?? ENRICHMENT_MAX_POLLS;
+  const maxPolls = options.maxPolls ?? ENRICHMENT_POLL_SCHEDULE_SECONDS.length;
 
   return useQuery({
     queryKey: queryKeys.enrichment(articleId ?? ''),
@@ -157,15 +195,22 @@ export function useEnrichment(
       // Anything that is not `queued` — including `unavailable`, where the server
       // has already looked and found no body — stops the poll dead.
       if (!data || data.status !== 'queued') return false;
-      if (query.state.dataUpdateCount >= maxPolls) {
+      const delay = query.state.dataUpdateCount >= maxPolls
+        ? null
+        : enrichmentPollDelayMs(query.state.dataUpdateCount);
+      if (delay === null) {
         console.warn(
-          `[enrichment] article ${articleId}: still queued after ${maxPolls} polls (${
-            data.reason ?? 'no reason given'
-          }); giving up until the screen is reopened.`,
+          `[enrichment] article ${articleId}: ${maxPolls} yoklama ve ` +
+            `~${ENRICHMENT_POLL_WINDOW_SECONDS} saniye sonra hâlâ kuyrukta (${
+              data.reason ?? 'sebep bildirilmedi'
+            }). Bu süre sunucunun iki dakikada bir çalışan özetleme cron'unun iki periyodunu ` +
+            'kapsıyor, yani beklemek artık yardımcı olmuyor: ya günlük tavan dolmuş, ' +
+            'ya worker çalışmıyor, ya da sağlayıcı anahtarı reddediliyor. Ekrandaki ' +
+            '"Tekrar dene" elle yeniden sorar.',
         );
         return false;
       }
-      return ENRICHMENT_POLL_SECONDS * 1000;
+      return delay;
     },
   });
 }

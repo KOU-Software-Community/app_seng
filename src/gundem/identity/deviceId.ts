@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { KV_KEYS, kv, type KvStore } from '../storage/kv';
 
 /**
@@ -17,28 +19,52 @@ export const isDeviceId = (value: unknown): value is string =>
   typeof value === 'string' && UUID_V4.test(value);
 
 /**
- * uuid v4 from `crypto.getRandomValues`, which React Native, Hermes and every
- * browser provide. `crypto.randomUUID` is not used because it is missing on some
- * RN runtimes; this path is the same everywhere.
+ * On altı rastgele bayt — ve sonucun gerçekten rastgele olduğunun kontrolü.
  *
- * Named for what it produces rather than for its first caller: the Edge
- * idempotency key needs the same uuid v4, and every server handler validates the
- * shape (P10 B1 — a home-grown "unique enough" id was rejected with 400).
+ * Sıfır dolu bir dizi teoride geçerli bir çıktı (2^128'de bir) ama pratikte tek
+ * bir anlama geliyor: rastgelelik kaynağı çalışmıyor. Sessizce kabul edilirse
+ * ortaya çıkan uuid `00000000-0000-4000-8000-000000000000` oluyor — biçim olarak
+ * kusursuz bir v4, yani `isDeviceId` onu onaylıyor — ve **her kurulum aynı
+ * kimliği** alıyor: tek bir hız-sınırı kovası, tek bir cihaz gibi görünen bütün
+ * kullanıcılar. Ölçüldü: Jest ortamında `expo-crypto` tam olarak bunu döndürüyor.
+ */
+function randomBytes16(): Uint8Array {
+  const bytes = Crypto.getRandomValues(new Uint8Array(16));
+  if (bytes.some((byte) => byte !== 0)) return bytes;
+
+  console.warn(
+    '[identity] rastgelelik kaynağı sıfır döndürdü; Math.random ile devam ediliyor. ' +
+      'Kimliğin gizli olması gerekmiyor ama benzersiz olması gerekiyor.',
+  );
+  const fallback = new Uint8Array(16);
+  for (let i = 0; i < fallback.length; i += 1) fallback[i] = Math.floor(Math.random() * 256);
+  return fallback;
+}
+
+/**
+ * uuid v4, rastgeleliği `expo-crypto`'dan.
+ *
+ * Kaynak uygulamanın yorumu "React Native, Hermes ve her tarayıcı sağlar" diyerek
+ * `globalThis.crypto.getRandomValues`'a güveniyordu. **Cihazda ölçüldü: yok.**
+ * Uygulama açıldığında log şunu basıyordu:
+ *
+ *     [identity] crypto.getRandomValues unavailable; falling back to Math.random.
+ *
+ * Yani cihaz kimliği ve Edge çağrılarının idempotency anahtarı `Math.random()`
+ * ile üretiliyordu. Kimliğin gizli olması gerekmiyor ama **çakışması** gerekmiyor:
+ * çakışan iki cihaz aynı hız-sınırı kovasını paylaşır ve tekrarlanan bir istek
+ * yanlış işi idempotent sayabilir.
+ *
+ * `expo-crypto` bu projede zaten SDK'nın listelediği sürümde ve native modül
+ * gerektirmeden `getRandomValues` sağlıyor.
+ *
+ * Adı ürettiği şeye göre, ilk çağıranına göre değil: Edge idempotency anahtarı da
+ * aynı uuid v4'ü istiyor ve sunucudaki her işleyici biçimi doğruluyor.
  */
 export function randomUuidV4(): string {
-  const bytes = new Uint8Array(16);
-  const cryptoObj = (globalThis as { crypto?: Crypto }).crypto;
-  if (cryptoObj?.getRandomValues) {
-    cryptoObj.getRandomValues(bytes);
-  } else {
-    // A device id only has to be unique, not unguessable — but a weak source is
-    // still worth saying out loud, because collisions would merge two devices'
-    // rate-limit buckets.
-    console.warn('[identity] crypto.getRandomValues unavailable; falling back to Math.random.');
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+  const bytes = randomBytes16();
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // sürüm 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // varyant 10xx
 
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;

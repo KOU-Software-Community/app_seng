@@ -446,3 +446,27 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   it: `check:release` now lists every declared package that is absent from
   `node_modules` and says `npm ci` outright. Reproduced by deleting exactly that
   package before adding the guard.
+- **A ported comment asserting a runtime capability is not evidence the runtime
+  has it.** `deviceId.ts` arrived saying `crypto.getRandomValues` is what
+  "React Native, Hermes and every browser provide", and on a real device it does
+  not exist — the app logged the fallback on every launch and both the device id
+  and the Edge idempotency key came from `Math.random()`. Neither needs to be
+  secret; both need to be unique, and colliding ids merge two devices into one
+  rate-limit bucket. `expo-crypto` is in the SDK's own version list and needs no
+  extra native module. When ported code claims a global exists, check the
+  runtime, not the comment.
+- **A zeroed random source produces a perfectly valid uuid.** With
+  `expo-crypto` stubbed (as it is under Jest), `getRandomValues` returns all
+  zeros and `randomUuidV4` yields `00000000-0000-4000-8000-000000000000` — which
+  passes the v4 shape check, so `isDeviceId` approves it and every install gets
+  the SAME identity. The generator now rejects an all-zero draw. The test that
+  caught it was already there, asserting only that two ids differ.
+- **A client's poll window has to be longer than the server's scheduling
+  period.** The enrichment hook polled six times at five seconds and gave up
+  after thirty, while the summarisation worker runs on a two-minute cron — so it
+  quit before the worker had run even once, and the log said "still queued (no
+  reason given)" because there was no reason: the job was waiting its turn.
+  Widening a window is done by spacing the polls, not by adding them; each poll
+  writes to a per-device rate-limit bucket. The window is asserted against the
+  cron period now, and that assertion caught its own arithmetic being wrong
+  before the code shipped.

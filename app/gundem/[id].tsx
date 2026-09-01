@@ -125,9 +125,30 @@ export default function GundemArticleRoute() {
           ) : pending ? (
             <View style={styles.pendingRow}>
               <ActivityIndicator size="small" color={colors.blue500} />
-              <Txt size={13.5} color={colors.textBody}>
+              <Txt size={13.5} color={colors.textBody} style={{ flex: 1 }}>
                 Özet hazırlanıyor
               </Txt>
+              {/*
+                Yoklama takvimi sunucunun iki dakikada bir çalışan cron'unun iki
+                periyodunu kapsıyor ve sonra duruyor. Durduğunda ekranda dönen bir
+                gösterge kalıyordu ve hiçbir şey olmuyordu — kullanıcı için bu,
+                sonsuza kadar "hazırlanıyor" demek. Elle sorma yolu her zaman açık.
+              */}
+              <Pressable
+                onPress={() => void enrichment.refetch()}
+                accessibilityRole="button"
+                accessibilityLabel="Özeti tekrar sor"
+                hitSlop={8}
+                disabled={enrichment.isFetching}
+                style={({ pressed }) => [
+                  styles.retryButton,
+                  { opacity: pressed || enrichment.isFetching ? 0.6 : 1 },
+                ]}
+              >
+                <Txt weight="semibold" size={12} color={colors.navy700}>
+                  Tekrar dene
+                </Txt>
+              </Pressable>
             </View>
           ) : (
             summary?.bullets.map((bullet, index) => (
@@ -198,6 +219,13 @@ const styles = StyleSheet.create({
     borderColor: colors.blue500,
   },
   saveButtonOn: { backgroundColor: colors.blue500, borderColor: colors.blue500 },
+  retryButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   summary: { marginHorizontal: 16, marginTop: 14 },
   summaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
