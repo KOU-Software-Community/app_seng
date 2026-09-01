@@ -244,6 +244,26 @@ check(
 );
 
 check(
+  'CI paketin içine bakıyor',
+  'Sırların pakete girip girmediğini yalnızca `check:bundle` görebiliyor: ' +
+    '`EXPO_PUBLIC_*` değerleri derleme anında gömülüyor, yani kaynakta olmayan bir ' +
+    'değer pakette olabiliyor. Adım CI\u2019dan düşerse hiçbir şey kırmızı olmaz — ' +
+    'yalnızca kimse bakmamış olur, ve fark edildiğinde anahtar çoktan yayınlanmıştır.',
+  () => {
+    // YAML yorumları `#`; bu iş akışı adımı kendi gerekçesini yanında taşıyor.
+    const stripYaml = (src) => src.replace(/^\s*#.*$/gm, '');
+    const ci = stripYaml(read('.github/workflows/ci.yml'));
+    if (!/npm run check:bundle/.test(ci)) {
+      return 'ci.yml `npm run check:bundle` çalıştırmıyor — pakete kimse bakmıyor';
+    }
+    if (!/"check:bundle"/.test(read('package.json'))) {
+      return 'package.json içinde `check:bundle` betiği yok';
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

@@ -42,3 +42,9 @@ jobs:
       # Paketleme ve import hataları typecheck'e takılmıyor: eksik bir dosya ya
       # da çözülemeyen bir modül ancak Metro paketlerken ortaya çıkıyor.
       - run: npx expo export --platform ios
+
+      # Paketin İÇİNDE ne olduğunu okur. `EXPO_PUBLIC_*` değerleri derleme anında
+      # gömülüyor, yani yanlış önekli bir anahtar kaynakta görünmüyor ama pakette
+      # duruyor. Kendi web paketini derliyor: düz JavaScript, Hermes bytecode
+      # değil, ve babel'in gömme davranışı platformdan bağımsız.
+      - run: npm run check:bundle

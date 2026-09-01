@@ -185,7 +185,7 @@ sonraki faz başlamıyor.
 | P5 ✅ | Bülten ekranı + bildirim birleştirme | 15 suite / 187 test; sessiz saat kuralı kırmızı testiyle sınandı |
 | P6 ✅ | Kaydedilenler + arama | üç segment tam, arama rotası bağlı, 16 suite / 192 test |
 | P7 ✅ | Bülten saati ayarı, sessiz-saat etiketi düzeltmesi, boş/hata durumları | 16 suite / 194 test; saat kısıtı kırmızı testiyle sınandı |
-| P8 | Yayın: `check:bundle`, EAS ortam değişkenleri (üç profil ayrı), yeni release guard'ları | EAS build yeşil |
+| P8 ✅ | Yayın: `check:bundle` (CI'da), EAS değişkenleri belgelendi, +1 release guard | 35 release kontrolü; sızıntı taraması iki yönden kırmızı sınandı. **EAS derlemesi yapılmadı** — bu ortamda EAS erişimi yok |
 
 P4 tek başına planın en ağır parçası: ~3.300 satır ekran ve bileşen kodunun
 görsel yarısı yeniden yazılıyor, mantık yarısı korunuyor.
@@ -217,6 +217,19 @@ görsel yarısı yeniden yazılıyor, mantık yarısı korunuyor.
   beyanı; ölçülen 43 dosya / 14.018 satır.
 - SDK 54 → 57 farkının kodda nereye çarptığı ölçülmedi.
 - Uygulama hiçbir cihazda çalıştırılmadı.
+
+## Port bitti — sırada ne var
+
+Sekiz fazın sekizi de `main`'de. Kalanlar bu portun dışında ve hiçbiri kod
+değil:
+
+1. **EAS ortam değişkenlerini tanımlayın** (README'de komutlar). Tanımlanmazsa
+   bölüm "yapılandırılmamış" diyor — sessizce fixture göstermiyor.
+2. **Bir derleme alın ve cihazda açın.** Bu portun hiçbir satırı cihazda
+   çalışmadı; test renderer "çiziliyor" der, "doğru görünüyor" demez.
+3. **Backend'in canlı olduğunu doğrulayın** — pg_cron işleri, Vault anahtarları,
+   sabah bülteninin gerçekten üretildiği. Buradan görülemedi.
+4. **RLS'i gözden geçirin.** Anon anahtar herkese açık; koruma tamamen orada.
 
 ## Sonraya bırakılanlar
 
