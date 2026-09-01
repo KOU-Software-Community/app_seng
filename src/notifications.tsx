@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import { useContent } from './content';
 import type { ClubEvent } from './data';
 import { isFirebaseConfigured } from './firebaseConfig';
+import { planNotifications } from './notificationPlan';
 import { NotificationPrefs, Registration, useAppStore } from './store';
 import { colors } from './theme';
 
@@ -23,13 +24,6 @@ import { colors } from './theme';
  * Both respect the same four preferences, so every toggle on the settings screen
  * now changes something real.
  */
-
-/** Matches the `Hatırlatma` entry in NOTIFICATION_CATEGORIES. */
-const REMINDER_CATEGORY = 'Hatırlatma';
-
-/** Nothing fires between 23:00 and 08:00 when quiet hours are on. */
-const QUIET_START_HOUR = 23;
-const QUIET_END_HOUR = 8;
 
 /** Foreground behaviour. `shouldShowAlert` is deprecated in SDK 57. */
 Notifications.setNotificationHandler({
@@ -86,31 +80,22 @@ export async function requestPushToken(): Promise<string | null> {
   }
 }
 
-/** REMINDER_OPTIONS entries mapped to milliseconds before the event. */
-function reminderOffsetMs(option: string): number {
-  if (option.startsWith('1 saat')) return 60 * 60 * 1000;
-  if (option.startsWith('3 gün')) return 3 * 24 * 60 * 60 * 1000;
-  return 24 * 60 * 60 * 1000; // "1 gün önce" — the default in the store.
-}
-
-/** Moves a night-time reminder to 08:00 so quiet hours mean something. */
-function applyQuietHours(when: Date): Date {
-  const hour = when.getHours();
-  if (hour >= QUIET_END_HOUR && hour < QUIET_START_HOUR) return when;
-
-  const shifted = new Date(when);
-  // 23:00–23:59 waits for the next morning; 00:00–07:59 uses the same one.
-  if (hour >= QUIET_START_HOUR) shifted.setDate(shifted.getDate() + 1);
-  shifted.setHours(QUIET_END_HOUR, 0, 0, 0);
-  return shifted;
-}
-
 /**
  * Rebuilds the whole local reminder schedule from current state.
  *
  * Cancel-then-reschedule rather than diffing: this app is the only thing
  * scheduling notifications, the list is a handful of events, and a diff would be
  * one more place for the schedule to drift out of sync with the settings.
+ */
+/**
+ * Cihazdaki bütün yerel bildirim programını sıfırdan kurar.
+ *
+ * Fark alıp güncellemek yerine hepsini iptal edip yeniden kurmak: bu uygulama
+ * bildirim kuran tek şey ve liste birkaç kalem. Ama artık **iki** kaynak var —
+ * etkinlik hatırlatmaları ve AI Gündem bülteni — ve `cancelAll` ikisini birden
+ * siliyor. Bu yüzden ne kurulacağına tek bir yerde karar veriliyor
+ * (`notificationPlan.ts`) ve burası yalnızca o listeyi uyguluyor. İki ayrı
+ * zamanlayıcı olsaydı biri diğerini sessizce silerdi.
  */
 export async function rescheduleReminders(
   events: ClubEvent[],
@@ -119,33 +104,17 @@ export async function rescheduleReminders(
 ): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  const wanted = prefs.master && prefs.categories[REMINDER_CATEGORY] !== false;
-  if (!wanted) return;
-
-  const offset = reminderOffsetMs(prefs.reminder);
-  const now = Date.now();
-
-  for (const registration of registrations) {
-    const event = events.find((e) => e.id === registration.eventId);
-    if (!event) continue;
-
-    const startsAt = new Date(event.startsAt);
-    if (Number.isNaN(startsAt.getTime())) continue;
-
-    let when = new Date(startsAt.getTime() - offset);
-    if (prefs.quietHours) when = applyQuietHours(when);
-
-    // A reminder in the past is noise, and one that quiet hours pushed past the
-    // event itself is worse than none.
-    if (when.getTime() <= now || when >= startsAt) continue;
-
+  for (const item of planNotifications({ events, registrations, prefs })) {
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: event.title,
-        body: `${event.time} · ${prefs.reminder} hatırlatma. Kayıt kodun: ${registration.code}`,
-        data: { eventId: event.id },
-      },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when },
+      content: { title: item.title, body: item.body, data: item.data },
+      trigger:
+        item.kind === 'digest'
+          ? {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: item.daily.hour,
+              minute: item.daily.minute,
+            }
+          : { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date },
     });
   }
 }

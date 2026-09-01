@@ -1,149 +1,54 @@
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import {
-  ContentNotice,
-  DottedRule,
-  EmptyState,
-  FilterChip,
-  GradientHeader,
-  PixelTxt,
-  Txt,
-} from '../../src/components/ui';
-import { ArticleCard } from '../../src/gundem/components/ArticleCard';
-import { useFeed } from '../../src/gundem/data-access/hooks';
-import type { Article } from '../../src/gundem/domain/types';
-import { useEnabledSources, useReadArticles } from '../../src/gundem/user-state/hooks';
+import { DottedRule, GradientHeader, Segmented, Txt } from '../../src/components/ui';
+import { DigestView } from '../../src/gundem/screens/DigestView';
+import { FeedView, todayLineTr } from '../../src/gundem/screens/FeedView';
 import { colors, gradients } from '../../src/theme';
 
-/** "Tümü" artı prototipin beş kategorisi. */
-const CATEGORIES = ['Tümü', 'Modeller', 'Araştırma', 'Ürün', 'Açık Kaynak', 'Türkiye'] as const;
-type Filter = (typeof CATEGORIES)[number];
-
-const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-const MONTHS_TR = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-];
-
-/** Başlıktaki gün satırı: "Perşembe, 20 Ağustos". */
-export const todayLineTr = (now: Date = new Date()): string =>
-  `${DAYS_TR[now.getDay()]}, ${now.getDate()} ${MONTHS_TR[now.getMonth()]}`;
-
-/** "N yeni" — bu cihazın henüz açmadıkları. Sunucudan gelen bir sayı değil. */
-export const unseenCount = (articles: Article[], isRead: (id: string) => boolean): number =>
-  articles.filter((a) => !isRead(a.id)).length;
+/**
+ * AI Gündem sekmesinin kabuğu.
+ *
+ * İç gezinme bir alt sekme çubuğu değil, `Segmented` — uygulamanın kendi
+ * bileşeni. İkinci bir sekme çubuğu koymak, alt barla üst üste iki gezinme
+ * yüzeyi demekti ve ikisi de aynı ekranı adresliyor olurdu.
+ *
+ * Başlık burada duruyor, görünümlerin içinde değil: iki görünüm arasında geçince
+ * başlığın yeniden çizilmesi (ve gradyanın bir kare titremesi) kullanıcının
+ * göreceği tek fark olurdu.
+ */
+type Tab = 'akis' | 'bulten';
 
 export default function GundemRoute() {
-  const router = useRouter();
-  const [filter, setFilter] = useState<Filter>('Tümü');
-
-  const { enabledSourceIds } = useEnabledSources();
-  const { isRead, markRead } = useReadArticles();
-
-  const feed = useFeed({
-    category: filter === 'Tümü' ? null : filter,
-    // `undefined` "bütün etkin kaynaklar" demek; boş dizi "hiçbir kaynak"
-    // olurdu ve akış boş dönerdi.
-    ...(enabledSourceIds && enabledSourceIds.length > 0 ? { sourceIds: enabledSourceIds } : {}),
-  });
-
-  const articles = useMemo(
-    () => feed.data?.pages.flatMap((page) => page.items) ?? [],
-    [feed.data],
-  );
-
-  const open = (id: string) => {
-    markRead(id);
-    router.push(`/gundem/${id}`);
-  };
-
-  // Önbellekteki satırlar ekranda dururken yenileme başarısız oluyorsa: göster,
-  // ama sessiz kalma. Boş ekran göstermek, eskimiş içerikten daha kötü.
-  const stale = feed.isError && articles.length > 0;
+  const [tab, setTab] = useState<Tab>('akis');
 
   return (
     <View style={styles.screen}>
-      <FlatList
-        data={articles}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <ArticleCard article={item} onPress={() => open(item.id)} unread={!isRead(item.id)} />
-        )}
-        refreshControl={
-          <RefreshControl
-            refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-            onRefresh={() => void feed.refetch()}
-            tintColor={colors.blue500}
-          />
-        }
-        onEndReachedThreshold={0.4}
-        onEndReached={() => {
-          if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
-        }}
-        ListHeaderComponent={
-          <>
-            <GradientHeader gradient={gradients.section} style={{ paddingBottom: 16 }}>
-              <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
-                AI Gündem
-              </Txt>
-              <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
-                {todayLineTr()} · {unseenCount(articles, isRead)} yeni
-              </Txt>
-              <DottedRule style={{ marginTop: 12 }} />
-            </GradientHeader>
+      <GradientHeader gradient={gradients.section} style={{ paddingBottom: 14 }}>
+        <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
+          AI Gündem
+        </Txt>
+        <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
+          {todayLineTr()}
+        </Txt>
+        <Segmented
+          onNavy
+          options={[
+            { label: 'Akış', value: 'akis' },
+            { label: 'Bülten', value: 'bulten' },
+          ]}
+          value={tab}
+          onChange={(value) => setTab(value as Tab)}
+          style={{ marginTop: 14 }}
+        />
+        <DottedRule style={{ marginTop: 12 }} />
+      </GradientHeader>
 
-            {feed.isError ? (
-              <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
-            ) : null}
-
-            {stale ? (
-              <Txt size={11.5} color={colors.muted} style={styles.staleLine}>
-                Çevrimdışı: en son alınan liste gösteriliyor.
-              </Txt>
-            ) : null}
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chips}
-            >
-              {CATEGORIES.map((c) => (
-                <FilterChip
-                  key={c}
-                  label={c}
-                  active={c === filter}
-                  onPress={() => setFilter(c)}
-                />
-              ))}
-            </ScrollView>
-          </>
-        }
-        ListEmptyComponent={
-          feed.isPending ? (
-            <PixelTxt size={9} style={styles.loading}>
-              YUKLENIYOR
-            </PixelTxt>
-          ) : feed.isError ? null : (
-            <EmptyState
-              title="Bu filtrede haber yok"
-              body="Başka bir kategori seçin ya da aşağı çekip yenileyin."
-              style={styles.empty}
-            />
-          )
-        }
-      />
+      {tab === 'akis' ? <FeedView /> : <DigestView />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  chips: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
-  loading: { textAlign: 'center', marginTop: 40, color: colors.faint },
-  empty: { marginTop: 28 },
-  staleLine: { paddingHorizontal: 16, paddingTop: 12 },
 });

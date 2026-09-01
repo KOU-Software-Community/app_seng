@@ -414,3 +414,18 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   fine while the provider one hangs. Tests own the client they mount and
   `clear()` it afterwards; `--forceExit` would have hidden it and, with it,
   every future real leak.
+- **`rescheduleReminders` cancels every scheduled notification, so a second
+  scheduler is a silent delete.** The AI Gündem digest needed a daily local
+  notification, and adding it as its own scheduler would have worked in
+  isolation and failed in place: the next reminder rebuild calls
+  `cancelAllScheduledNotificationsAsync()` and takes the digest with it. No
+  error, no log — a notification that simply stops arriving, which nobody
+  reports as a bug because nobody knows it was due. What gets scheduled is now
+  decided in one pure function (`src/notificationPlan.ts`) and the effectful
+  half only applies the list.
+- **Quiet hours may move a reminder and must not move the digest.** Nobody chose
+  03:00 for a reminder — it fell there from the event's own start time — so
+  shifting it to 08:00 is a service. The digest hour is picked by hand on the
+  settings screen, and moving it means a notification arriving at a time the
+  settings screen does not show. Same class as the calendar entry above: the
+  wall-clock the user set is the meaning.

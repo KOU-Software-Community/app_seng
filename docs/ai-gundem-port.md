@@ -182,7 +182,7 @@ sonraki faz başlamıyor.
 | P2 ✅ | Saf katman: `domain` + `data-access` + `storage` + `format`, testleriyle | Jest devrede, taşınan testler yeşil |
 | P3 ✅ | Sağlayıcılar: QueryProvider + AsyncStorage persister + user-state + sorgu kancaları | 12 suite / 159 test yeşil, ekran yok |
 | P4 ✅ | Akış ekranı + makale detayı, bu deponun tasarımıyla; 5. sekme belirdi | 14 suite / 173 test, `expo export` yeşil (cihaz denemesi yapılmadı) |
-| P5 | Bülten ekranı + bildirim birleştirme | bildirim planlanıyor, sessiz saat sınandı |
+| P5 ✅ | Bülten ekranı + bildirim birleştirme | 15 suite / 187 test; sessiz saat kuralı kırmızı testiyle sınandı |
 | P6 | Kaydedilenler + arama | alt ekranlar tam |
 | P7 | Ayarların `bildirim` ekranına katılması, boş/hata durumları, çevrimdışı akış | görsel tutarlılık |
 | P8 | Yayın: `check:bundle`, EAS ortam değişkenleri (üç profil ayrı), yeni release guard'ları | EAS build yeşil |

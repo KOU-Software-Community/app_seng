@@ -66,6 +66,14 @@ export type NotificationPrefs = {
   categories: Record<string, boolean>;
   reminder: string;
   quietHours: boolean;
+  /**
+   * AI Gündem bülteninin çalacağı saat (0-23).
+   *
+   * Hatırlatmaların `reminder`'ı gibi bir metin değil, sayı: bu bir "ne kadar
+   * önce" değil, günün hangi saati. Sessiz saatler bunu taşımıyor — saati
+   * kullanıcı açıkça seçiyor.
+   */
+  digestHour: number;
 };
 
 /**
@@ -92,12 +100,16 @@ type PersistedState = {
 const defaultNotifications: NotificationPrefs = {
   master: true,
   categories: NOTIFICATION_CATEGORIES.reduce<Record<string, boolean>>((acc, c) => {
-    // Everything on out of the box except general announcements, which are noisy.
-    acc[c.key] = c.key !== 'Duyuru';
+    // Everything on out of the box except general announcements, which are
+    // noisy — and the AI Gündem digest, which is a daily notification for a
+    // section the user has not opened yet. Switching that on for every existing
+    // install would be the app deciding to wake people up every morning.
+    acc[c.key] = c.key !== 'Duyuru' && c.key !== 'AI Gündem';
     return acc;
   }, {}),
   reminder: REMINDER_OPTIONS[1],
   quietHours: true,
+  digestHour: 8,
 };
 
 const defaultState: PersistedState = {
