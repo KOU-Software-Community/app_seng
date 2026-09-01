@@ -15,7 +15,10 @@ birebir uyarlandı.
 | Ana sayfa | `/(tabs)` | İstatistikler, yaklaşan etkinlikler, kulüp duyuruları |
 | Etkinlik takvimi | `/(tabs)/takvim` | Liste ve takvim (grid) görünümü |
 | Etkinlik arşivi | `/(tabs)/arsiv` | Tarihi geçmiş etkinlikler, kategori filtresi, boş durum |
-| Bildirim ayarları | `/(tabs)/bildirim` | Ana anahtar, 5 kategori, hatırlatma ve sessiz saatler |
+| AI Gündem | `/(tabs)/gundem` | Yapay zekâ haber akışı, günün bülteni, kaydedilenler |
+| Haber detay | `/gundem/[id]` | Üç maddelik TR özet, Orijinal/Çeviri geçişi, kaydet |
+| Haber arama | `/gundem/ara` | Başlık, kaynak ve kategoride arama; son aramalar |
+| Bildirim ayarları | `/(tabs)/bildirim` | Ana anahtar, 6 kategori, hatırlatma, bülten saati, sessiz saatler |
 | Etkinlik detay | `/etkinlik/[id]` | Hero, künye satırları, konuşmacı, kayıt CTA |
 | Kayıt formu | `/kayit/[id]` | Ad soyad, öğrenci no (9 hane), bölüm, sınıf, KVKK |
 | Kayıt başarılı | `/kayit-basarili` | Kayıt kodu ve dönüş aksiyonları |
@@ -52,12 +55,16 @@ Yayın öncesi regresyon kontrolü:
 npm run check:release
 ```
 
-`scripts/check-release.mjs` sekiz şeyi doğruluyor ve **her biri bir kez gerçekten
-başarısız olduğu için** orada: demo kaydının geri sızmaması, ana ekranda sabit isim
-olmaması, `deploymentTarget` override'ının geri gelmemesi, iki dosyadaki sürümün
-aynı kalması, uygulama kimliğinin değişmemesi, sürüm sayaçlarının `app.json`'a geri
-kopyalanmaması, `syncPending`'in tanımlı ve bağlı olması, ve servis hesabı
-anahtarlarının gitignore'lu kalması.
+`scripts/check-release.mjs` içindeki kontrollerin **her biri bir kez gerçekten
+başarısız olduğu için** orada — demo kaydının geri sızmasından, sürüm sayaçlarının
+`app.json`'a geri kopyalanmasına, panelin sunucuda ayağa kalkamamasına kadar.
+Sayısını buraya yazmıyoruz: bir önceki hâli "sekiz" diyordu ve çoktan otuzu
+geçmişti. Listeyi görmek için betiği çalıştırın.
+
+`npm run check:bundle` ayrı durur ve daha pahalıdır: web paketini derleyip
+**içine** bakar. `EXPO_PUBLIC_*` değerleri derleme anında gömüldüğü için, kaynakta
+görünmeyen bir sır pakette olabilir — ve gömülü bir JWT varsa yükünü çözüp
+`anon` olduğunu doğrular. CI her PR'da çalıştırıyor.
 
 Spekülatif kural eklemeyin. Bir regresyon kaçtığında onu yakalayan kontrolü ekleyin
 ve **eklemeden önce kontrolün kırmızı olduğunu görün** — boş geçen bir assertion,
@@ -68,7 +75,7 @@ olmayan assertion'dan beterdir çünkü yeşil rapor verir.
 ```
 app/                 expo-router rotaları (dosya adı = rota)
   _layout.tsx        fontlar, store, yükleme perdesi, stack
-  (tabs)/            alt sekmeli 4 ana ekran + özel tab bar
+  (tabs)/            alt sekmeli 5 ana ekran + özel tab bar
 src/
   theme.ts           renk paleti, gradyanlar, tipografi, radius/spacing
   icons.ts           8×8 pixel ikon path'leri + onboarding pixel çizimleri
@@ -78,6 +85,9 @@ src/
   firebaseConfig.ts  .env okur, SDK import etmez
   store.tsx          kayıtlar + bildirim tercihleri (AsyncStorage ile kalıcı)
   components/        Txt, PixelIcon, PixelBadge, Toggle, Segmented, kart vb.
+  notificationPlan.ts  ne zaman hangi bildirim kurulacak (saf; hatırlatma + bülten)
+  gundem/            AI Gündem bölümü — ayrı Supabase projesi, kendi veri katmanı
+                     (bkz. docs/ai-gundem-port.md)
 scripts/             kontroller, kural yayınlama, push gönderimi, kayıt dışa aktarma
 assets/brand/        kulüp rozeti ve laptop maskotu
 design-source/       kaynak tasarım kanvası (referans)
@@ -173,6 +183,25 @@ eas env:create --environment production --name EXPO_PUBLIC_FIREBASE_API_KEY --va
 
 Diğer altı değişken için de aynısını tekrarlayın. Tanımlanmazsa uygulama açılışta
 `[firebase] ...` uyarısı verir ve `getDb()` hata fırlatır.
+
+**AI Gündem bölümü için üç değişken daha var** ve bunlar Firebase'inkilerden
+tamamen ayrı bir Supabase projesine bakıyor:
+
+```bash
+eas env:create --environment production --name EXPO_PUBLIC_AIGUNDEM_DATA_MODE       --value "supabase" --visibility plaintext
+eas env:create --environment production --name EXPO_PUBLIC_AIGUNDEM_SUPABASE_URL    --value "https://<ref>.supabase.co" --visibility plaintext
+eas env:create --environment production --name EXPO_PUBLIC_AIGUNDEM_SUPABASE_ANON_KEY --value "..." --visibility plaintext
+```
+
+Tanımlanmazsa bölüm **sessizce fixture göstermez**: "yapılandırılmamış" durumuna
+düşer ve ekranda hangi değişkenin eksik olduğunu söyler. Bu bilinçli — mock
+verisi uydurma haber başlıkları ve mağaza sürümünde gerçek gibi görünürdü.
+
+`SUPABASE_SERVICE_ROLE_KEY` bu üçlünün arasında **yok** ve olmayacak: o anahtar
+panelin, sunucuda kalıyor. `npm run check:bundle` derlenmiş paketi tarayıp
+sızmadığını doğruluyor — ve gömülü bir JWT varsa yükünü çözüp `anon` olduğuna
+bakıyor, çünkü service_role anahtarı da bir JWT ve metin araması ikisini ayırt
+edemiyor.
 
 ## Bildirimler
 
