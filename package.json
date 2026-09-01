@@ -37,13 +37,19 @@
     "react-native-worklets-core": "^1.6.3"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "^0.86.3",
+    "@testing-library/react-native": "^14.0.1",
     "@types/express": "^5.0.6",
+    "@types/jest": "^29.5.14",
     "@types/multer": "^2.2.0",
     "@types/react": "~19.2.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase-admin": "^14.3.0",
+    "jest": "^29.7.0",
+    "jest-expo": "~57.0.5",
     "multer": "^2.2.0",
+    "react-test-renderer": "^19.2.3",
     "sharp": "^0.35.4",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3"
@@ -66,7 +72,8 @@
     "check:raffle": "tsx scripts/check-raffle.ts",
     "check:panel": "tsx scripts/check-panel.ts",
     "check:gundem": "tsx scripts/check-gundem.ts",
-    "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle && npm run check:panel && npm run check:gundem"
+    "test": "jest",
+    "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle && npm run check:panel && npm run check:gundem && npm test"
   },
   "private": true
 }
