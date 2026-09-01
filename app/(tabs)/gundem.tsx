@@ -1,9 +1,12 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { PixelIcon } from '../../src/components/Pixel';
 import { DottedRule, GradientHeader, Segmented, Txt } from '../../src/components/ui';
 import { DigestView } from '../../src/gundem/screens/DigestView';
 import { FeedView, todayLineTr } from '../../src/gundem/screens/FeedView';
+import { SavedView } from '../../src/gundem/screens/SavedView';
 import { colors, gradients } from '../../src/theme';
 
 /**
@@ -17,25 +20,40 @@ import { colors, gradients } from '../../src/theme';
  * başlığın yeniden çizilmesi (ve gradyanın bir kare titremesi) kullanıcının
  * göreceği tek fark olurdu.
  */
-type Tab = 'akis' | 'bulten';
+type Tab = 'akis' | 'bulten' | 'kayitli';
 
 export default function GundemRoute() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('akis');
 
   return (
     <View style={styles.screen}>
       <GradientHeader gradient={gradients.section} style={{ paddingBottom: 14 }}>
-        <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
-          AI Gündem
-        </Txt>
-        <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
-          {todayLineTr()}
-        </Txt>
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
+              AI Gündem
+            </Txt>
+            <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
+              {todayLineTr()}
+            </Txt>
+          </View>
+          <Pressable
+            onPress={() => router.push('/gundem/ara')}
+            accessibilityRole="button"
+            accessibilityLabel="Haber ara"
+            hitSlop={10}
+            style={({ pressed }) => [styles.searchButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <PixelIcon name="search" size={18} color="#fff" />
+          </Pressable>
+        </View>
         <Segmented
           onNavy
           options={[
             { label: 'Akış', value: 'akis' },
             { label: 'Bülten', value: 'bulten' },
+            { label: 'Kayıtlı', value: 'kayitli' },
           ]}
           value={tab}
           onChange={(value) => setTab(value as Tab)}
@@ -44,11 +62,22 @@ export default function GundemRoute() {
         <DottedRule style={{ marginTop: 12 }} />
       </GradientHeader>
 
-      {tab === 'akis' ? <FeedView /> : <DigestView />}
+      {tab === 'akis' ? <FeedView /> : null}
+      {tab === 'bulten' ? <DigestView /> : null}
+      {tab === 'kayitli' ? <SavedView /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  searchButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

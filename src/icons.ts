@@ -16,6 +16,8 @@ export const ICON = {
   chat: 'M0 0h8v5h-8z M1 5h2v2h-2z',
   lines: 'M0 0h8v2h-8z M0 3h6v2h-6z M0 6h4v2h-4z',
   code: 'M2 1h1v1h-1z M1 2h1v2h-1z M2 4h1v1h-1z M5 1h1v1h-1z M6 2h1v2h-1z M5 4h1v1h-1z',
+  // Büyüteç: 3x3 halka artı sağ alta inen sap. Sekme başlığındaki arama düğmesi.
+  search: 'M2 1h2v1h-2z M1 2h1v2h-1z M4 2h1v2h-1z M2 4h2v1h-2z M5 5h1v1h-1z M6 6h2v2h-2z',
   check:
     'M6 1h2v1h-2z M5 2h1v1h-1z M4 3h1v1h-1z M3 4h1v1h-1z M2 5h1v1h-1z M1 4h1v1h-1z M0 3h1v1h-1z M1 5h1v1h-1z',
 } as const;

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Card,
@@ -15,6 +15,7 @@ import {
 } from '../../src/components/ui';
 import { bodyFor, segmentState, type Segment } from '../../src/gundem/article/segment';
 import { useArticle, useEnrichment } from '../../src/gundem/data-access/hooks';
+import { useSavedArticles } from '../../src/gundem/user-state/hooks';
 import { relativeTimeTr } from '../../src/gundem/format/relativeTime';
 import { colors, gradients, radius } from '../../src/theme';
 
@@ -23,6 +24,7 @@ export default function GundemArticleRoute() {
   const articleId = id ?? '';
   const router = useRouter();
 
+  const { isSaved, setArticleSaved } = useSavedArticles();
   const query = useArticle(articleId);
   const enrichment = useEnrichment(articleId, { enabled: Boolean(articleId) });
 
@@ -80,6 +82,28 @@ export default function GundemArticleRoute() {
         <View style={styles.tagRow}>
           <Tag label={article.category} />
           {article.language !== 'tr' ? <Tag label="EN→TR" /> : null}
+          <View style={{ flex: 1 }} />
+          {/*
+            Kaydetme ve kaldırma aynı düğme. Kaydedilenler listesinde ayrı bir
+            silme düğmesi yok: kaydırırken yanlışlıkla basılan, geri alınamayan
+            bir silme olurdu.
+          */}
+          <Pressable
+            onPress={() => setArticleSaved(article.id, !isSaved(article.id))}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSaved(article.id) }}
+            accessibilityLabel={isSaved(article.id) ? 'Kaydı kaldır' : 'Kaydet'}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.saveButton,
+              isSaved(article.id) && styles.saveButtonOn,
+              { opacity: pressed ? 0.75 : 1 },
+            ]}
+          >
+            <Txt weight="semibold" size={12} color={isSaved(article.id) ? '#fff' : colors.navy700}>
+              {isSaved(article.id) ? 'Kaydedildi' : 'Kaydet'}
+            </Txt>
+          </Pressable>
         </View>
 
         <Card style={styles.summary}>
@@ -165,7 +189,15 @@ export default function GundemArticleRoute() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  tagRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 14 },
+  saveButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.blue500,
+  },
+  saveButtonOn: { backgroundColor: colors.blue500, borderColor: colors.blue500 },
   summary: { marginHorizontal: 16, marginTop: 14 },
   summaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
