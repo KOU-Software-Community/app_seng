@@ -99,4 +99,14 @@ export const kv: KvStore = createAsyncStorageStore();
 export const KV_KEYS = {
   /** uuid v4, kurulum başına bir kez üretiliyor. */
   deviceId: 'v1:kyk.gundem.device_id',
+
+  /** TanStack Query'nin kalıcı önbellek blob'u. */
+  queryCache: 'v1:kyk.gundem.query-cache',
+
+  /** Cihaza özel kullanıcı durumu — hiçbiri sunucuya gitmiyor. */
+  enabledSourceIds: 'v1:kyk.gundem.user.enabled_sources',
+  savedArticles: 'v1:kyk.gundem.user.saved',
+  readArticles: 'v1:kyk.gundem.user.read',
+  settings: 'v1:kyk.gundem.user.settings',
+  recentSearches: 'v1:kyk.gundem.user.recent_searches',
 } as const;

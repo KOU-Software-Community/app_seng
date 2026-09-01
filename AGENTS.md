@@ -397,3 +397,20 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   and cannot lose anything, because nothing was being auto-included to begin with.
   Diagnose this with `--listFiles`, not by re-reading the config: the config
   looks correct and is not.
+- **`@testing-library/react-native` 14 made `render`, `rerender` and `unmount`
+  async.** Ported tests written for 13 call them bare, and the failure names
+  nothing useful: `render` returns a promise, `screen` is still unbound, and the
+  next line throws "`render` function has not been called". Worse is the
+  unawaited `unmount()`: the test that forgot it passes, and the *next* test in
+  the file fails instead, because cleanup lands in the middle of its render.
+  That one cost the longest — the failing test passed in isolation, which is the
+  signal to stop reading the failing test and start reading the one before it.
+- **A seven-day `gcTime` is a seven-day timer, and Jest waits for it.** After the
+  suite went green, `jest` never exited: every test that mounted a real
+  `QueryClient` left one `setTimeout` per query, sized to `gcTime`, which
+  `createQueryClient` sets to the offline retention window.
+  `--detectOpenHandles` reports nothing, because nothing leaked — an ordinary
+  pending timer is not a leak. The tell is that a minimal render test exits
+  fine while the provider one hangs. Tests own the client they mount and
+  `clear()` it afterwards; `--forceExit` would have hidden it and, with it,
+  every future real leak.
