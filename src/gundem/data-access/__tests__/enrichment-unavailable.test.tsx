@@ -4,7 +4,11 @@ import React, { type ReactNode } from 'react';
 
 import type { Result } from '../../domain/errors';
 import type { ArticleId, EnrichmentResult } from '../../domain/types';
-import { ENRICHMENT_MAX_POLLS, ENRICHMENT_POLL_SECONDS, useEnrichment } from '../hooks';
+import {
+  ENRICHMENT_POLL_SCHEDULE_SECONDS,
+  ENRICHMENT_POLL_WINDOW_SECONDS,
+  useEnrichment,
+} from '../hooks';
 import { createMockRepositories } from '../mock';
 import { NO_CONTENT_ARTICLE } from '../mock/mapper';
 import { REPOSITORY_CONTRACT_VERSION, type Repositories } from '../repositories';
@@ -157,14 +161,23 @@ describe('useEnrichment — the poll cap (ver-003 §4)', () => {
     jest.useRealTimers();
   });
 
-  /** Advance exactly one poll interval and let the refetch settle. */
+  /**
+   * Advance past the longest interval in the schedule and let the refetch
+   * settle. The schedule is no longer a fixed interval — it widens to cover the
+   * server's two-minute summarisation cron — so a tick sized to the FIRST delay
+   * would silently stop advancing once the delays grew, and the test would
+   * "prove" that polling stopped when it had only slowed down.
+   */
+  const LONGEST_DELAY_MS = Math.max(...ENRICHMENT_POLL_SCHEDULE_SECONDS) * 1000;
   const tick = async () => {
     await act(async () => {
-      jest.advanceTimersByTime(ENRICHMENT_POLL_SECONDS * 1000);
+      jest.advanceTimersByTime(LONGEST_DELAY_MS);
     });
   };
 
-  it('polls a queued job exactly ENRICHMENT_MAX_POLLS times, warns once, then stops', async () => {
+  const MAX_POLLS = ENRICHMENT_POLL_SCHEDULE_SECONDS.length;
+
+  it('polls a queued job exactly as many times as the schedule allows, warns once, then stops', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       mockRepos = countingRepos({ status: 'queued', reason: 'no_api_key' });
@@ -176,12 +189,17 @@ describe('useEnrichment — the poll cap (ver-003 §4)', () => {
       // Well past the cap: the interval must stop scheduling itself, not merely
       // slow down. `dataUpdateCount` reaches maxPolls and the next tick returns
       // false, so the total settles at maxPolls calls.
-      for (let i = 0; i < ENRICHMENT_MAX_POLLS + 4; i += 1) await tick();
+      for (let i = 0; i < MAX_POLLS + 4; i += 1) await tick();
 
-      expect(mockRepos.calls()).toBe(ENRICHMENT_MAX_POLLS);
+      expect(mockRepos.calls()).toBe(MAX_POLLS);
       expect(warn).toHaveBeenCalledTimes(1);
+      // Uyarı, pencerenin sunucunun cron'unu kapsadığını söylüyor: "hâlâ
+      // kuyrukta" tek başına eyleme geçirmiyor, "iki periyot bekledik" geçiriyor.
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(`still queued after ${ENRICHMENT_MAX_POLLS} polls`),
+        expect.stringContaining(`${MAX_POLLS} yoklama`),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`${ENRICHMENT_POLL_WINDOW_SECONDS} saniye`),
       );
 
       // And it stays stopped.
@@ -213,7 +231,7 @@ describe('useEnrichment — the poll cap (ver-003 §4)', () => {
       const { result } = await renderHook(() => useEnrichment('article-1'), { wrapper });
 
       await waitFor(() => expect(result.current.data?.status).toBe('unavailable'));
-      for (let i = 0; i < ENRICHMENT_MAX_POLLS + 4; i += 1) await tick();
+      for (let i = 0; i < MAX_POLLS + 4; i += 1) await tick();
 
       // One initial fetch, forever. This is the regression fix-005 exists for:
       // before it, `unavailable` was decoded as `queued` and polled to the cap.
