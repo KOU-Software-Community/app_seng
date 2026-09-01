@@ -156,6 +156,7 @@ export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   { key: 'Çekiliş', icon: 'gift', tint: '#D2E7EC', desc: 'Çekiliş başlangıcı ve sonuç açıklaması' },
   { key: 'Duyuru', icon: 'star', tint: '#E4EEF3', desc: 'Genel kulüp duyuruları ve başvuru dönemleri' },
   { key: 'Hatırlatma', icon: 'clock', tint: '#D2E7EC', desc: 'Kayıtlı olduğun etkinlikler için hatırlatma' },
+  { key: 'AI Gündem', icon: 'lines', tint: '#E4EEF3', desc: 'Günün yapay zekâ bülteni, seçtiğin saatte' },
 ];
 
 export const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'];

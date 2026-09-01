@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
-import GundemRoute, { todayLineTr, unseenCount } from '../../../../app/(tabs)/gundem';
+import GundemRoute from '../../../../app/(tabs)/gundem';
+import { todayLineTr, unseenCount } from '../../screens/FeedView';
 import { ARTICLES } from '../../data/articles';
 import type { Article } from '../../domain/types';
 import { createQueryClient, QueryProvider } from '../../providers/QueryProvider';
