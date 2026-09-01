@@ -144,6 +144,8 @@ type AppStore = PersistedState & {
   toggleCategory: (key: string) => void;
   setReminder: (value: string) => void;
   setQuietHours: (on: boolean) => void;
+  /** AI Gündem bülteninin saati (0-23). */
+  setDigestHour: (hour: number) => void;
 };
 
 const Ctx = createContext<AppStore | null>(null);
@@ -501,6 +503,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
       setQuietHours: (quietHours) =>
         setState((s) => ({ ...s, notifications: { ...s.notifications, quietHours } })),
+
+      setDigestHour: (digestHour) =>
+        setState((s) => ({ ...s, notifications: { ...s.notifications, digestHour } })),
     };
   }, [state, hydrated, syncPending]);
 

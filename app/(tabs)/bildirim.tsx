@@ -13,12 +13,14 @@ import {
   Toggle,
   Txt,
 } from '../../src/components/ui';
-import { NOTIFICATION_CATEGORIES, REMINDER_OPTIONS } from '../../src/data';
+import { DIGEST_HOURS, NOTIFICATION_CATEGORIES, REMINDER_OPTIONS } from '../../src/data';
+import { DIGEST_CATEGORY, QUIET_END_HOUR, QUIET_START_HOUR } from '../../src/notificationPlan';
 import { useAppStore } from '../../src/store';
 import { colors, gradientDirection, gradients, radius } from '../../src/theme';
 
 export default function BildirimRoute() {
-  const { notifications, setMaster, toggleCategory, setReminder, setQuietHours } = useAppStore();
+  const { notifications, setMaster, toggleCategory, setReminder, setQuietHours, setDigestHour } =
+    useAppStore();
   const { master } = notifications;
 
   return (
@@ -117,8 +119,13 @@ export default function BildirimRoute() {
               <Txt weight="bold" size={14.5} color={colors.text}>
                 Sessiz saatler
               </Txt>
+              {/*
+                Aralık sabitlerden türetiliyor. Elle yazılmıştı ve kaymıştı:
+                ekran "09:00" diyordu, `QUIET_END_HOUR` 8'di — yani ayar, kendi
+                davranışını bir saat yanlış anlatıyordu.
+              */}
               <Txt size={12} color={colors.muted} style={{ marginTop: 2 }}>
-                23:00 – 09:00 arası bildirim yok
+                {`${String(QUIET_START_HOUR).padStart(2, '0')}:00 – ${String(QUIET_END_HOUR).padStart(2, '0')}:00 arası otomatik bildirim yok`}
               </Txt>
             </View>
             <Toggle
@@ -127,6 +134,42 @@ export default function BildirimRoute() {
               accessibilityLabel="Sessiz saatler"
             />
           </View>
+        </Card>
+
+        {/*
+          Bülten saati kendi kartında: hatırlatma "ne kadar önce", bu ise
+          "günün hangi saati" — aynı karta koymak ikisini aynı şey gibi
+          gösterirdi. Kategori kapalıyken de görünür ama etkisiz, çünkü
+          kaybolan bir ayar kullanıcıya nereye gittiğini sormaya bırakıyor.
+        */}
+        <Card style={{ paddingHorizontal: 14, paddingVertical: 15, marginTop: 12 }}>
+          <Txt weight="bold" size={14.5} color={colors.text}>
+            AI Gündem bülteni
+          </Txt>
+          <Txt size={12} color={colors.muted} style={{ marginTop: 2 }}>
+            {master && notifications.categories[DIGEST_CATEGORY]
+              ? 'Her sabah seçtiğin saatte'
+              : 'Bildirimlerde “AI Gündem” kapalı'}
+          </Txt>
+
+          <Segmented
+            value={String(notifications.digestHour)}
+            onChange={(value) => setDigestHour(Number(value))}
+            options={DIGEST_HOURS.map((h) => ({
+              label: `${String(h).padStart(2, '0')}:00`,
+              value: String(h),
+            }))}
+            style={{ marginTop: 12 }}
+          />
+
+          {/*
+            Sessiz saatler bunu taşımıyor ve bunu söylemek gerekiyor: aksi hâlde
+            iki ayarın çeliştiğini düşünen kullanıcı hangisinin kazandığını
+            tahmin etmek zorunda kalır.
+          */}
+          <Txt size={11.5} color={colors.faint} style={{ marginTop: 10 }}>
+            Bu saati sen seçtiğin için sessiz saatler onu değiştirmiyor.
+          </Txt>
         </Card>
       </View>
     </ScrollView>

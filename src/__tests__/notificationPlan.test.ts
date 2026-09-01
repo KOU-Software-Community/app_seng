@@ -1,4 +1,4 @@
-import type { ClubEvent } from '../data';
+import { DIGEST_HOURS, type ClubEvent } from '../data';
 import {
   DIGEST_CATEGORY,
   REMINDER_CATEGORY,
@@ -225,5 +225,25 @@ describe('planNotifications — the merge itself', () => {
       now: new Date(2026, 2, 1, 12, 0),
     });
     expect(plan.map((p) => p.kind).sort()).toEqual(['digest', 'reminder']);
+  });
+});
+
+describe('DIGEST_HOURS', () => {
+  /**
+   * Bülten sunucuda İstanbul saatiyle 06:30–06:50 arasında hazır oluyor. Daha
+   * erken bir saat sunmak, henüz üretilmemiş bir bülten için bildirim göndermek
+   * demek — kullanıcı açar, "hazırlanıyor" görür ve bildirimin neden geldiğini
+   * anlamaz.
+   */
+  it('offers no hour before the digest can exist', () => {
+    expect(DIGEST_HOURS.length).toBeGreaterThan(0);
+    for (const hour of DIGEST_HOURS) {
+      expect(hour).toBeGreaterThanOrEqual(7);
+      expect(isDigestHour(hour)).toBe(true);
+    }
+  });
+
+  it('offers the default the store ships with', () => {
+    expect(DIGEST_HOURS).toContain(8);
   });
 });

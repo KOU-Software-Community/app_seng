@@ -429,3 +429,10 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   settings screen, and moving it means a notification arriving at a time the
   settings screen does not show. Same class as the calendar entry above: the
   wall-clock the user set is the meaning.
+- **A hand-written time range in the UI drifts from the constant that enforces
+  it.** The notification screen said "23:00 – 09:00 arası bildirim yok" while
+  `QUIET_END_HOUR` was 8, so the setting described its own behaviour an hour
+  wrong — and nothing could catch it, because the string and the constant never
+  met. The label is built from the constants now. Anywhere a screen states a
+  number the code also decides, derive it; a copy of a value is a value that
+  will disagree.

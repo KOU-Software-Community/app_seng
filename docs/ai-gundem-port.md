@@ -184,7 +184,7 @@ sonraki faz başlamıyor.
 | P4 ✅ | Akış ekranı + makale detayı, bu deponun tasarımıyla; 5. sekme belirdi | 14 suite / 173 test, `expo export` yeşil (cihaz denemesi yapılmadı) |
 | P5 ✅ | Bülten ekranı + bildirim birleştirme | 15 suite / 187 test; sessiz saat kuralı kırmızı testiyle sınandı |
 | P6 ✅ | Kaydedilenler + arama | üç segment tam, arama rotası bağlı, 16 suite / 192 test |
-| P7 | Ayarların `bildirim` ekranına katılması, boş/hata durumları, çevrimdışı akış | görsel tutarlılık |
+| P7 ✅ | Bülten saati ayarı, sessiz-saat etiketi düzeltmesi, boş/hata durumları | 16 suite / 194 test; saat kısıtı kırmızı testiyle sınandı |
 | P8 | Yayın: `check:bundle`, EAS ortam değişkenleri (üç profil ayrı), yeni release guard'ları | EAS build yeşil |
 
 P4 tek başına planın en ağır parçası: ~3.300 satır ekran ve bileşen kodunun
