@@ -112,10 +112,19 @@ Eklenen: `@tanstack/react-query`, `@tanstack/react-query-persist-client`,
 bilgisi olmadan uygulamayı çalıştırabilmek `npx expo export` alışkanlığıyla
 birebir uyuşuyor; CI'da ağsız çalışıyor.
 
-### K8 — Tema: açık ve koyu, ikisi de
+### K8 — Şimdilik yalnızca açık tema; koyu tema sonra, tüm uygulamaya birden
 
-Karar verildi: uygulama iki temayı da destekleyecek. **Kapsamı henüz kararsız**
-(yalnızca AI Gündem bölümü mü, uygulamanın tamamı mı) — bkz. Açık sorular.
+AI Gündem ekranları bu deponun açık temasına giydiriliyor. Kaynak repodaki
+koyu-birincil tema sistemi (`src/theme/**`) taşınmıyor.
+
+Koyu tema iptal değil, ertelendi: port bittikten sonra **uygulamanın tamamına
+birden** gelecek ayrı bir iş. Yalnızca AI Gündem bölümünü tema duyarlı yapmak
+elenen seçenek — aynı uygulamada iki görsel dil olurdu ve bir sekmeye geçince
+temanın değişmesi kullanıcıya hata gibi görünürdü.
+
+O iş geldiğinde asıl maliyet renk paleti değil, `colors.*`'ı statik olarak içe
+aktaran 31 dosya ve modül yüklenirken değerlendirilen `StyleSheet.create`
+çağrıları olacak. Bu portun içine sıkıştırılmayacak kadar büyük.
 
 ## Taşınmayanlar
 
@@ -192,9 +201,9 @@ görsel yarısı yeniden yazılıyor, mantık yarısı korunuyor.
 - SDK 54 → 57 farkının kodda nereye çarptığı ölçülmedi.
 - Uygulama hiçbir cihazda çalıştırılmadı.
 
-## Açık sorular
+## Sonraya bırakılanlar
 
-1. **Tema kapsamı.** İki tema da olacak (K8), ama yalnızca AI Gündem bölümü mü
-   tema değiştirecek, yoksa uygulamanın tamamı mı? Tamamı, `src/theme.ts`'i
-   dinamik hâle getirmek ve `colors.*`'ı statik olarak içe aktaran 31 dosyanın
-   hepsine dokunmak demek. P4'ten önce cevaplanmalı; P1–P3 bunu beklemiyor.
+- **Koyu tema** (K8) — port bittikten sonra, uygulamanın tamamına birden.
+- **Panelden yönetilen kaynak listesi** (K3) — kullanıcı kaynak ekleyemiyor;
+  istenirse kaynak kataloğu yönetim paneline bir sayfa olarak eklenebilir.
+- **Backend'in kulübe devri** (K1) — şimdilik istenmedi.
