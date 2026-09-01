@@ -20,6 +20,24 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${CLAUDE_ENV_FILE:-/dev/null}" 2>/dev/null || true
 
+# Supabase skills. The AI Gundem port's backend half is Supabase - RLS,
+# migrations, edge functions - and these two carry that discipline. Same reason
+# as graphify below: they are not in this repo and the container forgets them.
+#
+# Guarded on the directory, not `command -v`: `skills add` writes files and
+# symlinks them into ~/.claude/skills, it does not install a binary, so there is
+# no command to look for.
+if [ -d "$HOME/.agents/skills/supabase" ]; then
+  echo "supabase skills already present"
+else
+  echo "installing supabase skills..."
+  if npx --yes skills add supabase/agent-skills >/dev/null 2>&1; then
+    echo "supabase skills installed"
+  else
+    echo "supabase skills install skipped (offline?)" >&2
+  fi
+fi
+
 if command -v graphify >/dev/null 2>&1; then
   echo "graphify already present ($(graphify --version 2>&1 | head -1))"
 else
