@@ -385,3 +385,15 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   `resolvePort` (`admin/port.ts`) now — blank, non-numeric, zero and out-of-range all
   fall through — and `check:release` asserts `server.ts` still goes through it, because a
   pure function nobody calls guards nothing.
+- **`@types/*` is not auto-included here, so a test runner's globals are invisible
+  to `tsc`.** Adding Jest made `typecheck` fail with `Cannot find name 'describe'`
+  in every test file while `@types/jest` sat correctly installed in
+  `node_modules/@types`. TypeScript normally pulls those in automatically when
+  `types` is unspecified, and this config never restricted it — but `tsc
+  --listFiles` showed only the `@types` packages something *imports* (express,
+  multer, react), never a global one. Whatever `expo/tsconfig.base` does with
+  `moduleResolution: bundler` and `customConditions`, the measured behaviour is
+  that automatic inclusion does not happen; naming `"types": ["jest"]` fixes it
+  and cannot lose anything, because nothing was being auto-included to begin with.
+  Diagnose this with `--listFiles`, not by re-reading the config: the config
+  looks correct and is not.

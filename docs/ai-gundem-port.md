@@ -135,7 +135,7 @@ aktaran 31 dosya ve modül yüklenirken değerlendirilen `StyleSheet.create`
 | `design/**` | Tasarım kaynağı; bu depoda `design-source/` zaten graph'ı bozuyor. |
 | `app/onboarding.tsx` | Bu uygulamanın kendi onboarding'i var. |
 | `src/theme/**` | Renk yalnızca `src/theme.ts`'te yaşar. |
-| `AddSourceSheet` + `addSourceByUrl` | K3. |
+| `AddSourceSheet` (arayüz) | K3. `addSourceByUrl` sözleşmede kalıyor — adaptörlerin ikisi de uyguluyor ve testleri var; taşınmayan şey onu çağıran ekran. |
 | `.codex/`, `scripts/setup-env.ps1` | Başka ajan altyapısı, PowerShell. |
 
 ## SDK farkı
