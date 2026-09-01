@@ -104,6 +104,15 @@ export const YEARS = ['Haz.', '1', '2', '3', '4'];
 export const REMINDER_OPTIONS = ['1 saat önce', '1 gün önce', '3 gün önce'];
 
 /**
+ * AI Gündem bülteninin seçilebilir saatleri.
+ *
+ * Hepsi 07:00 ve sonrası, keyfi değil: bülten sunucuda her sabah hazırlanıyor ve
+ * İstanbul saatiyle 06:30–06:50 arasında bitiyor. Daha erken bir saat sunmak,
+ * kullanıcıya henüz var olmayan bir bülten için bildirim göndermek olurdu.
+ */
+export const DIGEST_HOURS = [7, 8, 9];
+
+/**
  * Gizlilik politikası ve KVKK aydınlatma metni. Kayıt formundaki onay satırının
  * altından açılır, ve iki mağazanın gizlilik alanına da bu adres yazılır.
  */
