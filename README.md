@@ -36,6 +36,11 @@ npm install
 npx expo start
 ```
 
+> **Pull sonrası `npm ci`.** `git pull` yalnızca dosyaları güncelliyor;
+> `node_modules` olduğu yerde kalıyor. Yeni bir bağımlılık eklendiyse Metro
+> `Unable to resolve "…"` diyor ve bu, paketin depoda eksik olduğu gibi okunuyor —
+> eksik olan kurulum. `npm run check:release` bu durumu adıyla söylüyor.
+
 Telefonda denemek için Expo Go ile QR'ı okut. Simülatör/emülatör için `i` veya `a`.
 Tarayıcıda hızlı bakmak için:
 

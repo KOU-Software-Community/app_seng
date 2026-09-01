@@ -8,7 +8,7 @@
  *
  * Runs on plain node, no dependencies, so it works before `npm install` in CI.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -258,6 +258,30 @@ check(
     }
     if (!/"check:bundle"/.test(read('package.json'))) {
       return 'package.json içinde `check:bundle` betiği yok';
+    }
+    return null;
+  },
+);
+
+check(
+  'kurulu paketler package.json ile uyuşuyor',
+  'Bir bağımlılık eklendiğinde `git pull` onu kurmuyor — `node_modules` olduğu yerde ' +
+    'kalıyor. Sonuç Metro\u2019dan "Unable to resolve" diye geliyor ve bu, paketin ' +
+    'depoda eksik olduğu gibi okunuyor; oysa eksik olan kurulum. Ölçüldü: ' +
+    '@tanstack paketleri eklendikten sonra taze bir çalıştırmada tam olarak bu oldu.',
+  () => {
+    const declared = {
+      ...(pkg.dependencies ?? {}),
+      ...(pkg.devDependencies ?? {}),
+    };
+    const missing = Object.keys(declared).filter(
+      (name) => !existsSync(join(root, 'node_modules', name, 'package.json')),
+    );
+    if (missing.length) {
+      return (
+        `node_modules bu paketleri taşımıyor: ${missing.join(', ')}. ` +
+        '`npm ci` çalıştırın — pull kurulum yapmıyor.'
+      );
     }
     return null;
   },

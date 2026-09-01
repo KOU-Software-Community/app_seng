@@ -436,3 +436,13 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   met. The label is built from the constants now. Anywhere a screen states a
   number the code also decides, derive it; a copy of a value is a value that
   will disagree.
+- **A new dependency turns `git pull` into a broken checkout, and Metro's error
+  blames the wrong thing.** After the `@tanstack` packages landed, a fresh pull
+  and `npx expo start` failed with `Unable to resolve
+  "@tanstack/query-async-storage-persister"` — which reads as "the package is
+  missing from the repo", not "your node_modules is behind". It was declared in
+  `package.json` and in the lockfile the whole time. The rule "npm ci after a
+  pull" was already in this file and still did not help, because nothing checked
+  it: `check:release` now lists every declared package that is absent from
+  `node_modules` and says `npm ci` outright. Reproduced by deleting exactly that
+  package before adding the guard.
