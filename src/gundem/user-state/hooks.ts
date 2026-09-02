@@ -6,6 +6,7 @@ import {
   getRecentSearches,
   getSaved,
   getSettings,
+  mergeRecentSearch,
   getEnabledSourceIds,
   pushRecentSearch,
   setRead,
@@ -33,11 +34,24 @@ function useLoaded<T>(load: () => Promise<T>, fallback: T) {
 
   useEffect(() => {
     let cancelled = false;
-    load().then((loaded) => {
-      if (cancelled) return;
-      setValue(loaded);
-      setIsReady(true);
-    });
+    load()
+      .catch((error: unknown) => {
+        // Okuma reddedilirse **varsayılanla hazır ol.**
+        //
+        // `.catch` olmadan `isReady` sonsuza kadar false kalıyordu ve bunun
+        // ekrandaki karşılığı hiç bitmeyen bir iskelet: hata yok, log yok,
+        // yalnızca yüklenmeyen bir liste. Üstüne bir de yakalanmamış promise
+        // reddi. Bugün `kv.ts` her okumayı yutuyor, yani bu dal yalnızca
+        // depolama sözleşmesi değişirse çalışır — ama o gün geldiğinde
+        // görünmez bir donma yerine varsayılan bir liste görünsün.
+        console.warn('[user-state] okuma başarısız; varsayılan kullanılıyor:', error);
+        return fallback;
+      })
+      .then((loaded) => {
+        if (cancelled) return;
+        setValue(loaded);
+        setIsReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -137,13 +151,12 @@ export function useRecentSearches() {
 
   const push = useCallback(
     (query: string) => {
-      const trimmed = query.trim();
-      if (!trimmed) return;
-      setRecentState((current) => [
-        trimmed,
-        ...current.filter((q) => q.toLowerCase() !== trimmed.toLowerCase()),
-      ]);
-      void pushRecentSearch(trimmed);
+      if (!query.trim()) return;
+      // Aynı karar fonksiyonu diskteki yolla ortak. Burada elle yazılmış hâli
+      // ne sınırı uyguluyordu ne de Türkçe küçültüyordu; ekrandaki liste
+      // diskteki listeden sapıyordu.
+      setRecentState((current) => mergeRecentSearch(current, query));
+      void pushRecentSearch(query);
     },
     [setRecentState],
   );

@@ -49,8 +49,21 @@ export const asyncStorageFromKv = (storage: KvStore) => ({
 });
 
 /**
- * Trim a feed page's items before the cache is written. `dehydrateOptions` runs
- * on every persist, so this is where the 200-article cap is enforced.
+ * Trim a feed page's items before the cache is written.
+ *
+ * İki kez bozuktu ve ikisi de kendi testinden gizlenmişti:
+ *
+ * 1. **Hiç çağrılmıyordu.** `dehydrateOptions`ta yalnızca `shouldDehydrateQuery`
+ *    vardı; yukarıdaki yorum "burada uygulanıyor" diyordu ve uygulayan yoktu.
+ *    Tek çağıran kendi birim testiydi.
+ * 2. **Yanlış şekle bakıyordu.** `page.data.items` — oysa gerçek sayfa
+ *    `Page<Article>`, yani `{items, nextCursor, hasMore}`. Testin fikstürü de
+ *    aynı uydurma şekli kuruyordu, o yüzden yeşildi: sayaç hep 0 kalıyor,
+ *    fonksiyon hiçbir şeyi kesmiyordu.
+ *
+ * Sonuç, sınırsız büyüyen bir çevrimdışı blob'du. `serializeData` olarak
+ * bağlandı ve fikstür artık gerçek depodan geliyor
+ * (`src/__tests__/integration.test.tsx`).
  */
 export function capPersistedFeed(data: unknown): unknown {
   if (
@@ -65,7 +78,7 @@ export function capPersistedFeed(data: unknown): unknown {
     for (const page of pages) {
       if (kept >= MAX_PERSISTED_FEED_ARTICLES) break;
       trimmed.push(page);
-      const items = (page as { data?: { items?: unknown[] } })?.data?.items;
+      const items = (page as { items?: unknown[] } | null)?.items;
       kept += Array.isArray(items) ? items.length : 0;
     }
     if (trimmed.length !== pages.length) {
@@ -79,32 +92,61 @@ export function capPersistedFeed(data: unknown): unknown {
 export const shouldDehydrateQuery = (queryKey: QueryKey): boolean =>
   Array.isArray(queryKey) && queryKey[0] === QUERY_KEY_VERSION;
 
+/**
+ * Yazma kısması: iki saniyede en fazla bir blob. Sonsuz akışta her sayfa
+ * eklendiğinde tüm önbelleği yeniden serileştirmek pahalı.
+ */
+export const PERSIST_THROTTLE_MS = 2_000;
+
+/**
+ * Kalıcılık seçenekleri bileşenin dışında kuruluyor.
+ *
+ * Sebebi ölçüldü: `useMemo`nun içinde kaldıkları sürece bir test onları ancak
+ * kalıcılaştırıcının kısması geçtikten sonra, yazılmış blob üzerinden
+ * görebiliyor — ve o yarış "ilk anlık görüntü küçüktü" diye yeşil veriyor,
+ * sınır uygulanmasa bile. Dışarı alınınca `dehydrate()` doğrudan bu
+ * seçeneklerle çağrılabiliyor ve iddia kesin oluyor.
+ *
+ * `throttleMs` de aynı sebeple dışarıda: varsayılanla bir test unmount'tan
+ * sonra iki saniyelik bir zamanlayıcı bırakıyor ve Jest işçiyi zorla
+ * kapatıyor ("failed to exit gracefully") — ölçüldü.
+ */
+export function persistOptionsFor(storage: KvStore, throttleMs: number = PERSIST_THROTTLE_MS) {
+  return {
+    persister: createAsyncStoragePersister({
+      storage: asyncStorageFromKv(storage),
+      key: KV_KEYS.queryCache,
+      throttleTime: throttleMs,
+    }),
+    maxAge: MAX_CACHE_AGE_MS,
+    buster: CACHE_BUSTER,
+    dehydrateOptions: {
+      shouldDehydrateQuery: (query: { queryKey: QueryKey; state: { status: string } }) =>
+        query.state.status === 'success' && shouldDehydrateQuery(query.queryKey),
+      // Sınırı uygulayan satır. Bu olmadan `capPersistedFeed` yazılmış ama
+      // bağlanmamış bir fonksiyon.
+      serializeData: capPersistedFeed,
+    },
+  };
+}
+
 export function QueryProvider({
   children,
   client,
   storage = kv,
+  throttleMs = PERSIST_THROTTLE_MS,
 }: {
   children: ReactNode;
   client?: QueryClient;
   storage?: KvStore;
+  /** Test dikişi — `client` ve `storage` ile aynı sebeple burada. */
+  throttleMs?: number;
 }) {
   const queryClient = useMemo(() => client ?? createQueryClient(), [client]);
 
   const persistOptions = useMemo(
-    () => ({
-      persister: createAsyncStoragePersister({
-        storage: asyncStorageFromKv(storage),
-        key: KV_KEYS.queryCache,
-        throttleTime: 2_000,
-      }),
-      maxAge: MAX_CACHE_AGE_MS,
-      buster: CACHE_BUSTER,
-      dehydrateOptions: {
-        shouldDehydrateQuery: (query: { queryKey: QueryKey; state: { status: string } }) =>
-          query.state.status === 'success' && shouldDehydrateQuery(query.queryKey),
-      },
-    }),
-    [storage],
+    () => persistOptionsFor(storage, throttleMs),
+    [storage, throttleMs],
   );
 
   return (

@@ -22,6 +22,7 @@ import {
   type SearchArticlesParams,
   type SourceRepository,
 } from '../repositories';
+import { parseSourceUrl } from '../sourceUrl';
 import { FEED_VIEW, SEARCH_RPC, requireSupabaseClient, toDataError, toNetworkError } from './client';
 import { callEdgeFunction, clientRequestId, type EdgeCallOptions } from './edge';
 import {
@@ -180,28 +181,19 @@ export function createSupabaseSourceRepository(
 
     /** Creates the *shared* source row; the device's subscription is local (addendum §A). */
     async addSourceByUrl(url: string, options?: AddSourceOptions): Promise<Result<Source>> {
-      const raw = url?.trim();
-      if (!raw) return err('invalid_input', 'A feed or site URL is required.');
-
-      let parsed: URL;
-      try {
-        parsed = new URL(raw);
-      } catch {
-        return err('invalid_input', `"${raw}" is not a valid URL.`);
-      }
       // Client-side pre-checks mirror the server's SSRF rules so an obviously bad
       // URL never becomes a rate-limited round trip. The server re-checks.
-      if (parsed.protocol !== 'https:') {
-        return err('unsupported_source', 'Only https:// sources are allowed.');
-      }
-      if (parsed.username || parsed.password) {
-        return err('unsupported_source', 'Credentialed URLs are not allowed.');
-      }
+      //
+      // Ayrıştırma `parseSourceUrl`'de, `URL` ile değil: React Native'in `URL`'i
+      // geçersiz girdide fırlatmıyor, dolayısıyla buradaki eski `catch` hiç
+      // çalışmıyordu ve "url değil" cevabı "yalnızca https" olarak çıkıyordu.
+      const parsed = parseSourceUrl(url);
+      if (!parsed.ok) return err(parsed.problem, parsed.message);
 
       const result = await callEdgeFunction<{ source?: SourceRow }>(
         'add-source',
         {
-          url: parsed.toString(),
+          url: parsed.url,
           // The sheet's category/language are hints for the server's own
           // classification, not authority: add-source re-derives both.
           ...(options?.category ? { category: options.category } : {}),
@@ -290,9 +282,32 @@ export function createSupabaseDigestRepository(
 }
 
 /** `202 {status:'queued'}` shape from `request-enrichment`. */
+/**
+ * `request-enrichment`'ın gövdesi — fonksiyonun kaynağından okundu
+ * (`supabase/functions/request-enrichment/index.ts`, `ready` dalı), tahmin
+ * edilmedi.
+ *
+ * Maddelerin adı **`summary_tr`**. İstemci `bullets` okuyordu ve alan adı
+ * tutmadığı için sunucunun her `ready` cevabı "tanınmayan gövde" sayılıp
+ * `queued`a düşüyordu: özet üretilmiş, kablodan geçmiş, istemcide çöpe
+ * gitmişti. Cihaz logundaki her "unrecognised body" satırı bu.
+ *
+ * Kaynak uygulamada (`follow-ai`) da aynı uyuşmazlık var — port onu sadakatle
+ * taşımış, yani bu bir port regresyonu değil, taşınan bir hata.
+ *
+ * `bullets` yine de okunuyor: bir sunucu sürümünün onu göndermeyeceğinin
+ * garantisi yok ve iki adı da kabul etmenin bedeli yok.
+ */
 type EnrichmentResponse = {
   status?: string;
-  summary?: { bullets?: string[]; translation_tr?: string | null; translation_state?: string };
+  summary?: {
+    /** Sunucunun gönderdiği ad. */
+    summary_tr?: string[];
+    /** Eski/alternatif ad. */
+    bullets?: string[];
+    translation_tr?: string | null;
+    translation_state?: string;
+  };
   poll_after_seconds?: number;
   reason?: string;
 };
@@ -322,33 +337,52 @@ export function createSupabaseEnrichmentRepository(
         return ok({ status: 'unavailable', reason: data.reason ?? 'no_content' });
       }
 
+      // Bir gövde kullanılabilir bir özet taşıyorsa **cevap odur**, `status`
+      // ne derse desin.
+      //
+      // Eskiden koşul `data?.status === 'ready'` idi ve sıra da `queued`dan
+      // sonraydı. Sunucu özeti `ready` dışında bir adla döndürdüğü anda
+      // (`already_enriched`, `done`, `ok` — hangisi olduğunu buradan göremiyoruz)
+      // istemci elindeki üç maddeyi görmezden gelip "kuyrukta" diyordu. Bir
+      // durum dizesini tanımamak, veriyi atmak için sebep değil.
+      const summary = data?.summary;
+      const wire = summary?.summary_tr ?? summary?.bullets;
+      const bullets = wire?.filter((bullet) => bullet?.trim().length) ?? [];
+      if (wire && bullets.length > 0) {
+        const all = wire;
+        if (all.length !== 3) {
+          console.warn(
+            `[supabase] request-enrichment returned ${all.length} bullets for ${trimmed}, expected 3; padding.`,
+          );
+        }
+        const state = summary?.translation_state === 'not_required' ? 'not_required' : 'ready';
+        return ok({
+          status: 'ready',
+          summary: {
+            bullets: [all[0] ?? '', all[1] ?? '', all[2] ?? ''],
+            translationTr: state === 'not_required' ? null : (summary?.translation_tr ?? null),
+            translationState: state,
+          },
+        });
+      }
+
       // 202, or any body that says `queued`, is the normal no-API-key path
       // (addendum §E): the job is real, it just has nothing to run yet.
       if (status === 202 || data?.status === 'queued') {
         return ok({ status: 'queued', reason: data?.reason ?? null });
       }
 
-      const summary = data?.summary;
-      if (data?.status === 'ready' && summary?.bullets) {
-        const bullets = summary.bullets;
-        if (bullets.length !== 3) {
-          console.warn(
-            `[supabase] request-enrichment returned ${bullets.length} bullets for ${trimmed}, expected 3; padding.`,
-          );
-        }
-        const state = summary.translation_state === 'not_required' ? 'not_required' : 'ready';
-        return ok({
-          status: 'ready',
-          summary: {
-            bullets: [bullets[0] ?? '', bullets[1] ?? '', bullets[2] ?? ''],
-            translationTr: state === 'not_required' ? null : (summary.translation_tr ?? null),
-            translationState: state,
-          },
-        });
-      }
-
+      // Tanınmayan gövde. Uyarı artık **ne geldiğini** söylüyor.
+      //
+      // Eski hâli yalnızca "unrecognised body" diyordu, ve cihazdan gelen log
+      // tam olarak bu yüzden teşhis edilemiyordu: sekiz yoklamanın sekizi de
+      // aynı cümleyi yazıyor, hiçbiri sunucunun ne dediğini taşımıyordu.
+      // Gövdenin kendisi değil — içinde makale metni olabilir — durum kodu,
+      // `status` alanı ve üst düzey anahtarlar yazılıyor.
       console.warn(
-        `[supabase] request-enrichment returned an unrecognised body for ${trimmed}; treating it as queued.`,
+        `[supabase] request-enrichment returned an unrecognised body for ${trimmed}; ` +
+          `treating it as queued. HTTP ${status}, status=${JSON.stringify(data?.status)}, ` +
+          `keys=[${data && typeof data === 'object' ? Object.keys(data).join(', ') : ''}]`,
       );
       return ok({ status: 'queued', reason: data?.reason ?? null });
     },

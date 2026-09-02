@@ -13,7 +13,7 @@ import {
   Tag,
   Txt,
 } from '../../src/components/ui';
-import { bodyFor, segmentState, type Segment } from '../../src/gundem/article/segment';
+import { bodyFor, hasSummary, segmentState, type Segment } from '../../src/gundem/article/segment';
 import { useArticle, useEnrichment } from '../../src/gundem/data-access/hooks';
 import { useSavedArticles } from '../../src/gundem/user-state/hooks';
 import { relativeTimeTr } from '../../src/gundem/format/relativeTime';
@@ -26,11 +26,23 @@ export default function GundemArticleRoute() {
 
   const { isSaved, setArticleSaved } = useSavedArticles();
   const query = useArticle(articleId);
-  const enrichment = useEnrichment(articleId, { enabled: Boolean(articleId) });
-
   const article = query.data;
+  /*
+    Özeti zaten olan bir haber için `request-enrichment` çağrılmıyor.
+
+    Cihazda ölçüldü: çağrılıyordu, sunucu istemcinin tanımadığı bir gövde
+    döndürüyordu, depo onu `queued` sayıyordu ve kanca sekiz kez yokluyordu —
+    sekiz Edge isteği, hepsi cihazın günlük hız-sınırı kovasına yazan, hiçbiri
+    verilecek bir cevabı olmayan. Sunucunun işi bitmişti; soracak bir şey yoktu.
+  */
+  const enrichment = useEnrichment(articleId, {
+    enabled: Boolean(articleId) && query.isSuccess && !hasSummary(article?.summary),
+  });
+
   const result = enrichment.data;
   const summary = result?.status === 'ready' ? result.summary : article?.summary;
+  /* Elde gösterilecek üç madde var mı — uç nokta ne derse desin. */
+  const summaryReady = hasSummary(summary);
 
   const segment = segmentState(article, summary);
   const [chosen, setChosen] = useState<Segment>('tr');
@@ -62,8 +74,14 @@ export default function GundemArticleRoute() {
     );
   }
 
-  const pending = result?.status === 'queued' || (!summary && !result);
-  const unavailable = result?.status === 'unavailable';
+  /*
+    İkisi de `summaryReady` ile kapılı. Eskiden değildi ve kullanıcının gördüğü
+    hata buydu: satırda üç madde dururken uç noktadan gelen `queued`, ekranı
+    sonsuza kadar "Özet hazırlanıyor"a çeviriyordu. Bir cevap, elde olan veriyi
+    silemez — en fazla ona ekleyebilir.
+  */
+  const pending = !summaryReady && (result?.status === 'queued' || !result);
+  const unavailable = !summaryReady && result?.status === 'unavailable';
   const body = bodyFor(article, summary, active);
 
   return (

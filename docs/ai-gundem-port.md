@@ -237,3 +237,118 @@ değil:
 - **Panelden yönetilen kaynak listesi** (K3) — kullanıcı kaynak ekleyemiyor;
   istenirse kaynak kataloğu yönetim paneline bir sayfa olarak eklenebilir.
 - **Backend'in kulübe devri** (K1) — şimdilik istenmedi.
+
+## P9 — grafiğe dayalı temizlik turu (2026-09-02)
+
+Portun kapanışında bırakılan "bu temiz kâğıt değil" kaydının karşılığı. Tarama
+bu sefer alt ajanla değil, kod-only bir graphify grafiğiyle yapıldı
+(`111 dosya → 1005 düğüm, 2272 kenar`, sıfır LLM çağrısı) ve iki mercek —
+`react-and-expo`, `network-and-storage` — elle kapatıldı.
+
+Bulunan ve düzeltilen dört hata, hepsi ölçümle:
+
+| # | Nerede | Ne | Nasıl bulundu |
+|---|--------|-----|---------------|
+| 1 | `data-access/*/repositories.ts` | `new URL()` RN'de doğrulama yapmıyor: `invalid_input` dalı erişilemez, geçerli bir adres bile `unsupported_source` dönüyordu | RN `URL` polyfill'i okundu, eski kod ona karşı koşturuldu |
+| 2 | `providers/QueryProvider.tsx` | `capPersistedFeed` hem bağlanmamış hem yanlış şekle bakıyordu → 200 haberlik sınır hiç uygulanmıyordu | grafik sorgusu: "dosya-dışı tek göndergesi kendi testi olan çağrılabilirler" |
+| 3 | `user-state/hooks.ts` + `store.ts` | son arama listesi ekranda ve diskte ayrışıyordu; büyük/küçük harf katlaması iki dilden birini hep kaçırıyordu | iki uygulamayı aynı testte karşılaştırınca |
+| 4 | `user-state/hooks.ts` | `useLoaded`ın `.catch`i yok: reddedilen okuma `isReady`yi sonsuza kadar `false` bırakıyor | `.then` taraması |
+
+Testler 217 → 247. Yeni dosyalar:
+
+- `src/__tests__/integration.test.tsx` — sahte PostgREST'ten kancaya kadar
+  uçtan uca. `hooks.ts` bu dosyayı aylardır adıyla anıyordu ve dosya yoktu.
+- `src/gundem/data-access/__tests__/source-url.test.ts` — ayrıştırıcı, ve aynı
+  girdilerin depo sınırındaki hata kodları.
+- `src/gundem/user-state/__tests__/hooks-integration.test.tsx` — kanca ile disk
+  aynı testte.
+
+Dördünün de kırmızı hâli ölçüldü: düzeltme geri alınınca ilgili test düşüyor
+(2 numaranın iki ayrı bozukluğu ayrı ayrı denendi, ikisi de kırmızı).
+
+### Bu turda **bilerek** düzeltilmeyenler
+
+- **`SavedView` yalnızca akışın ilk sayfasını çekiyor.** `useFeed()`i filtresiz
+  çağırıyor, `fetchNextPage` yok; ilk 20 kaydın ötesinde kaydedilen bir haber
+  Kayıtlı sekmesinde görünmüyor. Üstelik `FeedView` etkin kaynak listesi boş
+  değilken farklı bir sorgu anahtarı kullanıyor, yani iki ekran ayrı önbellek
+  tutuyor. Doğru çözüm kimliğe göre çekmek (`getArticle`) ya da kayıtlıları
+  sunucudan sormak — ikisi de bu turun kapsamı dışında, bir tasarım kararı.
+- **`unseenCount` ölü.** `FeedView`den dışa açık, yorumu "N yeni" rozetini
+  anlatıyor, çağıranı yalnızca kendi testi. Rozeti eklemek yeni bir özellik
+  (sayı akışta, başlık sekme kabuğunda — durum yukarı taşınmalı), silmek ise
+  istenmemiş bir kayıp. Kayıt burada duruyor.
+
+## P10 — cihaz raporu: "çeviri gelmiş ama özet oluşturamıyor" (2026-09-02)
+
+Cihaz logu:
+
+```
+WARN [supabase] request-enrichment returned an unrecognised body for
+     2e3c71ae-…; treating it as queued.        (x8)
+WARN [enrichment] article 2e3c71ae-…: 8 yoklama ve ~290 saniye sonra hâlâ
+     kuyrukta (sebep bildirilmedi). …
+```
+
+Zincir, testle yeniden üretildi (`src/__tests__/article-summary.test.tsx`):
+satır özetli ve çevirili → `request-enrichment` istemcinin tanımadığı bir gövde
+döndürüyor → depo `queued` diyor → ekran, **elindeki üç maddeye bakmadan**,
+"Özet hazırlanıyor" çiziyor → kanca sekiz kez yokluyor. Çevirinin ekranda
+görünmesi özetin de satırda olduğunun kanıtı: eski `toSummary`'de çeviri ancak
+`summary_ready` ile birlikte "ready" oluyordu.
+
+Dört düzeltme, dördü de tek tek kırmızı görülerek:
+
+| # | Nerede | Ne |
+|---|--------|-----|
+| 1 | `app/gundem/[id].tsx` | `pending` ve `unavailable` artık `hasSummary(summary)` ile kapılı — bir cevap, elde olan veriyi silemez |
+| 2 | `app/gundem/[id].tsx` | özeti olan haber için `request-enrichment` hiç çağrılmıyor (sekiz gereksiz Edge isteği, hepsi hız-sınırı kovasına yazan) |
+| 3 | `data-access/supabase/repositories.ts` | dolu `summary.bullets` taşıyan gövde, `status` ne derse desin kabul ediliyor; tanınmayan gövde uyarısı artık HTTP kodunu, `status`u ve anahtarları yazıyor |
+| 4 | `data-access/supabase/mapper.ts` | `toSummary` çeviriyi özete bağlamayı bıraktı; çeviri durumu metnin kendisinden okunuyor |
+
+### Kök neden: alan adı uyuşmazlığı
+
+İlk turda "sunucunun ne döndürdüğü buradan bilinemez" yazmıştım. **Yanlıştı** —
+backend'in Supabase projesi bağlı değil, ama fonksiyonun kaynağı
+`Akadirr1/follow-ai` deposunda ve o depo herkese açık. Okundu
+(`supabase/functions/request-enrichment/index.ts`), ve cevap net:
+
+```ts
+return jsonResponse({
+  status: 'ready',
+  summary: {
+    article_id: …,
+    summary_tr: result.summary.summary_tr,   // ← maddelerin adı
+    translation_tr: …,
+    translation_state: …,
+    model: …,
+    prompt_version: …,
+  },
+  client_request_id: …,
+}, 200, requestId);
+```
+
+İstemci `summary.bullets` okuyordu. **Alan adı tutmuyor**, dolayısıyla sunucunun
+her `ready` cevabı "tanınmayan gövde" sayılıp `queued`a düşüyordu: özet
+üretilmiş, kablodan geçmiş, istemcide çöpe gitmişti. Cihaz logundaki her
+"unrecognised body" satırının tek sebebi bu.
+
+**Kaynak uygulamada da aynı uyuşmazlık var** (`follow-ai`'ın kendi
+`src/data-access/supabase/repositories.ts:332`'si de `summary?.bullets`
+okuyor). Yani bu bir port regresyonu değil, sadakatle taşınmış bir hata — ve
+taşınırken yeniden bulunması gereken bir hata.
+
+`queued` (202 + `poll_after_seconds` + `reason`) ve `unavailable`
+(200 + `reason`) gövdeleri uyuşuyor; `add-source`'un `{source, …}` zarfı da.
+
+### Bundan sonrası için
+
+- **Bir uç noktanın gövdesini tahmin etmeyin; fonksiyonun kaynağını okuyun.**
+  Backend ayrı bir Supabase projesinde olabilir ama kodu bir depoda ve o depo
+  okunabilir. Bu hata sekiz ay boyunca iki uygulamada birden yaşadı, çünkü
+  istemci tarafındaki testlerin fikstürü de istemcinin varsaydığı adı
+  kullanıyordu.
+- **`poll_after_seconds` hâlâ yok sayılıyor.** Sunucu ne zaman dönüleceğini
+  söylüyor, istemci kendi sabit takvimini kullanıyor (`pollAfterSeconds()`
+  yazılmış ama çağrılmıyor). Takvim iki cron periyodunu kapsadığı için bugün
+  zararsız; sunucu periyodu değişirse ayrışır.

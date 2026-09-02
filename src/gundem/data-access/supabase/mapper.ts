@@ -81,33 +81,40 @@ function toBullets(articleId: string, bullets: string[]): [string, string, strin
 }
 
 /**
- * Summary state, including the case P6 exists to handle: with
- * no Anthropic key configured the enrichment job stays queued, the summary join finds
- * nothing, and `summary_ready` is false. That is `pending` — a first-class state
+ * Summary state, including the case P6 exists to handle: with no Anthropic key
+ * configured the enrichment job stays queued, the summary join finds nothing,
+ * and `summary_ready` is false. That is `pending` — a first-class state
  * (addendum §E), not an error and not an absent summary.
+ *
+ * **Özet ve çeviri iki ayrı üründür.** Bu fonksiyon onları birbirine bağlıyordu:
+ * `summary_ready` false ise erken dönüp `translationTr: null` diyor, yani satır
+ * bitmiş bir çeviri taşısa bile onu atıyordu. Sonuç, çevirisi hazır bir haberde
+ * "Çeviri hazırlanıyor" yazması ve düğmenin kapalı kalmasıydı — satırdaki metin
+ * hiç ekrana gelmeden.
+ *
+ * Çeviri durumu artık **metnin kendisinden** okunuyor, bir bayraktan değil: elde
+ * Türkçe metin varsa çeviri hazırdır. Ters yönü de aynı sebeple önemli —
+ * `translation_state` "ready" derken metin boşsa eskiden düğme açılıyor,
+ * kullanıcı basıyor ve `bodyFor` sessizce orijinale düşüyordu.
  */
 export function toSummary(row: FeedArticleRow): ArticleSummary | undefined {
   const language = toLanguage(row.language, `article ${row.article_id}`);
-
-  if (!row.summary_ready || !row.summary_tr) {
-    return {
-      bullets: ['', '', ''],
-      translationTr: null,
-      translationState: 'pending',
-    };
-  }
+  const translation = row.translation_tr?.trim() ? row.translation_tr : null;
 
   // A Turkish article is never translated; the DB trigger enforces the same rule.
   const state: TranslationState =
-    language === 'tr'
+    language === 'tr' || row.translation_state === 'not_required'
       ? 'not_required'
-      : row.translation_state === 'not_required'
-        ? 'not_required'
-        : 'ready';
+      : translation
+        ? 'ready'
+        : 'pending';
 
   return {
-    bullets: toBullets(row.article_id, row.summary_tr),
-    translationTr: state === 'not_required' ? null : row.translation_tr,
+    bullets:
+      row.summary_ready && row.summary_tr
+        ? toBullets(row.article_id, row.summary_tr)
+        : ['', '', ''],
+    translationTr: state === 'ready' ? translation : null,
     translationState: state,
   };
 }

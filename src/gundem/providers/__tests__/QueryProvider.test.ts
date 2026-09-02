@@ -14,6 +14,7 @@ createQueryClient,
 shouldDehydrateQuery,
 } from '../QueryProvider';
 import { QUERY_KEY_VERSION } from '../../data-access/queryKeys';
+import type { Page } from '../../domain/types';
 
 /**
  * The persistence contract, exercised against a real `QueryClient` and a fake kv
@@ -161,7 +162,19 @@ describe('persisted cache', () => {
 });
 
 describe('feed cap', () => {
-  const page = (n: number) => ({ data: { items: Array.from({ length: n }, (_, i) => ({ id: i })) } });
+  /**
+   * Fikstür `Page<Article>`in gerçek şekli.
+   *
+   * Eskiden `{ data: { items } }` idi — uygulamanın hiç üretmediği bir şekil,
+   * ve `capPersistedFeed` de tam olarak ona bakıyordu. İkisi birbirini
+   * doğruluyordu: sayaç gerçek veride hep 0 kalıyor, fonksiyon hiçbir şeyi
+   * kesmiyor, test yeşil kalıyordu. Şekil artık tipten geliyor.
+   */
+  const page = (n: number): Page<{ id: number }> => ({
+    items: Array.from({ length: n }, (_, i) => ({ id: i })),
+    nextCursor: null,
+    hasMore: true,
+  });
 
   it('keeps pages up to the article cap', () => {
     const data = { pages: [page(50), page(50)], pageParams: [null, 'c1'] };
