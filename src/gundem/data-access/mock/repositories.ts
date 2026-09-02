@@ -25,6 +25,7 @@ import {
   type SearchArticlesParams,
   type SourceRepository,
 } from '../repositories';
+import { parseSourceUrl } from '../sourceUrl';
 import {
   compareArticles,
   cursorOfArticle,
@@ -119,24 +120,13 @@ export function createMockSourceRepository(): SourceRepository {
      * the app does not have until P3.
      */
     async addSourceByUrl(url: string, _options?: AddSourceOptions): Promise<Result<Source>> {
-      const raw = url?.trim();
-      if (!raw) return err('invalid_input', 'A feed or site URL is required.');
-
-      let parsed: URL;
-      try {
-        parsed = new URL(raw);
-      } catch {
-        return err('invalid_input', `"${raw}" is not a valid URL.`);
-      }
-      if (parsed.protocol !== 'https:') {
-        return err('unsupported_source', 'Only https:// sources are allowed.');
-      }
-      if (parsed.username || parsed.password) {
-        return err('unsupported_source', 'Credentialed URLs are not allowed.');
-      }
+      // Gerçek uygulamayla aynı doğrulayıcı: mock'un "kabul ederdim" dediği bir
+      // adresi Supabase deposu reddediyorsa mock yalan söylüyor demektir.
+      const parsed = parseSourceUrl(url);
+      if (!parsed.ok) return err(parsed.problem, parsed.message);
 
       const existing = mockSources().find(
-        (s) => s.feedUrl === parsed.toString() || s.siteUrl === parsed.toString(),
+        (s) => s.feedUrl === parsed.url || s.siteUrl === parsed.url,
       );
       if (existing) {
         return err('duplicate_source', `"${existing.name}" is already in the catalog.`, {

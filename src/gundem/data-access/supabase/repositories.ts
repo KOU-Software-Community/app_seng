@@ -22,6 +22,7 @@ import {
   type SearchArticlesParams,
   type SourceRepository,
 } from '../repositories';
+import { parseSourceUrl } from '../sourceUrl';
 import { FEED_VIEW, SEARCH_RPC, requireSupabaseClient, toDataError, toNetworkError } from './client';
 import { callEdgeFunction, clientRequestId, type EdgeCallOptions } from './edge';
 import {
@@ -180,28 +181,19 @@ export function createSupabaseSourceRepository(
 
     /** Creates the *shared* source row; the device's subscription is local (addendum §A). */
     async addSourceByUrl(url: string, options?: AddSourceOptions): Promise<Result<Source>> {
-      const raw = url?.trim();
-      if (!raw) return err('invalid_input', 'A feed or site URL is required.');
-
-      let parsed: URL;
-      try {
-        parsed = new URL(raw);
-      } catch {
-        return err('invalid_input', `"${raw}" is not a valid URL.`);
-      }
       // Client-side pre-checks mirror the server's SSRF rules so an obviously bad
       // URL never becomes a rate-limited round trip. The server re-checks.
-      if (parsed.protocol !== 'https:') {
-        return err('unsupported_source', 'Only https:// sources are allowed.');
-      }
-      if (parsed.username || parsed.password) {
-        return err('unsupported_source', 'Credentialed URLs are not allowed.');
-      }
+      //
+      // Ayrıştırma `parseSourceUrl`'de, `URL` ile değil: React Native'in `URL`'i
+      // geçersiz girdide fırlatmıyor, dolayısıyla buradaki eski `catch` hiç
+      // çalışmıyordu ve "url değil" cevabı "yalnızca https" olarak çıkıyordu.
+      const parsed = parseSourceUrl(url);
+      if (!parsed.ok) return err(parsed.problem, parsed.message);
 
       const result = await callEdgeFunction<{ source?: SourceRow }>(
         'add-source',
         {
-          url: parsed.toString(),
+          url: parsed.url,
           // The sheet's category/language are hints for the server's own
           // classification, not authority: add-source re-derives both.
           ...(options?.category ? { category: options.category } : {}),

@@ -492,3 +492,64 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   `todayLocal` and both sections read it. Related: "dün" is a calendar word, so
   it is computed from calendar days at +03:00, not from elapsed milliseconds —
   47 elapsed hours can be two calendar days.
+
+### AI Gündem portundan — bir çalışma zamanı, bir de kendi testine saklanan hatalar
+
+- **React Native'in `URL`'i bir ayrıştırıcı değil, bir dize sarmalayıcısı.** Taban
+  verilmediğinde girdiyi hiç denetlemeden saklıyor, yani **hiçbir zaman
+  fırlatmıyor** — `new URL(raw)` etrafındaki `catch` erişilemez kod. Ölçüldü:
+  `addSourceByUrl`'e verilen beş girdinin beşi de `unsupported_source` döndü,
+  `https://ornek.com/rss?redirect=https://a:b@c.com` dâhil. `invalid_input`
+  dalına hiç girilmiyordu; `protocol` getter'ı şemasız girdide `''` döndüğü için
+  "yalnızca https" cevabı çıkıyordu, ve `password` getter'ı
+  (`/https?:\/\/.*:(.*)@/`, açgözlü `.*`) yetki bölümünün dışını da tarayıp
+  sorgu dizesindeki bir `@`yi kimlik bilgisi sanıyordu. Bir de çökme var:
+  `new URL('a#b')` yapıcının içinde `undefined.includes` çağırıyor. Doğrulama
+  artık `src/gundem/data-access/sourceUrl.ts`'te, elle: girdi bir dize, çıktı bir
+  karar, motor bilgisi girmiyor. **Tarayıcıda ve Node'da doğru olan bir şey
+  burada doğru değil — ve Jest Node olduğu için testler bunu göstermiyor.**
+- **Yazılmış ama bağlanmamış bir fonksiyon hiçbir şeyi korumuyor; kendi testi
+  varsa daha da kötü.** `capPersistedFeed` çevrimdışı önbelleğe 200 haberlik
+  sınırı uyguluyordu — kâğıt üzerinde. İki ayrı sebeple uygulamıyordu:
+  `dehydrateOptions`ta yalnızca `shouldDehydrateQuery` vardı (kimse çağırmıyordu)
+  **ve** fonksiyon `page.data.items`e bakıyordu, oysa gerçek sayfa
+  `Page<Article>`, yani `{items, nextCursor, hasMore}`. Birim testinin fikstürü
+  de aynı uydurma şekli kuruyordu, o yüzden yeşildi. Grafik sorgusu buldu:
+  *"kaynak dosyalarda tanımlı, ama dosya-dışı tek göndergesi kendi testi olan"*
+  çağrılabilirler. Sonuç sınırsız büyüyen bir AsyncStorage blob'uydu.
+  **Bir testin fikstürü tipten gelmiyorsa, test kodu değil kendini doğruluyor
+  olabilir.**
+- **Kısma (throttle) bir testi sahte yeşile boyar.** Kalıcılaştırıcı iki saniyede
+  bir yazıyor; "blob'da 200'den fazla haber yok" iddiası, `waitFor` ilk anlık
+  görüntüyü gördüğü an geçiyordu — o görüntüde zaten 20 haber vardı. Sınır hiç
+  uygulanmasa da geçen bir iddia. `persistOptionsFor()` bileşenin dışına alındı,
+  test artık `dehydrate()`i sağlayıcının kullandığı seçeneklerle doğrudan
+  çağırıyor. **Zamanlayıcının arkasından ölçülen bir sayı, ölçmek istediğiniz
+  sayı değildir.**
+- **`toLowerCase()` Türkçeyi, `toLocaleLowerCase('tr')` İngilizceyi kaçırıyor —
+  ve son arama listesinde ikisi birden var.** Düz küçültme `İstanbul` ile
+  `istanbul`u ayırıyor (birleşen nokta); Türkçe küçültme `OpenAI`yi `openaı`
+  yapıp `openai`den ayırıyor. Türkçeye geçince mevcut `OpenAI` testi kırmızı
+  verdi — deponun kendi kuralını körü körüne uygulamanın bedeli. Kural artık tek
+  cümle: **I harfinin noktası bu listede bir arama farkı değil**; dördü de düz
+  `i`ye katlanıyor (`searchKey`).
+- **Aynı kararı iki yerde uygulamak, ikisinin ayrışmasının tek sebebidir.**
+  `pushRecentSearch` listeyi 10'da kesiyordu, `useRecentSearches`'ün iyimser
+  kopyası kesmiyordu: ekranda 15 arama, diskte 10, ve fark ancak uygulama
+  yeniden açılınca görünüyor. İki taraf da tek bir saf `mergeRecentSearch`
+  çağırıyor artık. İkisini ayrı ayrı sınayan iki test bu farkı asla göremez —
+  farkı gören test ikisini **aynı** testte karşılaştıran testtir.
+- **`.catch`i olmayan bir `.then`, bitmeyen bir iskelet demek.** `useLoaded`
+  reddedilen bir okumada `isReady`yi sonsuza kadar `false` bırakıyordu: hata
+  yok, log yok, yalnızca yüklenmeyen bir liste — üstüne yakalanmamış bir promise
+  reddi. Bugün `kv.ts` her okumayı yuttuğu için dal tetiklenmiyor, ama
+  tetiklenmeyen bir dal yazılmamış bir daldır.
+- **Bir yorumun adıyla andığı dosyanın var olduğunu kontrol edin.** `hooks.ts`
+  aylarca "Measured with the fake PostgREST in `src/__tests__/integration.test.tsx`"
+  diyordu; o dosya yoktu. Bu defterde zaten aynısının bir örneği var
+  (`syncPending`). Dosya artık var ve o ölçümü gerçekten yapıyor.
+- **Grafiği kurarken `docs/` ve `*.md` dışarıda bırakılırsa maliyet sıfır.**
+  Semantik çıkarım alt ajan istiyor; AST yarısı istemiyor. `/graphify .` bu
+  depoda kod-only koşturulduğunda 111 dosya → 1005 düğüm, 2272 kenar, tek
+  LLM çağrısı olmadan. Mimari sorular için yeterli: yukarıdaki "yalnızca kendi
+  testi çağırıyor" bulgusu bir grafik sorgusu, dosya taraması değil.

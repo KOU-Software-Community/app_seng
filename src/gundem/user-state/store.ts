@@ -170,15 +170,48 @@ export async function updateSettings(
 export const getRecentSearches = (storage: KvStore = kv): Promise<string[]> =>
   readJson(storage, KV_KEYS.recentSearches, [], isStringArray);
 
+/**
+ * İki aramayı "aynı" sayan anahtar.
+ *
+ * Ne düz `toLowerCase()` ne de `toLocaleLowerCase('tr')` tek başına doğru,
+ * çünkü bu listede iki dil birden var:
+ *
+ * - `toLowerCase()`: `İstanbul` → `i` + birleşen nokta, yani `istanbul`la
+ *   eşleşmiyor. Türkçe girdi tekilleşmiyor.
+ * - `toLocaleLowerCase('tr')`: `OpenAI` → `openaı` (noktasız ı), yani
+ *   `openai`yle eşleşmiyor. İngilizce kısaltmalar tekilleşmiyor — ve bu
+ *   listedeki kaynak adlarının çoğu İngilizce. Bu tam olarak ölçüldü:
+ *   Türkçe küçültmeye geçince mevcut `OpenAI`/`openai` testi kırmızı verdi.
+ *
+ * O yüzden noktalı/noktasız I ailesinin dördü de düz `i`ye katlanıyor. Kural
+ * tek cümle: **I harfinin noktası bu listede bir arama farkı değil.**
+ */
+const searchKey = (value: string): string =>
+  value.normalize('NFC').replace(/[İIı]/g, 'i').toLocaleLowerCase('tr');
+
+/**
+ * Son aramaların tek karar noktası: en yeni başta, büyük/küçük harf farkı
+ * yok sayılarak tekilleştirilmiş, `MAX_RECENT_SEARCHES` ile sınırlı.
+ *
+ * Saf ve dışa açık, çünkü iki çağıranı var — bu dosyadaki yazma yolu ve
+ * `useRecentSearches`'ün iyimser React durumu. Ayrı ayrı yazıldıklarında
+ * ayrıştılar: kanca sınırı hiç uygulamıyordu, yani ekran 15 arama gösterirken
+ * diskte 10 duruyordu ve fark ancak uygulama yeniden açılınca ortaya çıkıyordu.
+ *
+ * Karşılaştırma anahtarı için bkz. `searchKey`.
+ */
+export const mergeRecentSearch = (current: string[], query: string): string[] => {
+  const trimmed = query.trim();
+  if (!trimmed) return current;
+  const key = searchKey(trimmed);
+  return [trimmed, ...current.filter((q) => searchKey(q) !== key)].slice(0, MAX_RECENT_SEARCHES);
+};
+
 /** Most recent first, de-duplicated case-insensitively, capped. */
 export async function pushRecentSearch(query: string, storage: KvStore = kv): Promise<string[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return getRecentSearches(storage);
   const current = await getRecentSearches(storage);
-  const next = [trimmed, ...current.filter((q) => q.toLowerCase() !== trimmed.toLowerCase())].slice(
-    0,
-    MAX_RECENT_SEARCHES,
-  );
+  const next = mergeRecentSearch(current, query);
+  if (next === current) return current;
   await writeJson(storage, KV_KEYS.recentSearches, next);
   return next;
 }

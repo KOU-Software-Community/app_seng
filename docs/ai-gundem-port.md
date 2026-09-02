@@ -237,3 +237,44 @@ değil:
 - **Panelden yönetilen kaynak listesi** (K3) — kullanıcı kaynak ekleyemiyor;
   istenirse kaynak kataloğu yönetim paneline bir sayfa olarak eklenebilir.
 - **Backend'in kulübe devri** (K1) — şimdilik istenmedi.
+
+## P9 — grafiğe dayalı temizlik turu (2026-09-02)
+
+Portun kapanışında bırakılan "bu temiz kâğıt değil" kaydının karşılığı. Tarama
+bu sefer alt ajanla değil, kod-only bir graphify grafiğiyle yapıldı
+(`111 dosya → 1005 düğüm, 2272 kenar`, sıfır LLM çağrısı) ve iki mercek —
+`react-and-expo`, `network-and-storage` — elle kapatıldı.
+
+Bulunan ve düzeltilen dört hata, hepsi ölçümle:
+
+| # | Nerede | Ne | Nasıl bulundu |
+|---|--------|-----|---------------|
+| 1 | `data-access/*/repositories.ts` | `new URL()` RN'de doğrulama yapmıyor: `invalid_input` dalı erişilemez, geçerli bir adres bile `unsupported_source` dönüyordu | RN `URL` polyfill'i okundu, eski kod ona karşı koşturuldu |
+| 2 | `providers/QueryProvider.tsx` | `capPersistedFeed` hem bağlanmamış hem yanlış şekle bakıyordu → 200 haberlik sınır hiç uygulanmıyordu | grafik sorgusu: "dosya-dışı tek göndergesi kendi testi olan çağrılabilirler" |
+| 3 | `user-state/hooks.ts` + `store.ts` | son arama listesi ekranda ve diskte ayrışıyordu; büyük/küçük harf katlaması iki dilden birini hep kaçırıyordu | iki uygulamayı aynı testte karşılaştırınca |
+| 4 | `user-state/hooks.ts` | `useLoaded`ın `.catch`i yok: reddedilen okuma `isReady`yi sonsuza kadar `false` bırakıyor | `.then` taraması |
+
+Testler 217 → 247. Yeni dosyalar:
+
+- `src/__tests__/integration.test.tsx` — sahte PostgREST'ten kancaya kadar
+  uçtan uca. `hooks.ts` bu dosyayı aylardır adıyla anıyordu ve dosya yoktu.
+- `src/gundem/data-access/__tests__/source-url.test.ts` — ayrıştırıcı, ve aynı
+  girdilerin depo sınırındaki hata kodları.
+- `src/gundem/user-state/__tests__/hooks-integration.test.tsx` — kanca ile disk
+  aynı testte.
+
+Dördünün de kırmızı hâli ölçüldü: düzeltme geri alınınca ilgili test düşüyor
+(2 numaranın iki ayrı bozukluğu ayrı ayrı denendi, ikisi de kırmızı).
+
+### Bu turda **bilerek** düzeltilmeyenler
+
+- **`SavedView` yalnızca akışın ilk sayfasını çekiyor.** `useFeed()`i filtresiz
+  çağırıyor, `fetchNextPage` yok; ilk 20 kaydın ötesinde kaydedilen bir haber
+  Kayıtlı sekmesinde görünmüyor. Üstelik `FeedView` etkin kaynak listesi boş
+  değilken farklı bir sorgu anahtarı kullanıyor, yani iki ekran ayrı önbellek
+  tutuyor. Doğru çözüm kimliğe göre çekmek (`getArticle`) ya da kayıtlıları
+  sunucudan sormak — ikisi de bu turun kapsamı dışında, bir tasarım kararı.
+- **`unseenCount` ölü.** `FeedView`den dışa açık, yorumu "N yeni" rozetini
+  anlatıyor, çağıranı yalnızca kendi testi. Rozeti eklemek yeni bir özellik
+  (sayı akışta, başlık sekme kabuğunda — durum yukarı taşınmalı), silmek ise
+  istenmemiş bir kayıp. Kayıt burada duruyor.
