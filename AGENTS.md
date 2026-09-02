@@ -608,3 +608,16 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   bekleyen kodun testi de `bullets` gönderiyordu, yeşildi ve hiçbir şeyi
   korumuyordu. Kablodaki şekli sınayan fikstür, kablonun **öbür ucundan**
   kopyalanır.
+- **Uzun metnin "txt dosyası gibi" görünmesi bir yazı tipi sorunu değil,
+  paragrafın hiç olmamasıydı.** Gövde tek bir `<Txt>` olarak basılıyordu; RSS
+  çıkarıcıları kimi kaynakta boş satırla, kimisinde tek satır sonuyla ayırıyor
+  ve ekran ikisini de olduğu gibi geçiriyordu. `toParagraphs` her iki biçimi de
+  tanıyor **ve** boş satır varken paragraf içindeki tek satır sonlarını boşluğa
+  katlıyor — katlamazsa metin, sütun genişliğiyle alakasız yerlerden kırılmış
+  görünür. Boş satırı hiç olmayan metinde ise tek satır sonu paragraf
+  ayırıcısıdır; o dal atlanırsa metnin tamamı tek bir dev paragrafa iner, yani
+  düzeltilmeye çalışılan duvarın aynısı kurulur.
+- **Okunabilirlik dört sayının işi, biri değil:** punto (14,5 → 16), satır
+  aralığı (1,52 → 1,7), satır uzunluğu (kartın 18 px iç boşluğu ~85 karakteri
+  ~60'a indiriyor) ve zemin (beyaz kart, sayfa zemininde yüzen metin değil).
+  Yalnızca puntoyu büyütmek satırı daha da uzatır ve durumu kötüleştirir.

@@ -14,6 +14,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { bodyFor, hasSummary, segmentState, type Segment } from '../../src/gundem/article/segment';
+import { ArticleBody } from '../../src/gundem/components/ArticleBody';
 import { useArticle, useEnrichment } from '../../src/gundem/data-access/hooks';
 import { useSavedArticles } from '../../src/gundem/user-state/hooks';
 import { relativeTimeTr } from '../../src/gundem/format/relativeTime';
@@ -180,34 +181,35 @@ export default function GundemArticleRoute() {
           )}
         </Card>
 
-        {segment.visible ? (
-          <View style={styles.segmentWrap}>
-            <Segmented
-              options={[
-                { label: 'Orijinal', value: 'en' },
-                { label: 'Çeviri', value: 'tr' },
-              ]}
-              value={active}
-              onChange={(value) => {
-                if (segment.enabled) setChosen(value as Segment);
-              }}
-            />
-            {segment.enabled ? null : (
-              <Txt size={11.5} color={colors.faint} style={{ marginTop: 6 }}>
-                Çeviri hazırlanıyor.
-              </Txt>
-            )}
-          </View>
-        ) : null}
-
-        <View style={styles.bodyWrap}>
-          <Txt size={11.5} color={colors.faint}>
-            {body.label}
-          </Txt>
-          <Txt size={14.5} color={colors.textBody} style={styles.bodyText}>
-            {body.text}
-          </Txt>
-        </View>
+        {/*
+          Dil seçici metnin kartının içinde: hangi metni değiştirdiği görünsün.
+          Dışarıda asılıyken hangi bölüme ait olduğu okunmuyordu.
+        */}
+        <ArticleBody
+          text={body.text}
+          label={body.label}
+          header={
+            segment.visible ? (
+              <>
+                <Segmented
+                  options={[
+                    { label: 'Orijinal', value: 'en' },
+                    { label: 'Çeviri', value: 'tr' },
+                  ]}
+                  value={active}
+                  onChange={(value) => {
+                    if (segment.enabled) setChosen(value as Segment);
+                  }}
+                />
+                {segment.enabled ? null : (
+                  <Txt size={11.5} color={colors.faint} style={{ marginTop: 6 }}>
+                    Çeviri hazırlanıyor.
+                  </Txt>
+                )}
+              </>
+            ) : null
+          }
+        />
 
         <PrimaryButton
           label="Kaynağa git"
@@ -256,9 +258,6 @@ const styles = StyleSheet.create({
     marginTop: 7,
   },
   bulletText: { flex: 1, lineHeight: 20 },
-  segmentWrap: { paddingHorizontal: 16, marginTop: 16 },
-  bodyWrap: { paddingHorizontal: 16, marginTop: 16, gap: 6 },
-  bodyText: { lineHeight: 22 },
   cta: { marginHorizontal: 16, marginTop: 20 },
   back: { marginHorizontal: 16, marginTop: 16 },
   credit: { textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
