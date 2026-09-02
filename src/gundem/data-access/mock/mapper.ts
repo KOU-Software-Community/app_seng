@@ -151,13 +151,20 @@ export function toArticleDto(mock: MockArticle): Article {
   };
 }
 
-/** Newest first, id descending as the tie-break — the contract's sort order. */
-export const compareArticles = (a: Article, b: Article): number =>
-  a.publishedAt === b.publishedAt
-    ? b.id.localeCompare(a.id)
-    : a.publishedAt < b.publishedAt
-      ? 1
-      : -1;
+/**
+ * En yeni önce, eşitlikte kimlik azalan — sözleşmenin sıralaması.
+ *
+ * Eşitlik bozucu `localeCompare` değil düz karşılaştırma: Hermes'in
+ * `localeCompare`'ı platformun harmanlayıcısına iniyor (iOS'ta CoreFoundation,
+ * Android'de java.text.Collator) ve sonuç cihaza göre değişebiliyor. Sayfa
+ * sınırını belirleyen `isAfterCursor` ise zaten düz `<` kullanıyor — ikisi
+ * ayrışırsa sayfa 2 ya bir kaydı atlar ya iki kez gösterir.
+ */
+export const compareArticles = (a: Article, b: Article): number => {
+  if (a.publishedAt !== b.publishedAt) return a.publishedAt < b.publishedAt ? 1 : -1;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
+};
 
 /**
  * One article with no body, because production has 100 of them.

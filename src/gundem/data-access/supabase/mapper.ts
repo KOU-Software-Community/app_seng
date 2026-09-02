@@ -112,9 +112,25 @@ export function toSummary(row: FeedArticleRow): ArticleSummary | undefined {
   };
 }
 
-/** Two-letter badge; the DB has no such column, so it comes from the slug. */
-export const tileFromSlug = (slug: string, name: string): string =>
-  (slug || name).replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || '??';
+/**
+ * İki harflik rozet; veritabanında böyle bir sütun yok, slug'dan türetiliyor.
+ *
+ * Eski hâli `/[^a-z0-9]/gi` ile süzüyordu ve bu, Türkçe harfleri **düzeltmiyor
+ * siliyordu**: ölçüldü, `İTÜ Yapay Zekâ` → `"TY"` (İ ve Ü atılıp T ile Y'nin
+ * yan yana gelmesi), `şirket-blog` → `"IR"`. Ardından gelen `toUpperCase()` de
+ * `i`'yi `I` yapıyordu, `İ` değil.
+ *
+ * Harf testi motordan bağımsız: bir karakterin büyük ve küçük hâli farklıysa o
+ * bir harftir. Unicode özellik kaçışları (`\p{L}`) Hermes'te güvenilir değil.
+ */
+const isLetter = (ch: string): boolean =>
+  ch.toLocaleLowerCase('tr') !== ch.toLocaleUpperCase('tr');
+const isDigit = (ch: string): boolean => ch >= '0' && ch <= '9';
+
+export const tileFromSlug = (slug: string, name: string): string => {
+  const kept = [...(slug || name)].filter((ch) => isLetter(ch) || isDigit(ch)).join('');
+  return kept.slice(0, 2).toLocaleUpperCase('tr') || '??';
+};
 
 export function toArticle(row: FeedArticleRow): Article {
   const language = toLanguage(row.language, `article ${row.article_id}`);

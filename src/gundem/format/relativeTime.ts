@@ -1,3 +1,5 @@
+import { clubCalendar } from '../../eventSchema';
+
 /**
  * Turkish relative time.
  *
@@ -31,13 +33,30 @@ const DAY = 24 * HOUR;
 /** Past this age, show the date instead of a relative label. */
 export const ABSOLUTE_AFTER_DAYS = 7;
 
-/** "20 Ağustos" — same year; "20 Ağustos 2025" — any other year. */
+/**
+ * "20 Ağustos" — aynı yıl; "20 Ağustos 2025" — başka yıl.
+ *
+ * Takvim alanları cihazın saat diliminden değil kulübün saatinden (+03:00)
+ * okunuyor. `getDate()` cihazın dilimini okur ve +03:00'ın batısındaki her
+ * telefonda tarihi bir gün erken gösterirdi — aynı makale, Takvim sekmesindeki
+ * bir etkinlikle çelişen bir tarih taşırdı.
+ */
 export function absoluteTr(date: Date, now: Date): string {
-  const day = date.getDate();
-  const month = MONTHS_TR[date.getMonth()];
-  return date.getFullYear() === now.getFullYear()
-    ? `${day} ${month}`
-    : `${day} ${month} ${date.getFullYear()}`;
+  const then = clubCalendar(date);
+  const today = clubCalendar(now);
+  const month = MONTHS_TR[then.month];
+  return then.year === today.year
+    ? `${then.day} ${month}`
+    : `${then.day} ${month} ${then.year}`;
+}
+
+/** İki anın kulüp saatindeki takvim günü farkı. */
+function calendarDaysBetween(then: Date, now: Date): number {
+  const a = clubCalendar(then);
+  const b = clubCalendar(now);
+  return Math.round(
+    (Date.UTC(b.year, b.month, b.day) - Date.UTC(a.year, a.month, a.day)) / DAY,
+  );
 }
 
 /**
@@ -67,7 +86,12 @@ export function relativeTimeTr(iso: string, now: Date = new Date()): string {
     return `${Math.floor(elapsed / HOUR)} saat önce`;
   }
 
-  const days = Math.floor(elapsed / DAY);
+  // "dün" ve "N gün önce" takvim ifadeleri; geçen milisaniye takvim taşımıyor.
+  // Eski hâli 47 saat önce yayınlanmış bir habere "dün" diyordu (iki takvim günü
+  // geçmişti) ve 25 saat öncesine "1 gün önce" (bir takvim günü). Sınır, bu
+  // uygulamanın her yerinde olduğu gibi +03:00 gece yarısı.
+  const days = calendarDaysBetween(then, now);
+  if (days <= 0) return `${Math.floor(elapsed / HOUR)} saat önce`;
   if (days === 1) return 'dün';
   if (days <= ABSOLUTE_AFTER_DAYS) return `${days} gün önce`;
 

@@ -470,3 +470,25 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   writes to a per-device rate-limit bucket. The window is asserted against the
   cron period now, and that assertion caught its own arithmetic being wrong
   before the code shipped.
+- **`btoa`, `atob` and `Buffer` are all absent under Hermes, and code that
+  falls back from one to the other assumes a world with only two runtimes.**
+  `cursor.ts` read `typeof btoa === 'function' ? btoa(...) : Buffer.from(...)`,
+  which says "browser, else Node". Expo SDK 57 on RN 0.86 is neither: grep the
+  whole `react-native` and `expo` trees and nothing installs any of the three.
+  Jest hid it perfectly, because Jest *is* Node and always took the second
+  branch. The test that catches it deletes the three globals before calling —
+  that is the only way to put a Node test runner in the device's world.
+- **A regex character class written as `[^a-z0-9]` does not case-fold Turkish,
+  it deletes it.** `tileFromSlug` stripped with `/[^a-z0-9]/gi` and then called
+  `toUpperCase()`. Measured: `İTÜ Yapay Zekâ` produced the badge `"TY"` — the
+  `İ` and `Ü` were removed and the letters that survived came from two different
+  words — and `şirket-blog` produced `"IR"`. Testing "is this a letter" by
+  asking whether its upper and lower forms differ is engine-independent and
+  needs no unicode property escapes, which Hermes does not support reliably.
+- **The +03:00 rule belongs to the app, not to the events screen.** The port
+  rendered its day line and article dates from `new Date().getDay()` and friends,
+  so a phone outside Türkiye showed AI Gündem naming one day while the Takvim
+  tab named another, at the same instant. `clubCalendar` now sits beside
+  `todayLocal` and both sections read it. Related: "dün" is a calendar word, so
+  it is computed from calendar days at +03:00, not from elapsed milliseconds —
+  47 elapsed hours can be two calendar days.

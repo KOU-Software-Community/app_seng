@@ -411,6 +411,35 @@ export function todayLocal(now: Date): string {
 }
 
 /**
+ * Bir anın kulüp saatindeki takvim alanları.
+ *
+ * `todayLocal` ile aynı kaydırma, ama metin yerine alanlar döndürüyor — çünkü
+ * ekranlar gün adı, ay adı ve yıl istiyor, `YYYY-MM-DD` değil.
+ *
+ * Ayrı bir yardımcı olarak duruyor çünkü ikinci bir bölüm (AI Gündem) aynı
+ * kuralı kendi tarafında `new Date().getDay()` ile yeniden yazmıştı: cihazın
+ * saat dilimini okuyordu. Sonuç, yurt dışındaki bir telefonda Takvim sekmesiyle
+ * AI Gündem başlığının **aynı anda farklı gün** yazmasıydı. Kural bir tane, o
+ * yüzden onu üreten fonksiyon da bir tane.
+ */
+export function clubCalendar(instant: Date): {
+  year: number;
+  /** 0-11. */
+  month: number;
+  day: number;
+  /** 0 Pazar. */
+  weekday: number;
+} {
+  const local = new Date(instant.getTime() + 3 * 60 * 60_000);
+  return {
+    year: local.getUTCFullYear(),
+    month: local.getUTCMonth(),
+    day: local.getUTCDate(),
+    weekday: local.getUTCDay(),
+  };
+}
+
+/**
  * Etkinlikleri takvim ve arşiv olarak ikiye ayırır.
  *
  * Arşiv ayrı bir koleksiyon değil; geçmiş etkinliğin ta kendisi. Ayrı tutmak,
