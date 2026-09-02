@@ -13,6 +13,7 @@ import { ArticleCard } from '../components/ArticleCard';
 import { useFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useEnabledSources, useReadArticles } from '../user-state/hooks';
+import { clubCalendar } from '../../eventSchema';
 import { colors } from '../../theme';
 
 /** "Tümü" artı prototipin beş kategorisi. */
@@ -25,9 +26,17 @@ const MONTHS_TR = [
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
 ];
 
-/** Başlıktaki gün satırı: "Perşembe, 20 Ağustos". */
-export const todayLineTr = (now: Date = new Date()): string =>
-  `${DAYS_TR[now.getDay()]}, ${now.getDate()} ${MONTHS_TR[now.getMonth()]}`;
+/**
+ * Başlıktaki gün satırı: "Perşembe, 20 Ağustos".
+ *
+ * Gün cihazın saat diliminden değil kulübün saatinden okunuyor — aksi hâlde
+ * yurt dışındaki bir telefonda bu satır, aynı anda Takvim sekmesinin yazdığı
+ * günden başka bir gün gösteriyordu.
+ */
+export const todayLineTr = (now: Date = new Date()): string => {
+  const today = clubCalendar(now);
+  return `${DAYS_TR[today.weekday]}, ${today.day} ${MONTHS_TR[today.month]}`;
+};
 
 /** "N yeni" — bu cihazın henüz açmadıkları. Sunucudan gelen bir sayı değil. */
 export const unseenCount = (articles: Article[], isRead: (id: string) => boolean): number =>
