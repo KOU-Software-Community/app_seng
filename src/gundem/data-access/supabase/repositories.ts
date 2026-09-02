@@ -282,9 +282,32 @@ export function createSupabaseDigestRepository(
 }
 
 /** `202 {status:'queued'}` shape from `request-enrichment`. */
+/**
+ * `request-enrichment`'ın gövdesi — fonksiyonun kaynağından okundu
+ * (`supabase/functions/request-enrichment/index.ts`, `ready` dalı), tahmin
+ * edilmedi.
+ *
+ * Maddelerin adı **`summary_tr`**. İstemci `bullets` okuyordu ve alan adı
+ * tutmadığı için sunucunun her `ready` cevabı "tanınmayan gövde" sayılıp
+ * `queued`a düşüyordu: özet üretilmiş, kablodan geçmiş, istemcide çöpe
+ * gitmişti. Cihaz logundaki her "unrecognised body" satırı bu.
+ *
+ * Kaynak uygulamada (`follow-ai`) da aynı uyuşmazlık var — port onu sadakatle
+ * taşımış, yani bu bir port regresyonu değil, taşınan bir hata.
+ *
+ * `bullets` yine de okunuyor: bir sunucu sürümünün onu göndermeyeceğinin
+ * garantisi yok ve iki adı da kabul etmenin bedeli yok.
+ */
 type EnrichmentResponse = {
   status?: string;
-  summary?: { bullets?: string[]; translation_tr?: string | null; translation_state?: string };
+  summary?: {
+    /** Sunucunun gönderdiği ad. */
+    summary_tr?: string[];
+    /** Eski/alternatif ad. */
+    bullets?: string[];
+    translation_tr?: string | null;
+    translation_state?: string;
+  };
   poll_after_seconds?: number;
   reason?: string;
 };
@@ -323,20 +346,21 @@ export function createSupabaseEnrichmentRepository(
       // istemci elindeki üç maddeyi görmezden gelip "kuyrukta" diyordu. Bir
       // durum dizesini tanımamak, veriyi atmak için sebep değil.
       const summary = data?.summary;
-      const bullets = summary?.bullets?.filter((bullet) => bullet?.trim().length) ?? [];
-      if (summary?.bullets && bullets.length > 0) {
-        const all = summary.bullets;
+      const wire = summary?.summary_tr ?? summary?.bullets;
+      const bullets = wire?.filter((bullet) => bullet?.trim().length) ?? [];
+      if (wire && bullets.length > 0) {
+        const all = wire;
         if (all.length !== 3) {
           console.warn(
             `[supabase] request-enrichment returned ${all.length} bullets for ${trimmed}, expected 3; padding.`,
           );
         }
-        const state = summary.translation_state === 'not_required' ? 'not_required' : 'ready';
+        const state = summary?.translation_state === 'not_required' ? 'not_required' : 'ready';
         return ok({
           status: 'ready',
           summary: {
             bullets: [all[0] ?? '', all[1] ?? '', all[2] ?? ''],
-            translationTr: state === 'not_required' ? null : (summary.translation_tr ?? null),
+            translationTr: state === 'not_required' ? null : (summary?.translation_tr ?? null),
             translationState: state,
           },
         });

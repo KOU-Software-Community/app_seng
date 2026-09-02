@@ -205,3 +205,100 @@ describe('requestEnrichment — a body that carries a summary is an answer', () 
     }
   });
 });
+
+/**
+ * Kablonun üstündeki gerçek gövde.
+ *
+ * Fikstür uydurma değil: `supabase/functions/request-enrichment/index.ts`'in
+ * `status === 'ready'` dalından birebir kopyalandı. Alan adı **`summary_tr`** —
+ * istemci ise `summary.bullets` okuyordu, yani sunucunun her `ready` cevabı
+ * "tanınmayan gövde" sayılıp `queued`a düşüyordu. Cihazdaki
+ * "returned an unrecognised body" satırlarının tamamı bu.
+ *
+ * Kaynak uygulamada (`follow-ai`) da aynı uyuşmazlık var; port onu sadakatle
+ * taşımış. Yani bu bir port regresyonu değil, taşınan bir hata.
+ */
+describe('requestEnrichment — the body the deployed function actually sends', () => {
+  const stub = (body: unknown, status = 200) => {
+    const fetchImpl = (async () => {
+      const text = JSON.stringify(body);
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        text: async () => text,
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+    return createSupabaseEnrichmentRepository({ fetchImpl, config: CONFIG });
+  };
+
+  /** request-enrichment/index.ts, `result.status === 'ready'` dalı. */
+  const READY_BODY = {
+    status: 'ready',
+    summary: {
+      article_id: 'aa201139-ae37-4633-a0b3-67e7e4e16753',
+      summary_tr: ['Birinci madde', 'İkinci madde', 'Üçüncü madde'],
+      translation_tr: 'Türkçe çeviri.',
+      translation_state: 'ready',
+      model: 'claude-sonnet-4',
+      prompt_version: 3,
+    },
+    client_request_id: '7f6b7f0a-1f2e-4a3b-8c4d-5e6f70819293',
+  };
+
+  it('reads summary_tr, which is the field the server sends', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = await stub(READY_BODY).requestEnrichment(
+        'aa201139-ae37-4633-a0b3-67e7e4e16753',
+      );
+      if (!result.ok || result.data.status !== 'ready') {
+        throw new Error(`expected ready, got ${result.ok ? result.data.status : 'an error'}`);
+      }
+      expect(result.data.summary.bullets).toEqual(['Birinci madde', 'İkinci madde', 'Üçüncü madde']);
+      expect(result.data.summary.translationTr).toBe('Türkçe çeviri.');
+      expect(result.data.summary.translationState).toBe('ready');
+      // Ve hiçbir şey "tanınmadı" diye uyarılmadı.
+      expect(warn.mock.calls.map((call) => String(call[0])).join('\n')).not.toContain(
+        'unrecognised body',
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('drops the translation when the server says not_required', async () => {
+    const result = await stub({
+      ...READY_BODY,
+      summary: { ...READY_BODY.summary, translation_state: 'not_required' },
+    }).requestEnrichment('a1');
+    if (!result.ok || result.data.status !== 'ready') throw new Error('expected ready');
+    expect(result.data.summary.translationState).toBe('not_required');
+    expect(result.data.summary.translationTr).toBeNull();
+  });
+
+  /** 202 + `poll_after_seconds`, anahtarsız kurulumun normal cevabı. */
+  it('still reads the queued body the function sends alongside it', async () => {
+    const result = await stub(
+      {
+        status: 'queued',
+        poll_after_seconds: 120,
+        reason: 'no_api_key',
+        client_request_id: '7f6b7f0a-1f2e-4a3b-8c4d-5e6f70819293',
+      },
+      202,
+    ).requestEnrichment('a1');
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data).toEqual({ status: 'queued', reason: 'no_api_key' });
+  });
+
+  /** Ve `unavailable` gövdesi, yine fonksiyonun kaynağından. */
+  it('still reads the unavailable body', async () => {
+    const result = await stub({
+      status: 'unavailable',
+      reason: 'no_content',
+      client_request_id: '7f6b7f0a-1f2e-4a3b-8c4d-5e6f70819293',
+    }).requestEnrichment('a1');
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data).toEqual({ status: 'unavailable', reason: 'no_content' });
+  });
+});

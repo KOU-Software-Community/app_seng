@@ -590,3 +590,21 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   ayrıştığı sırayı kuran testtir: özet **yokken** aç, `queued` cevabını al,
   sonra satırı tazele. Her düzeltmeyi tek tek geri alıp kırmızıyı görmeden
   "test ettim" demeyin; birlikte geri almak bu maskelemeyi gizler.
+- **Bir uç noktanın gövdesini tahmin etmeyin — fonksiyonun kaynağını okuyun.**
+  `request-enrichment`'ın `ready` cevabı maddeleri **`summary_tr`** adıyla
+  gönderiyor; istemci `summary.bullets` okuyordu. Alan adı tutmadığı için
+  sunucunun her başarılı cevabı "tanınmayan gövde" sayılıp `queued`a
+  düşüyordu — özet üretilmiş, kablodan geçmiş, istemcide çöpe gitmişti.
+  Backend ayrı bir Supabase projesinde ve buraya bağlı değil, ama kodu
+  `Akadirr1/follow-ai`'da ve depo herkese açık: `add_repo` + `git clone` ile
+  okundu ve soru bir tahminle değil kaynakla kapandı. Bir tur önce "buradan
+  bilinemez" demiştim; bilinebiliyordu.
+- **Aynı hata kaynak uygulamada da var.** `follow-ai` kendi Edge
+  fonksiyonunun gövdesini kendi istemcisinde yanlış okuyor. Taşınan kod
+  taşındığı hatayı da taşır: bir portu "sadakatle taşındı" diye doğru
+  saymayın — karşı tarafın sözleşmesini bir kez de kendiniz okuyun.
+- **İstemci testinin fikstürü, istemcinin varsayımını doğrular.** Bu
+  uyuşmazlığın iki uygulamada birden yaşamasının sebebi buydu: `bullets`
+  bekleyen kodun testi de `bullets` gönderiyordu, yeşildi ve hiçbir şeyi
+  korumuyordu. Kablodaki şekli sınayan fikstür, kablonun **öbür ucundan**
+  kopyalanır.

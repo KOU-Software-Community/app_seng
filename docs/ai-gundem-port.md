@@ -306,18 +306,49 @@ Dört düzeltme, dördü de tek tek kırmızı görülerek:
 | 3 | `data-access/supabase/repositories.ts` | dolu `summary.bullets` taşıyan gövde, `status` ne derse desin kabul ediliyor; tanınmayan gövde uyarısı artık HTTP kodunu, `status`u ve anahtarları yazıyor |
 | 4 | `data-access/supabase/mapper.ts` | `toSummary` çeviriyi özete bağlamayı bıraktı; çeviri durumu metnin kendisinden okunuyor |
 
-### Hâlâ bilinmeyen — ve buradan bilinemez
+### Kök neden: alan adı uyuşmazlığı
 
-**Sunucunun `request-enrichment`'tan tam olarak ne döndürdüğü.** AI Gündem
-backend'i bu oturuma bağlı Supabase projesi değil (bağlı olan tek proje
-`tidasan`, ve onda hiç Edge Function yok), dolayısıyla fonksiyonun kaynağı da
-logları da okunamadı. Yukarıdaki düzeltmeler uygulamayı **her iki dünyada da**
-doğru yapıyor:
+İlk turda "sunucunun ne döndürdüğü buradan bilinemez" yazmıştım. **Yanlıştı** —
+backend'in Supabase projesi bağlı değil, ama fonksiyonun kaynağı
+`Akadirr1/follow-ai` deposunda ve o depo herkese açık. Okundu
+(`supabase/functions/request-enrichment/index.ts`), ve cevap net:
 
-- Sunucu özeti başka bir adla döndürüyorsa → artık kabul ediliyor.
-- Sunucu gerçekten özet üretemiyorsa (anahtar reddi, günlük tavan, worker
-  çalışmıyor) → yeni haberler için özet yine gelmez, ve bu **sunucu tarafı bir
-  iş**. Ama artık cihaz logu hangisi olduğunu söyleyecek: uyarı `status` alanını
-  ve gövdenin anahtarlarını taşıyor.
+```ts
+return jsonResponse({
+  status: 'ready',
+  summary: {
+    article_id: …,
+    summary_tr: result.summary.summary_tr,   // ← maddelerin adı
+    translation_tr: …,
+    translation_state: …,
+    model: …,
+    prompt_version: …,
+  },
+  client_request_id: …,
+}, 200, requestId);
+```
 
-Bir sonraki cihaz koşusunda o satırı okumak, kalan soruyu kapatır.
+İstemci `summary.bullets` okuyordu. **Alan adı tutmuyor**, dolayısıyla sunucunun
+her `ready` cevabı "tanınmayan gövde" sayılıp `queued`a düşüyordu: özet
+üretilmiş, kablodan geçmiş, istemcide çöpe gitmişti. Cihaz logundaki her
+"unrecognised body" satırının tek sebebi bu.
+
+**Kaynak uygulamada da aynı uyuşmazlık var** (`follow-ai`'ın kendi
+`src/data-access/supabase/repositories.ts:332`'si de `summary?.bullets`
+okuyor). Yani bu bir port regresyonu değil, sadakatle taşınmış bir hata — ve
+taşınırken yeniden bulunması gereken bir hata.
+
+`queued` (202 + `poll_after_seconds` + `reason`) ve `unavailable`
+(200 + `reason`) gövdeleri uyuşuyor; `add-source`'un `{source, …}` zarfı da.
+
+### Bundan sonrası için
+
+- **Bir uç noktanın gövdesini tahmin etmeyin; fonksiyonun kaynağını okuyun.**
+  Backend ayrı bir Supabase projesinde olabilir ama kodu bir depoda ve o depo
+  okunabilir. Bu hata sekiz ay boyunca iki uygulamada birden yaşadı, çünkü
+  istemci tarafındaki testlerin fikstürü de istemcinin varsaydığı adı
+  kullanıyordu.
+- **`poll_after_seconds` hâlâ yok sayılıyor.** Sunucu ne zaman dönüleceğini
+  söylüyor, istemci kendi sabit takvimini kullanıyor (`pollAfterSeconds()`
+  yazılmış ama çağrılmıyor). Takvim iki cron periyodunu kapsadığı için bugün
+  zararsız; sunucu periyodu değişirse ayrışır.
