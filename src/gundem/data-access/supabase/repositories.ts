@@ -314,33 +314,51 @@ export function createSupabaseEnrichmentRepository(
         return ok({ status: 'unavailable', reason: data.reason ?? 'no_content' });
       }
 
-      // 202, or any body that says `queued`, is the normal no-API-key path
-      // (addendum §E): the job is real, it just has nothing to run yet.
-      if (status === 202 || data?.status === 'queued') {
-        return ok({ status: 'queued', reason: data?.reason ?? null });
-      }
-
+      // Bir gövde kullanılabilir bir özet taşıyorsa **cevap odur**, `status`
+      // ne derse desin.
+      //
+      // Eskiden koşul `data?.status === 'ready'` idi ve sıra da `queued`dan
+      // sonraydı. Sunucu özeti `ready` dışında bir adla döndürdüğü anda
+      // (`already_enriched`, `done`, `ok` — hangisi olduğunu buradan göremiyoruz)
+      // istemci elindeki üç maddeyi görmezden gelip "kuyrukta" diyordu. Bir
+      // durum dizesini tanımamak, veriyi atmak için sebep değil.
       const summary = data?.summary;
-      if (data?.status === 'ready' && summary?.bullets) {
-        const bullets = summary.bullets;
-        if (bullets.length !== 3) {
+      const bullets = summary?.bullets?.filter((bullet) => bullet?.trim().length) ?? [];
+      if (summary?.bullets && bullets.length > 0) {
+        const all = summary.bullets;
+        if (all.length !== 3) {
           console.warn(
-            `[supabase] request-enrichment returned ${bullets.length} bullets for ${trimmed}, expected 3; padding.`,
+            `[supabase] request-enrichment returned ${all.length} bullets for ${trimmed}, expected 3; padding.`,
           );
         }
         const state = summary.translation_state === 'not_required' ? 'not_required' : 'ready';
         return ok({
           status: 'ready',
           summary: {
-            bullets: [bullets[0] ?? '', bullets[1] ?? '', bullets[2] ?? ''],
+            bullets: [all[0] ?? '', all[1] ?? '', all[2] ?? ''],
             translationTr: state === 'not_required' ? null : (summary.translation_tr ?? null),
             translationState: state,
           },
         });
       }
 
+      // 202, or any body that says `queued`, is the normal no-API-key path
+      // (addendum §E): the job is real, it just has nothing to run yet.
+      if (status === 202 || data?.status === 'queued') {
+        return ok({ status: 'queued', reason: data?.reason ?? null });
+      }
+
+      // Tanınmayan gövde. Uyarı artık **ne geldiğini** söylüyor.
+      //
+      // Eski hâli yalnızca "unrecognised body" diyordu, ve cihazdan gelen log
+      // tam olarak bu yüzden teşhis edilemiyordu: sekiz yoklamanın sekizi de
+      // aynı cümleyi yazıyor, hiçbiri sunucunun ne dediğini taşımıyordu.
+      // Gövdenin kendisi değil — içinde makale metni olabilir — durum kodu,
+      // `status` alanı ve üst düzey anahtarlar yazılıyor.
       console.warn(
-        `[supabase] request-enrichment returned an unrecognised body for ${trimmed}; treating it as queued.`,
+        `[supabase] request-enrichment returned an unrecognised body for ${trimmed}; ` +
+          `treating it as queued. HTTP ${status}, status=${JSON.stringify(data?.status)}, ` +
+          `keys=[${data && typeof data === 'object' ? Object.keys(data).join(', ') : ''}]`,
       );
       return ok({ status: 'queued', reason: data?.reason ?? null });
     },

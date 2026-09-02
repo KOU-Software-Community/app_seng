@@ -278,3 +278,46 @@ Dördünün de kırmızı hâli ölçüldü: düzeltme geri alınınca ilgili te
   anlatıyor, çağıranı yalnızca kendi testi. Rozeti eklemek yeni bir özellik
   (sayı akışta, başlık sekme kabuğunda — durum yukarı taşınmalı), silmek ise
   istenmemiş bir kayıp. Kayıt burada duruyor.
+
+## P10 — cihaz raporu: "çeviri gelmiş ama özet oluşturamıyor" (2026-09-02)
+
+Cihaz logu:
+
+```
+WARN [supabase] request-enrichment returned an unrecognised body for
+     2e3c71ae-…; treating it as queued.        (x8)
+WARN [enrichment] article 2e3c71ae-…: 8 yoklama ve ~290 saniye sonra hâlâ
+     kuyrukta (sebep bildirilmedi). …
+```
+
+Zincir, testle yeniden üretildi (`src/__tests__/article-summary.test.tsx`):
+satır özetli ve çevirili → `request-enrichment` istemcinin tanımadığı bir gövde
+döndürüyor → depo `queued` diyor → ekran, **elindeki üç maddeye bakmadan**,
+"Özet hazırlanıyor" çiziyor → kanca sekiz kez yokluyor. Çevirinin ekranda
+görünmesi özetin de satırda olduğunun kanıtı: eski `toSummary`'de çeviri ancak
+`summary_ready` ile birlikte "ready" oluyordu.
+
+Dört düzeltme, dördü de tek tek kırmızı görülerek:
+
+| # | Nerede | Ne |
+|---|--------|-----|
+| 1 | `app/gundem/[id].tsx` | `pending` ve `unavailable` artık `hasSummary(summary)` ile kapılı — bir cevap, elde olan veriyi silemez |
+| 2 | `app/gundem/[id].tsx` | özeti olan haber için `request-enrichment` hiç çağrılmıyor (sekiz gereksiz Edge isteği, hepsi hız-sınırı kovasına yazan) |
+| 3 | `data-access/supabase/repositories.ts` | dolu `summary.bullets` taşıyan gövde, `status` ne derse desin kabul ediliyor; tanınmayan gövde uyarısı artık HTTP kodunu, `status`u ve anahtarları yazıyor |
+| 4 | `data-access/supabase/mapper.ts` | `toSummary` çeviriyi özete bağlamayı bıraktı; çeviri durumu metnin kendisinden okunuyor |
+
+### Hâlâ bilinmeyen — ve buradan bilinemez
+
+**Sunucunun `request-enrichment`'tan tam olarak ne döndürdüğü.** AI Gündem
+backend'i bu oturuma bağlı Supabase projesi değil (bağlı olan tek proje
+`tidasan`, ve onda hiç Edge Function yok), dolayısıyla fonksiyonun kaynağı da
+logları da okunamadı. Yukarıdaki düzeltmeler uygulamayı **her iki dünyada da**
+doğru yapıyor:
+
+- Sunucu özeti başka bir adla döndürüyorsa → artık kabul ediliyor.
+- Sunucu gerçekten özet üretemiyorsa (anahtar reddi, günlük tavan, worker
+  çalışmıyor) → yeni haberler için özet yine gelmez, ve bu **sunucu tarafı bir
+  iş**. Ama artık cihaz logu hangisi olduğunu söyleyecek: uyarı `status` alanını
+  ve gövdenin anahtarlarını taşıyor.
+
+Bir sonraki cihaz koşusunda o satırı okumak, kalan soruyu kapatır.

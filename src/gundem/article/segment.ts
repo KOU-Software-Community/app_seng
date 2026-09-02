@@ -13,6 +13,22 @@ import type { Article, ArticleSummary } from '../domain/types';
  */
 export type Segment = 'en' | 'tr';
 
+/**
+ * Elde gösterilebilir bir özet var mı?
+ *
+ * Cihazda ölçülen hata bu soruyu hiç sormamaktan çıktı. `toSummary` özeti
+ * olmayan bir satır için de bir `ArticleSummary` üretiyor — üç boş dizeyle —
+ * yani "özet nesnesi var" ile "özet var" aynı şey değil. Ekran ise
+ * "hazırlanıyor" kararını **uç noktanın cevabına** bakarak veriyordu:
+ * `request-enrichment` tanımadığı bir gövde döndürüp `queued`a düşünce, satırda
+ * duran üç madde dönen bir göstergenin arkasında kayboluyordu.
+ *
+ * Doğru kaynak elde olan veri: maddelerden biri doluysa özet vardır, sunucu ne
+ * derse desin.
+ */
+export const hasSummary = (summary: ArticleSummary | undefined): boolean =>
+  !!summary && summary.bullets.some((bullet) => bullet.trim().length > 0);
+
 export function segmentState(
   article: Article | undefined,
   summary: ArticleSummary | undefined,

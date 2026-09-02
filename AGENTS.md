@@ -553,3 +553,40 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   depoda kod-only koşturulduğunda 111 dosya → 1005 düğüm, 2272 kenar, tek
   LLM çağrısı olmadan. Mimari sorular için yeterli: yukarıdaki "yalnızca kendi
   testi çağırıyor" bulgusu bir grafik sorgusu, dosya taraması değil.
+
+### Cihazdan gelen "çeviri gelmiş ama özet oluşturamıyor" raporundan
+
+- **Bir cevap, elde olan veriyi silemez — en fazla ona ekleyebilir.** Makale
+  ekranı "Özet hazırlanıyor" kararını `request-enrichment`'ın cevabına bakarak
+  veriyordu: `pending = result?.status === 'queued' || ...`. Satırda üç madde
+  dururken uç noktadan gelen bir `queued`, onları dönen bir göstergenin
+  arkasında yok ediyordu. Kullanıcının gördüğü tam olarak buydu — çeviri
+  ekranda (yani `summary_ready` doğru, yani özet de satırda), özet yok.
+  Ekran artık önce **elindekine** bakıyor: `hasSummary(summary)` doğruysa ne
+  `pending` ne `unavailable` yazabilir.
+- **Bir durum dizesini tanımamak, veriyi atmak için sebep değil.** Depo yalnızca
+  `status === 'ready'` gövdesini kabul ediyordu; sunucu özeti başka bir adla
+  döndürdüğü an (`already_enriched`, `done`, ne olduğunu buradan göremiyoruz)
+  üç madde çöpe gidiyor ve cevap "kuyrukta" oluyordu. Koşul artık şekle bakıyor:
+  gövde dolu `summary.bullets` taşıyorsa cevap odur. `unavailable` yine önce
+  kontrol ediliyor — sunucu bakıp "gövde yok" dediyse boş bir `summary` alanı
+  bunu bozmamalı.
+- **Özet ve çeviri iki ayrı üründür; `toSummary` onları birbirine bağlıyordu.**
+  `summary_ready` false ise fonksiyon erken dönüp `translationTr: null`
+  diyordu — satır bitmiş bir çeviri taşısa bile. Çeviri durumu artık metnin
+  kendisinden okunuyor, bayraktan değil: elde Türkçe metin varsa hazırdır.
+  Ters yönü de düzeldi — `translation_state: 'ready'` derken metin boşken
+  düğme açılıyor, kullanıcı basıyor ve `bodyFor` sessizce orijinale düşüyordu.
+- **Teşhis edilemeyen bir uyarı, uyarı değil.** Cihaz logunda sekiz satır vardı
+  ve sekizi de aynı cümleydi: "returned an unrecognised body". Sunucunun ne
+  döndürdüğünü hiçbiri taşımıyordu, dolayısıyla log elde olduğu hâlde sebep
+  bilinemiyordu. Uyarı artık HTTP kodunu, `status` alanını ve üst düzey
+  anahtarları yazıyor — gövdenin kendisini değil, içinde makale metni olabilir.
+- **İki düzeltme aynı anda girince biri diğerinin testini görünmez kılabilir.**
+  "Özeti olan haberde hiç sorma" düzeltmesi devreye girince `result` hiç
+  oluşmuyor, ve `pending`in eski (yanlış) ifadesi de artık yanlış cevabı
+  veremiyor: ekran testleri **eski kodla da** yeşil kalıyordu. Ölçüldü —
+  düzeltme geri alındı, üç test de yeşil verdi. Koruyan test, ikisinin
+  ayrıştığı sırayı kuran testtir: özet **yokken** aç, `queued` cevabını al,
+  sonra satırı tazele. Her düzeltmeyi tek tek geri alıp kırmızıyı görmeden
+  "test ettim" demeyin; birlikte geri almak bu maskelemeyi gizler.
