@@ -30,16 +30,30 @@
 export const WARM_BATCH = 4;
 
 /**
- * Gün başına en fazla kaç **farklı** haber ısıtılır. Sunucunun tavanı 30;
- * 12'si ısıtmaya, kalan 18'i kullanıcının kendi açtıklarına.
+ * Gün başına en fazla kaç **farklı** haber ısıtılır. Sunucunun tavanı 30.
+ *
+ * 20, ısıtma akışa girmenin **mekanizması** olduğu için: ısıtılmayan haber
+ * `gate.ts`'in penceresi dolana kadar bekliyor. Kullanıcının kendi açtıkları
+ * bu bütçeden neredeyse hiç yemiyor — ısıtılmış bir haberin ikinci isteği
+ * önbellek isabeti, yani saatlik 120'lik *check* sayacına yazılıyor, günlük
+ * *miss* sayacına değil. Kalan 10 ısıtılmamış hâliyle açılanlara.
  */
-export const WARM_DAILY_CAP = 12;
+export const WARM_DAILY_CAP = 20;
 
 /**
  * İstekler arası boşluk. Dördünü aynı anda yollamak Edge tarafında dört eşzamanlı
  * çağrı demek ve kazandırdığı şey yok — worker zaten iki dakikada bir koşuyor.
  */
 export const WARM_SPACING_MS = 1500;
+
+/**
+ * Isıtma turu bittikten ne kadar sonra akış bir kez tazelenir.
+ *
+ * Worker iki dakikada bir koşuyor; 150 saniye bir turu artı biraz payı
+ * kapsıyor. Daha kısası worker'dan önce sorar ve hiçbir şey değişmemiş bir
+ * cevapla döner.
+ */
+export const WARM_REFRESH_AFTER_MS = 150_000;
 
 /** Isıtılabilir olarak akıştan alınan izdüşüm. Tam `Article` gerekmiyor. */
 export type WarmCandidate = {

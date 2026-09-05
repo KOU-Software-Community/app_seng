@@ -847,6 +847,11 @@ check(
     if (!feed.includes('useEnrichmentWarmup(')) {
       return 'FeedView arka plan ısıtmasını çağırmıyor';
     }
+    // Isıtma ve kapı bir çift: kapı olmadan yarım hazırlanmış haber akışa
+    // giriyor, ısıtma olmadan kapı haberleri pencere dolana kadar saklıyor.
+    if (!feed.includes('holdUnenriched(')) {
+      return 'FeedView özetsiz haberi akışa girmekten alıkoymuyor';
+    }
     if (!feed.includes("'unconfigured'")) {
       return 'FeedView yapılandırma hatasını ağ hatasından ayırmıyor';
     }

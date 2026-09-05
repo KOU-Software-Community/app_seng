@@ -699,3 +699,38 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   olmayan bir `setQueryData` girdisi anında toplanıyor, yani "önbelleğe yazdı
   mı" iddiası her zaman `undefined` görüyor. Sızıntı korkusuyla sıfırlamak
   yerine sonlu bir değer verip `afterEach`'te `client.clear()` demek gerekiyor.
+
+### "Yayına girmeden hazırlansın" — sunucu değiştirilemiyorken
+
+- **Backend deposu emekliye ayrıldı, dağıtılmış fonksiyonlar çalışmaya devam
+  ediyor.** Doğru düzeltme (`sync-feeds` yeni haberi eklerken özet işini de
+  kuyruğa koysun) oraya yazılamıyor. Uygulamanın elindeki tek kaldıraç **ne
+  göstereceği**, o yüzden "yayın" burada akışa girmek olarak tanımlandı: özeti
+  olmayan taze haber listeye hiç girmiyor, arka planda ısıtılıyor, hazır olunca
+  geliyor. Kaldıracın olmadığı yerde tanımı değiştirmek, sorunu görmezden
+  gelmekten iyidir — ama bunun bir tanım değişikliği olduğu yazılmalı.
+- **İçerik saklayan her kuralın bir tavanı olmak zorunda.** Gövdesi olmayan bir
+  haberin özeti hiç üretilemiyor (`unavailable`), yani `summary_ready` sonsuza
+  kadar false. Tavansız bir kapı o haberi ebediyen saklardı — ve bunu kimse
+  bildirmez, çünkü **görünmeyen bir haberin eksik olduğu belli olmaz.** Kapı bu
+  yüzden yaşa bağlı: 30 dakika (çekim 15 dakikada bir + worker 2 dakikada bir =
+  en kötü ~17 dakika; tavan onun iki katına yakın).
+- **Bozuk bir tarihte içerik saklanmıyor.** `publishedAt` okunamıyorsa haber
+  gösteriliyor: iki hatadan biri geç gelen bir özet, öteki hiç görünmeyen bir
+  haber.
+- **Bekleyen haber ekranda söyleniyor.** Sessizce saklamak, kullanıcının
+  yenileyip "değişmedi" görmesi demek — ve akış boşken "Bu filtrede haber yok"
+  yazmak düpedüz yanlış olurdu; o durumda "HAZIRLANIYOR" yazıyor.
+- **Kapı ile ısıtma bir çift, ve tek başlarına ikisi de zararlı.** Kapısız
+  ısıtma yarım hazırlanmış haberi akışa sokar; ısıtmasız kapı haberleri pencere
+  dolana kadar saklar. `check:release` ikisinin de yerinde durduğunu ayrı ayrı
+  doğruluyor.
+- **`EXPO_PUBLIC_*` bir EAS değişkeninde `secret` olamaz, `plain text`
+  olmalı.** Değer zaten derleme anında JS paketine gömülüyor; `.ipa`'yı açan
+  herkes okuyabiliyor. `secret` görünürlük hiçbir şey saklamıyor — yalnızca
+  `eas env:list` ile geri okumayı engelleyip doğrulamayı imkânsız yapıyor.
+  Supabase anon anahtarı da tasarımı gereği açık; koruma RLS'te.
+- **`eas env:create` `.env` okumuyor.** Değeri yalnızca `--value`'dan alıyor,
+  hangi klasörde çalıştırıldığının değere etkisi yok. Dosyadan yükleyen komut
+  ayrı: `eas env:push <ortam> --path .env`. (`env:create` artık deprecated,
+  yerine `eas env:set`.)

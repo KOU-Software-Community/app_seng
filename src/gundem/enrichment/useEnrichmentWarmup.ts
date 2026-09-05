@@ -3,12 +3,13 @@ import { useEffect, useRef } from 'react';
 
 import { env } from '../config/env';
 import { useRepositories } from '../data-access/hooks';
-import { queryKeys } from '../data-access/queryKeys';
+import { QUERY_KEY_VERSION, queryKeys } from '../data-access/queryKeys';
 import { kv, KV_KEYS, type KvStore } from '../storage/kv';
 import {
   emptyBudget,
   planWarmup,
   warmDayKey,
+  WARM_REFRESH_AFTER_MS,
   WARM_SPACING_MS,
   type WarmBudget,
   type WarmCandidate,
@@ -38,6 +39,7 @@ export function useEnrichmentWarmup(
     /** Test tohumu. */
     storage?: KvStore;
     spacingMs?: number;
+    refreshAfterMs?: number;
   } = {},
 ): void {
   const client = useQueryClient();
@@ -52,6 +54,7 @@ export function useEnrichmentWarmup(
 
   const enabled = options.enabled !== false;
   const spacing = options.spacingMs ?? WARM_SPACING_MS;
+  const refreshAfter = options.refreshAfterMs ?? WARM_REFRESH_AFTER_MS;
   const storage = options.storage ?? kv;
 
   useEffect(() => {
@@ -61,6 +64,7 @@ export function useEnrichmentWarmup(
     if (articles.length === 0 || runningRef.current) return;
 
     let cancelled = false;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     runningRef.current = true;
 
     void (async () => {
@@ -83,6 +87,25 @@ export function useEnrichmentWarmup(
           if (cancelled) return;
           await delay(spacing);
         }
+
+        /**
+         * Tur bittikten sonra akış **bir kez** tazeleniyor.
+         *
+         * Isıtılan haberin özeti worker'ın bir sonraki turunda yazılıyor;
+         * o ana kadar akış satırı hâlâ özetsiz ve `gate.ts` onu bekletiyor.
+         * Bu tazeleme olmasaydı haber ancak kullanıcı elle yenileyene kadar
+         * görünmezdi — yani "hazırlansın sonra girsin" kuralı "hazırlansın ve
+         * sen isteyene kadar girmesin"e dönerdi.
+         *
+         * Döngü kurmuyor: tazelemenin getirdiği satırlar zaten bütçedeki
+         * kimlikler, `planWarmup` boş dönüyor ve yeni bir tazeleme
+         * planlanmıyor.
+         */
+        if (!cancelled) {
+          refreshTimer = setTimeout(() => {
+            void client.invalidateQueries({ queryKey: [QUERY_KEY_VERSION, 'feed'] });
+          }, refreshAfter);
+        }
       } finally {
         runningRef.current = false;
       }
@@ -104,10 +127,11 @@ export function useEnrichmentWarmup(
 
     return () => {
       cancelled = true;
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
     };
     // `articles` FeedView'da useMemo'lu; kimliği ancak yeni sayfa gelince değişiyor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [articles, enabled, spacing]);
+  }, [articles, enabled, spacing, refreshAfter]);
 }
 
 const delay = (ms: number): Promise<void> =>

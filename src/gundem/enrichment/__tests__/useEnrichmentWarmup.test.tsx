@@ -52,7 +52,8 @@ function mount(articles: { id: string; summaryReady: boolean }[]) {
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   const result = renderHook(
-    () => useEnrichmentWarmup(articles, { storage: memoryStore, spacingMs: 0 }),
+    // `refreshAfterMs` küçük: gerçek değeri 150 saniye ve Jest onu bekler.
+    () => useEnrichmentWarmup(articles, { storage: memoryStore, spacingMs: 0, refreshAfterMs: 5 }),
     { wrapper },
   );
   return { client, result };
@@ -129,6 +130,30 @@ describe('useEnrichmentWarmup', () => {
     }
 
     expect(mockRequestEnrichment).toHaveBeenCalledTimes(WARM_DAILY_CAP);
+  });
+
+  /**
+   * Isıtılan haberin özeti worker'ın bir sonraki turunda yazılıyor. Bu tazeleme
+   * olmasaydı haber, `gate.ts` onu bekletirken, kullanıcı elle yenileyene kadar
+   * akışa hiç girmezdi.
+   */
+  it('tur bitince akışı bir kez tazeliyor', async () => {
+    mockRequestEnrichment.mockResolvedValue(ok(QUEUED));
+
+    const { client } = await mount(rows(1));
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['v1', 'feed'] });
+  });
+
+  it('ısıtacak bir şey yoksa akışı tazelemiyor', async () => {
+    const { client } = await mount([{ id: 'hazir', summaryReady: true }]);
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(mockRequestEnrichment).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('bir istek başarısız olursa yüzeye çıkmıyor ve tur devam ediyor', async () => {

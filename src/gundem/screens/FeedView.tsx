@@ -12,6 +12,7 @@ import {
 import { hasSummary } from '../article/segment';
 import { ArticleCard } from '../components/ArticleCard';
 import { useEnrichmentWarmup } from '../enrichment/useEnrichmentWarmup';
+import { heldLineTr, holdUnenriched } from '../enrichment/gate';
 import { asDataError, useFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useEnabledSources, useReadArticles } from '../user-state/hooks';
@@ -64,18 +65,35 @@ export function FeedView() {
   );
 
   /**
-   * Özeti olmayan en yeni haberlerin zenginleştirmesi, kullanıcı listeyi
-   * kaydırırken arka planda başlıyor.
+   * Akışa girme kuralı ve onu besleyen arka plan ısıtması.
    *
    * Sunucudaki iş talep güdümlü: haber çekimi özet işi yaratmıyor, işi yaratan
-   * şey bu çağrı. Olmadığında bir haberi ilk açan kişi her seferinde worker'ın
-   * bir sonraki turunu bekliyor — ekranda görülen "Özet hazırlanıyor" tam olarak
-   * bu. `summaryReady` satırdan okunuyor, yani zaten özeti olanlar için hiç
-   * istek çıkmıyor.
+   * şey istemcinin isteği, ve worker iki dakikada bir koşuyor. Yani bir haberi
+   * ilk açan kişi her seferinde bekliyordu.
+   *
+   * İkisi birlikte çalışıyor: özetsiz taze haber **akışa hiç girmiyor**
+   * (`holdUnenriched`), aynı anda arka planda ısıtılıyor, ve ısıtma turundan
+   * sonra akış bir kez tazeleniyor. Kullanıcı yarım hazırlanmış bir haber
+   * görmüyor; gördüğü her haberin çevirisi ve özeti hazır.
    */
-  const warmCandidates = useMemo(
-    () => articles.map((article) => ({ id: article.id, summaryReady: hasSummary(article.summary) })),
+  const rows = useMemo(
+    () =>
+      articles.map((article) => ({
+        article,
+        id: article.id,
+        publishedAt: article.publishedAt,
+        summaryReady: hasSummary(article.summary),
+      })),
     [articles],
+  );
+
+  const gate = useMemo(() => holdUnenriched(rows, new Date()), [rows]);
+  const visible = useMemo(() => gate.visible.map((row) => row.article), [gate]);
+  const heldLine = heldLineTr(gate.heldCount);
+
+  const warmCandidates = useMemo(
+    () => rows.map(({ id, summaryReady }) => ({ id, summaryReady })),
+    [rows],
   );
   useEnrichmentWarmup(warmCandidates);
 
@@ -102,7 +120,7 @@ export function FeedView() {
   return (
     <View style={styles.screen}>
       <FlatList
-        data={articles}
+        data={visible}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
@@ -131,6 +149,12 @@ export function FeedView() {
               <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
             ) : null}
 
+            {heldLine ? (
+              <Txt size={11.5} color={colors.muted} style={styles.staleLine}>
+                {heldLine}
+              </Txt>
+            ) : null}
+
             {stale ? (
               <Txt size={11.5} color={colors.muted} style={styles.staleLine}>
                 Çevrimdışı: en son alınan liste gösteriliyor.
@@ -157,6 +181,11 @@ export function FeedView() {
           feed.isPending ? (
             <PixelTxt size={9} style={styles.loading}>
               YUKLENIYOR
+            </PixelTxt>
+          ) : gate.heldCount > 0 ? (
+            // Liste boş değil, bekliyor. "Haber yok" demek yanlış olurdu.
+            <PixelTxt size={9} style={styles.loading}>
+              HAZIRLANIYOR
             </PixelTxt>
           ) : feed.isError ? null : (
             <EmptyState
