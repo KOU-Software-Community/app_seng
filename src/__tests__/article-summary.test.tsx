@@ -64,6 +64,13 @@ const enrichedRow = (): FeedArticleRow => ({
   summary_ready: true,
 });
 
+/** Gerçek bir gövde: üç paragraf, ikisi yumuşak sarma taşıyor. */
+const LONG_BODY = [
+  'Giris paragrafi burada duruyor ve haberin ne hakkinda oldugunu soyluyor.',
+  'Ikinci paragraf bir\ncumlenin ortasindan kirilmis hâlde geliyor.',
+  'Ucuncu paragraf da metnin sonunu getiriyor.',
+].join('\n\n');
+
 /** Özeti **bekleyen**, ama çevirisi biten satır. */
 const translatedOnlyRow = (): FeedArticleRow => ({
   ...enrichedRow(),
@@ -303,6 +310,71 @@ describe('article screen — a summary already in hand', () => {
           screen.queryByText('Bu haber için özet üretilemiyor; kaynağa gidebilirsiniz.'),
         ).toBeNull(),
       );
+      await (await view).unmount();
+    } finally {
+      warn.mockRestore();
+    }
+  }, 30000);
+});
+
+describe('article screen — the reading surface', () => {
+  /**
+   * Duvarın çözümü: gövde tek bir metin düğümü değil, paragraflar. Ekranda
+   * paragrafları ayrı ayrı bulabiliyorsak ayrılmışlar demektir.
+   */
+  it('renders the body as separate paragraphs, not one block', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { view } = mount(
+        [{ ...enrichedRow(), language: 'tr', content_text: LONG_BODY }],
+        { status: 'already_enriched' },
+      );
+      await view;
+
+      expect(
+        await screen.findByText(
+          'Giris paragrafi burada duruyor ve haberin ne hakkinda oldugunu soyluyor.',
+        ),
+      ).toBeTruthy();
+      // Yumuşak sarma katlanmış: satır sonu boşluğa dönmüş hâliyle aranıyor.
+      expect(
+        screen.getByText('Ikinci paragraf bir cumlenin ortasindan kirilmis hâlde geliyor.'),
+      ).toBeTruthy();
+      expect(screen.getByText('Ucuncu paragraf da metnin sonunu getiriyor.')).toBeTruthy();
+      await (await view).unmount();
+    } finally {
+      warn.mockRestore();
+    }
+  }, 30000);
+
+  it('tells the reader how long it is, next to which text they are reading', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { view } = mount([{ ...enrichedRow(), content_text: LONG_BODY }], {
+        status: 'already_enriched',
+      });
+      await view;
+      // Çeviri hazır olduğu için varsayılan seçim çeviri; etiket ve süre yan yana.
+      expect(await screen.findByText(/Çeviri · Türkçe · \d+ dk okuma/)).toBeTruthy();
+      await (await view).unmount();
+    } finally {
+      warn.mockRestore();
+    }
+  }, 30000);
+
+  /** Gövdesi olmayan haber boş bir kart göstermemeli. */
+  it('says so when there is no body text at all', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { view } = mount(
+        // Çeviri de yok: aksi hâlde `bodyFor` çeviriyi gösterirdi ve gövde boş olmazdı.
+        [{ ...enrichedRow(), language: 'tr', translation_tr: null, content_text: null, excerpt: null }],
+        { status: 'already_enriched' },
+      );
+      await view;
+      expect(
+        await screen.findByText('Bu haberin metni alınamadı. Aşağıdan kaynağa gidebilirsiniz.'),
+      ).toBeTruthy();
       await (await view).unmount();
     } finally {
       warn.mockRestore();

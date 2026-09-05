@@ -608,3 +608,55 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   bekleyen kodun testi de `bullets` gönderiyordu, yeşildi ve hiçbir şeyi
   korumuyordu. Kablodaki şekli sınayan fikstür, kablonun **öbür ucundan**
   kopyalanır.
+- **Uzun metnin "txt dosyası gibi" görünmesi bir yazı tipi sorunu değil,
+  paragrafın hiç olmamasıydı.** Gövde tek bir `<Txt>` olarak basılıyordu; RSS
+  çıkarıcıları kimi kaynakta boş satırla, kimisinde tek satır sonuyla ayırıyor
+  ve ekran ikisini de olduğu gibi geçiriyordu. `toParagraphs` her iki biçimi de
+  tanıyor **ve** boş satır varken paragraf içindeki tek satır sonlarını boşluğa
+  katlıyor — katlamazsa metin, sütun genişliğiyle alakasız yerlerden kırılmış
+  görünür. Boş satırı hiç olmayan metinde ise tek satır sonu paragraf
+  ayırıcısıdır; o dal atlanırsa metnin tamamı tek bir dev paragrafa iner, yani
+  düzeltilmeye çalışılan duvarın aynısı kurulur.
+- **Okunabilirlik dört sayının işi, biri değil:** punto (14,5 → 16), satır
+  aralığı (1,52 → 1,7), satır uzunluğu (kartın 18 px iç boşluğu ~85 karakteri
+  ~60'a indiriyor) ve zemin (beyaz kart, sayfa zemininde yüzen metin değil).
+  Yalnızca puntoyu büyütmek satırı daha da uzatır ve durumu kötüleştirir.
+
+### Apple'ın çekiliş reddinden — 5.3.1 / 5.3.2
+
+- **Red mekanikte değildi, beyandaydı.** Uygulama zaten çekiliş çekmiyordu:
+  `raffleSchema.ts` aylardır "burada rastgele seçim, tohum, durum makinesi yok"
+  diye yazıyor ve doğru yazıyor — form toplanıyor, kazanan panelden elle
+  giriliyor. Eksik olan tek şey, bunun **kullanıcıya söylenmesiydi**: düzenleyen
+  kim, katılım ücretsiz mi, kazanan nasıl seçiliyor, Apple'ın ilgisi var mı.
+  Reddi okuyup koda bakınca ilk refleks mantığı değiştirmek oluyor; değiştirilecek
+  mantık yoktu. Guideline 5.3.x'in istediği şeylerin çoğu davranış değil metin.
+- **Düzenleyen adı, App Store Connect'teki *takım* adıdır — kişisel Apple Account
+  adı değil.** Bu hesapta ikisi farklı yazılıyor: hesap sayfasının tepesinde
+  `Abdülkadir İvenç`, Team ID'nin üstünde `Abdulkadir IVENC`. Mağazada
+  geliştirici olarak görünen ve Apple'ın beyanla karşılaştırdığı ikincisi.
+  Türkçe aksanlı hâli daha "doğru" göründüğü için düzeltmek isteniyor; düzeltmek
+  tam olarak reddin sebebini geri getirir. Testte `not.toContain('Abdülkadir')`
+  var, ve orada olma sebebi bu.
+- **Kurallar sayfası yalnızca kodun gerçekten yaptığı şeyi yazabilir.** "Her
+  öğrenci numarası bir çekilişe yalnızca bir kez katılabilir" cümlesi yazılmadı:
+  o kural *kayıtlarda* doküman kimliğiyle (`eventId__studentNo`) zorlanıyor ama
+  çekiliş katılımının kimliği rastgele (`makeEntryId`) — uygulama ikinci
+  katılımı yalnızca aynı cihazda engelliyor. Zorlanmayan bir kuralı resmî
+  kurallara yazmak, "412 fotoğraf" satırıyla aynı sınıfta bir kurgu olurdu.
+- **Bir bileşenin kendi testi, onu kimsenin ekrana koymadığını göremez.**
+  `RaffleNotice` render testleriyle birlikte geldi ve o testler beyan iki
+  ekrandan da silinse yeşil kalırdı. Mount edildiğini doğrulayan şey
+  `check:release` — dördü de tek tek kırılıp kırmızı verdiği görüldü (etkinlik
+  ekranı, form, rota kaydı, Apple cümlesinin birebir hâli). Aynı gerekçeyle
+  `raffleLegal.ts` okunurken yorumlar atılıyor: cümleyi yalnızca bir açıklama
+  satırında bırakmak kontrolü yeşile boyardı.
+- **`@testing-library/react-native` 14'te elle `unmount()` çağırmayın — beklenmiş
+  olsa bile.** Depodaki eski kayıt "unmount'u beklemeyi unutma" diyor; ölçülen
+  doğru bundan farklı. Her testin sonunda `await unmount()` varken dosyadaki ilk
+  render geçiyor, sonraki her render **boş ağaç** buluyordu: kurallar sayfası
+  testi tek başına (`jest -t`) yeşil, dosyanın tamamıyla kırmızı. Konsolda tek
+  ipucu "overlapping act() calls". RNTL 14 kendi `afterEach` temizliğini zaten
+  bekletiyor; üstüne elle sökmek çakışan act() kapsamı üretiyor. **Tek başına
+  geçip toplu koşuda düşen bir render testinde önce bir önceki testin
+  temizliğine bakın.**

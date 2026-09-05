@@ -791,6 +791,46 @@ check(
   },
 );
 
+check(
+  'çekiliş beyanı iki ekranda da mount ediliyor',
+  'Uygulama Guideline 5.3.1 yüzünden bir kez reddedildi: çekilişin kim ' +
+    'tarafından düzenlendiği, katılımın ücretsiz olduğu ve Apple’ın sponsor ' +
+    'olmadığı hiçbir yerde yazmıyordu. Bileşenin kendi testi var ama bir test ' +
+    'onu ekrana kimsenin koymadığını göremez — reddi geri getirecek şey tam ' +
+    'olarak bu satırın bir yeniden düzenlemede düşmesi.',
+  () => {
+    // Yorumları önce at: bu depoda bir guard üç kez kendi gerekçesini bulup
+    // yeşil verdi. Aşağıdaki iki dosyanın yorumları da 5.3.1'i anlatıyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    const missing = ['app/etkinlik/[id].tsx', 'app/cekilis/[id].tsx'].filter(
+      (file) => !strip(read(file)).includes('<RaffleNotice'),
+    );
+    if (missing.length) return `RaffleNotice çizilmiyor: ${missing.join(', ')}`;
+
+    // Kartın bağlantısı `/cekilis-kurallari`'na push ediyor. Rota stack'e
+    // kayıtlı değilse bağlantı boş ekrana gider ve incelemeci kuralları
+    // bulamaz — beyan varmış gibi görünür, olmaz.
+    if (!strip(read('app/_layout.tsx')).includes('cekilis-kurallari')) {
+      return 'app/_layout.tsx `cekilis-kurallari` rotasını kaydetmiyor';
+    }
+    if (!existsSync(join(root, 'app/cekilis-kurallari.tsx'))) {
+      return 'app/cekilis-kurallari.tsx yok';
+    }
+
+    // Apple’ın cümlesi birebir isteniyor; yeniden yazılmış hâli beyanı doğru
+    // ama incelemecinin aradığı kalıptan farklı yapar.
+    // Yorumlar burada da atılıyor: cümleyi yalnızca bir açıklama satırında
+    // bırakmak kontrolü yeşile boyardı — bu depoda üç kez böyle oldu.
+    const legal = strip(read('src/raffleLegal.ts'));
+    const sentence =
+      'Apple bu çekilişin sponsoru değildir ve çekilişle hiçbir şekilde bağlantılı değildir.';
+    if (!legal.includes(sentence)) return 'src/raffleLegal.ts Apple feragatini birebir taşımıyor';
+
+    return null;
+  },
+);
+
 const failed = results.filter((r) => r.problem);
 
 for (const r of results) {

@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PixelIcon } from '../../src/components/Pixel';
+import { RaffleNotice } from '../../src/components/RaffleNotice';
 import {
   GlassButton,
   GradientHeader,
@@ -200,6 +201,10 @@ export default function RaffleEntryRoute() {
             </Pressable>
           </View>
         )}
+
+        {/* Üç dalın da altında: katılım kapalıyken ya da zaten katılmışken de
+            beyan görünmeli. Katılımı asıl gönderen ekran burası. */}
+        <RaffleNotice style={styles.legal} />
       </ScrollView>
 
       {!already && open ? (
@@ -287,6 +292,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   policyLink: { paddingLeft: 33, paddingTop: 2, paddingBottom: 4 },
+  legal: { marginHorizontal: 20, marginTop: 22 },
 
   submitBar: {
     position: 'absolute',
