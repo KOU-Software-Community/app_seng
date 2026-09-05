@@ -734,3 +734,63 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   hangi klasörde çalıştırıldığının değere etkisi yok. Dosyadan yükleyen komut
   ayrı: `eas env:push <ortam> --path .env`. (`env:create` artık deprecated,
   yerine `eas env:set`.)
+
+### Bildirim otomasyonu — kime, neye göre, ve neyin gitmemesi gerektiği
+
+- **`devices` yazılmıyorsa push diye bir şey yok.** Token bir `useRef`'te
+  duruyordu ve onu okuyan efektin bağımlılığı değildi: `hydrated` true olunca
+  efekt koşuyor, token o an `null`, ve token gelince ref yazılıyor ama render
+  tetiklenmediği için efekt bir daha koşmuyor. Sonuç, cihaz kaydının yalnızca
+  kullanıcı bir ayarı değiştirdiğinde yazılması. Bir promise'in çözümünü ref'e
+  yazıp o ref'i bir efektin okumasını beklemek, React'te her zaman bu hata.
+- **Otomasyonda asıl iş "ne gönderilmeyecek".** Gelmeyen bildirim can sıkar;
+  gelmemesi gereken bildirim güveni bozar ve geri alınamaz. `src/pushPolicy.ts`
+  bu yüzden saf ve her dalı testli: düzenlemede gönderme (bir yazım hatası
+  düzeltmesi herkese ikinci "yeni atölye" atmasın), geçmiş tarihli etkinliği
+  duyurma, **hiç duyurulmamış etkinliğin iptalini duyurma** (kullanıcının hiç
+  duymadığı bir şeyin iptal edildiğini söylemek), boş kazanan listesini
+  duyurma (o "sonucu geri al" demek).
+- **Önce kilit, sonra gönderim.** `pushLog/{kind}__{eventId}` dokümanı
+  `create()` ile yazılıyor — var olan kimlikte fırlıyor, yani iki eşzamanlı
+  istek de aynı bildirimi gönderemiyor. Sıra ters olsaydı yarıda kalan bir
+  istek yeniden denendiğinde herkese ikinci kez giderdi.
+- **Sessiz saatler atlama değil erteleme.** Eski `send-push` sessiz saatlerdeki
+  cihazı listeden düşürüyordu: gece açılan bir atölyeyi o kullanıcılar hiç
+  duymuyordu ve düzeltmesi "sabah komutu tekrar çalıştır"dı — yani otomasyonun
+  olmadığı yer. Şimdi `pendingPushes`'a giriyor ve panel 08:00'de gönderiyor.
+- **Kuyruktan çıkan bildirim yeniden doğrulanıyor.** Aradan gece geçiyor:
+  etkinlik silinmiş olabilir (o zaman bildirim düşürülüyor — sabah "yeni
+  atölye" deyip kullanıcıyı silinmiş bir kayda göndermek en kötüsü) ve
+  kullanıcı gece bildirimleri kapatmış olabilir.
+- **Sessiz saat penceresi kulüp saatinde hesaplanıyor.** Panel bir konteynerde
+  koşuyor ve dilimi genellikle UTC; `new Date().getHours()` ile hesaplanan
+  pencere üç saat kaymış olurdu — 23:00 UTC, Kocaeli'de 02:00. `clubHour`
+  `todayLocal` ve `clubCalendar`'ın yanında duruyor.
+- **Otomatik gönderim varsayılan olarak AÇIK, ve panel açılışta hangi modda
+  olduğunu yazıyor.** Kapalı varsayılan, bu defterdeki iki maddenin aynısı
+  olurdu: sessizce çalışmayan bir özellik. Yerelde çalışırken gerçek
+  kullanıcılara gitmesini engellemek için `ADMIN_AUTO_PUSH=off`.
+- **Bir yerel zamanlayıcı içeriği bilemez.** Bülten bildirimi "Bugünün beş
+  başlığı hazır." diyordu; kurulduğu an ile çaldığı an arasında bir gün var ve
+  o gün bülten üretilmemiş olabilir. İçeriğe göre konuşan bildirim ancak
+  sunucudan gelen bir push olabilir — zamanlayıcıyla söylenebilecek doğru şey
+  bir hatırlatma.
+- **Ayar ekranındaki açıklama bir vaattir.** "Kontenjan güncellendiğinde" ve
+  "başvuru dönemleri" yazıyordu; ikisini de tetikleyen hiçbir şey yoktu.
+  Açıklamalar artık kodun yaptığını anlatıyor, ve yeni bir kategori
+  açıklamasının karşılığı yoksa önce mekanizma yazılmalı.
+- **Duyuru otomasyonunun ilk turu sessiz olmak zorunda.** Duyurular panelde
+  değil kulübün sitesinde yazılıyor, yani panel onları yoklayarak öğreniyor.
+  Defter boşken sitedeki her duyuru "yeni" görünür: otomasyon devreye girdiği
+  gün herkesin telefonu arka arkaya on kez titrerdi. İlk tur yalnızca mevcut
+  listeyi işaretliyor (`pushState/announcements.seededAt`), bildirim bir
+  sonraki gerçekten yeni duyuruyla başlıyor. Yaş sınırı (24 saat) ikinci
+  koruma: panel bir süre kapalı kalıp geri döndüğünde birikmiş listeyi görüyor.
+- **Okunamayan tarihte hangi tarafa düşüleceği içeriğe göre değişir.** Akış
+  kapısında bozuk `publishedAt` haberi **gösteriyor** (içerik saklamamak için);
+  duyuru bildiriminde bozuk `createdAt` **göndermiyor**. Risk ters yönde: orada
+  saklanan bir haber, burada herkese giden bir bildirim.
+- **Bir guard'ın aradığı dize yalnızca korumak istediği yerde geçmeli.** Duyuru
+  dokunma dalını doğrulayan kontrol `announcementId` arıyordu; o ad tip
+  anotasyonunda da geçiyor, dolayısıyla dal silindiğinde kontrol yeşil kaldı —
+  ölçüldü. Artık rotayı (`/duyuru/`) arıyor. Alan adı değil, davranışın izi.

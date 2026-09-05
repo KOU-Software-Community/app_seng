@@ -2,10 +2,11 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { useContent } from './content';
+import type { DeviceRecord } from './firebase';
 import type { ClubEvent } from './data';
 import { isFirebaseConfigured } from './firebaseConfig';
 import { planNotifications } from './notificationPlan';
@@ -123,12 +124,42 @@ export async function rescheduleReminders(
  * Wiring. Rendered inside both providers so it can see events, registrations and
  * preferences at once; renders nothing.
  */
-export function NotificationSync() {
+/**
+ * Cihaz kaydını yazan varsayılan yol.
+ *
+ * `./firebase` bu depoda her yerde tembel yükleniyor (dört çağrı noktasının
+ * dördü de `import()`), böylece Firebase SDK'sı açılışta değil ilk gerçek
+ * kullanımda kuruluyor. Deseni bozmuyoruz; ama Jest dinamik `import()`'i
+ * çalıştıramadığı için çağrı bir dikişin arkasına alındı.
+ */
+const lazyUpsertDevice = (record: DeviceRecord): Promise<void> =>
+  import('./firebase').then(({ upsertDevice }) => upsertDevice(record));
+
+export function NotificationSync({
+  /** Test tohumu. Üretimde `./firebase` tembel yükleniyor. */
+  upsertDevice = lazyUpsertDevice,
+}: { upsertDevice?: (record: DeviceRecord) => Promise<void> } = {}) {
   const router = useRouter();
   const { events } = useContent();
   const { registrations, notifications, onboardingSeen, hydrated } = useAppStore();
 
-  const token = useRef<string | null>(null);
+  /**
+   * Token **state**, ref değil — ve bu satır bütün push'un çalışıp
+   * çalışmamasını belirliyor.
+   *
+   * Ref olduğu sürece: `hydrated` true olunca aşağıdaki iki efekt de koşuyor,
+   * ikincisi o anda `token.current === null` görüp erken dönüyor, token birkaç
+   * yüz milisaniye sonra ref'e yazılıyor — ve ref yazmak render tetiklemediği
+   * için efekt bir daha koşmuyor. Sonraki açılışta ref yine `null` başlıyor,
+   * aynı şey tekrarlanıyor.
+   *
+   * Yani cihaz dokümanı, kullanıcı token geldikten *sonra* bir bildirim ayarını
+   * değiştirmedikçe **hiç yazılmıyordu**. `devices` koleksiyonu push'un kime
+   * gideceğini belirleyen tek kaynak; yazılmayan cihaz hiçbir duyuru almıyor.
+   * Hiçbir şey hata vermiyor, log bile yok — gelmeyen bir bildirimin eksik
+   * olduğu belli olmaz.
+   */
+  const [token, setToken] = useState<string | null>(null);
 
   // Ask only once the user has been through onboarding — a permission prompt on
   // the very first frame, before anything has been explained, gets refused.
@@ -136,33 +167,32 @@ export function NotificationSync() {
     if (!hydrated || !onboardingSeen) return;
     let cancelled = false;
     void requestPushToken().then((value) => {
-      if (!cancelled) token.current = value;
+      if (!cancelled) setToken(value);
     });
     return () => {
       cancelled = true;
     };
   }, [hydrated, onboardingSeen]);
 
-  // The device document is what `npm run push` reads to decide who gets what.
-  // Rewritten whenever the preferences change so the two never drift apart.
+  // The device document is what the push sender reads to decide who gets what.
+  // Rewritten whenever the token or the preferences change so the two never
+  // drift apart.
   useEffect(() => {
-    if (!hydrated || !token.current || !isFirebaseConfigured) return;
+    if (!hydrated || !token || !isFirebaseConfigured) return;
     const record = {
-      token: token.current,
+      token,
       platform: Platform.OS,
       master: notifications.master,
       categories: notifications.categories,
       reminder: notifications.reminder,
       quietHours: notifications.quietHours,
     };
-    void import('./firebase')
-      .then(({ upsertDevice }) => upsertDevice(record))
-      .catch((err: unknown) => {
-        // Not fatal: the next preference change tries again, and local reminders
-        // are unaffected.
-        console.log(`[bildirim] cihaz kaydı yazılamadı: ${String(err)}`);
-      });
-  }, [hydrated, notifications]);
+    void upsertDevice(record).catch((err: unknown) => {
+      // Not fatal: the next preference change tries again, and local reminders
+      // are unaffected.
+      console.log(`[bildirim] cihaz kaydı yazılamadı: ${String(err)}`);
+    });
+  }, [hydrated, token, notifications, upsertDevice]);
 
   // Local reminders are pure device state, so they are rebuilt whenever anything
   // they depend on moves.
@@ -176,8 +206,23 @@ export function NotificationSync() {
   // Tapping a notification opens the event it is about.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const eventId = response.notification.request.content.data?.eventId;
-      if (typeof eventId === 'string') router.push(`/etkinlik/${eventId}`);
+      const data = response.notification.request.content.data as
+        | { eventId?: unknown; announcementId?: unknown; tab?: unknown }
+        | undefined;
+
+      // Silinmiş bir etkinliğin kimliği de buradan geçebilir; o rota kendi
+      // "bulunamadı" ekranını çiziyor, bu yüzden burada ayrıca kontrol yok.
+      if (typeof data?.eventId === 'string') {
+        router.push(`/etkinlik/${data.eventId}`);
+        return;
+      }
+      if (typeof data?.announcementId === 'string') {
+        router.push(`/duyuru/${data.announcementId}`);
+        return;
+      }
+      // Bülten bildirimi. Eskiden `data` boştu ve dokunmak hiçbir yere
+      // gitmiyordu: kullanıcı uygulamanın kaldığı ekrana düşüyordu.
+      if (data?.tab === 'bulten') router.push('/gundem?tab=bulten');
     });
     return () => sub.remove();
   }, [router]);

@@ -160,10 +160,13 @@ export type NotificationCategory = {
 };
 
 export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
-  { key: 'Atölye', icon: 'code', tint: '#D2E7EC', desc: 'Yeni atölye açıldığında ve kontenjan güncellendiğinde' },
-  { key: 'Söyleşi', icon: 'chat', tint: '#E4EEF3', desc: 'Konuk konuşmacı ve panel duyuruları' },
-  { key: 'Çekiliş', icon: 'gift', tint: '#D2E7EC', desc: 'Çekiliş başlangıcı ve sonuç açıklaması' },
-  { key: 'Duyuru', icon: 'star', tint: '#E4EEF3', desc: 'Genel kulüp duyuruları ve başvuru dönemleri' },
+  // Açıklamalar kodun gerçekten yaptığı şeyi anlatıyor. Eskiden "kontenjan
+  // güncellendiğinde" ve "başvuru dönemleri" yazıyordu; ikisini de tetikleyen
+  // hiçbir şey yoktu — ayar ekranında kurgu.
+  { key: 'Atölye', icon: 'code', tint: '#D2E7EC', desc: 'Yeni atölye açıldığında ve iptal edildiğinde' },
+  { key: 'Söyleşi', icon: 'chat', tint: '#E4EEF3', desc: 'Yeni söyleşi ya da panel duyurulduğunda' },
+  { key: 'Çekiliş', icon: 'gift', tint: '#D2E7EC', desc: 'Çekiliş açıldığında ve sonuç açıklandığında' },
+  { key: 'Duyuru', icon: 'star', tint: '#E4EEF3', desc: 'Teknik gezi, yarışma ve genel kulüp duyuruları' },
   { key: 'Hatırlatma', icon: 'clock', tint: '#D2E7EC', desc: 'Kayıtlı olduğun etkinlikler için hatırlatma' },
   { key: 'AI Gündem', icon: 'lines', tint: '#E4EEF3', desc: 'Günün yapay zekâ bülteni, seçtiğin saatte' },
 ];

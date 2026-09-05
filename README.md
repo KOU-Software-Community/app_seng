@@ -177,6 +177,35 @@ const snap = await getDocs(collection(getDb(), COLLECTIONS.events));
 
 Analytics (`measurementId`) React Native'de çalışmaz; sadece web derlemesi için `.env`'de duruyor.
 
+### Bildirimler nereden çıkıyor
+
+| ne | nasıl | otomatik mi |
+|---|---|---|
+| Etkinlik hatırlatması | cihazda yerel, kayıt olunan etkinliğin saatinden geri sayarak | ✅ |
+| AI Gündem bülteni | cihazda yerel, kullanıcının seçtiği saatte | ✅ |
+| Yeni etkinlik / iptal / çekiliş sonucu | panel kaydettiği anda push | ✅ |
+| Yeni duyuru | panel `api.kouseng.com`'u 15 dakikada bir yokluyor | ✅ |
+| Serbest metinli duyuru | `npm run push -- --category ... --title ... --body ...` | elle |
+
+Push'un çalışması için **panelin ayakta olması** gerekiyor: gönderen taraf o.
+Panel kapalıyken kaydedilen bir etkinlik bildirim üretmez (kayıt yine yazılır).
+
+Yerelde panel çalıştırırken gerçek kullanıcılara bildirim gitmesin istiyorsanız:
+
+```bash
+ADMIN_AUTO_PUSH=off npm run admin
+```
+
+Panel açılışta hangi modda olduğunu yazıyor. Duyuru yoklaması **ilk turda
+hiçbir şey göndermez** — mevcut listeyi sessizce işaretler, bildirimler bir
+sonraki gerçekten yeni duyuruyla başlar.
+
+> **Simülatörde push test edilemez.** iOS Simulator'da APNs yok, dolayısıyla
+> token da yok — `requestPushToken` orada bilerek `null` dönüyor. Simülatörde
+> çalışan tek şey **yerel** bildirimler (hatırlatma ve bülten). Uzaktan push
+> için gerçek cihaz + development build ya da TestFlight gerekiyor; Expo Go
+> SDK 53'ten beri uzaktan push'u desteklemiyor.
+
 ### EAS derlemelerinde
 
 `.env` git'te olmadığı için EAS Build sunucusuna **gitmez**. Üretim derlemesinden önce

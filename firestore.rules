@@ -195,6 +195,19 @@ service cloud.firestore {
         && request.resource.data.values.size() <= 12;
     }
 
+    // Bildirim otomasyonunun defterleri. Yalnızca panel (Admin SDK) yazıyor;
+    // Admin SDK bu kuralları hiç görmüyor, dolayısıyla `false` onu engellemiyor.
+    // Aşağıdaki catch-all zaten kapatırdı — açıkça yazılmalarının sebebi, bir
+    // gün "istemci de okusun" diyen birinin neden okumaması gerektiğini burada
+    // görmesi: `pushLog` hangi duyurunun gittiğini, `pendingPushes` ise
+    // gönderilecek token listesini taşıyor.
+    match /pushLog/{id} {
+      allow read, write: if false;
+    }
+    match /pendingPushes/{id} {
+      allow read, write: if false;
+    }
+
     // Yukarıda eşleşmeyen her şey kapalı.
     match /{document=**} {
       allow read, write: if false;
