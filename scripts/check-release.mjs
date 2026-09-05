@@ -862,6 +862,42 @@ check(
   },
 );
 
+check(
+  'otomatik bildirim panele bağlı',
+  'Bildirim kararları (`src/pushPolicy.ts`) baştan sona testli, ama bir testin ' +
+    'göremeyeceği şey panelin onları hiç çağırmaması. Çağrı düşerse yeni ' +
+    'etkinlik yine sessizce yayımlanır — kimse hata görmez, sadece bildirim ' +
+    'gelmez, ve gelmeyen bir bildirimin eksik olduğu belli olmaz. Aynı şekilde ' +
+    'kuyruk zamanlayıcısı düşerse sessiz saatlerde biriken bildirimler ' +
+    'sonsuza kadar bekler.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const server = strip(read('admin/server.ts'));
+
+    const missing = [
+      'decideNewEvent(',
+      'decideCancelledEvent(',
+      'decideRaffleResult(',
+      'startPushFlusher(',
+    ].filter((call) => !server.includes(call));
+    if (missing.length) return `admin/server.ts çağırmıyor: ${missing.join(', ')}`;
+
+    // Elle gönderim ve otomatik gönderim aynı motoru kullanmak zorunda:
+    // iki uygulama kategorileri ya da sessiz saatleri farklı yorumladığı gün
+    // ayrışır, ve fark ancak birinin bildirimi almamasıyla görünür.
+    if (!strip(read('scripts/send-push.ts')).includes("from '../admin/push'")) {
+      return 'scripts/send-push.ts kendi gönderim mantığını taşıyor';
+    }
+
+    // Bülten bildirimi `{ tab: 'bulten' }` taşıyor; onu okuyan dal düşerse
+    // dokunmak yine hiçbir yere gitmez.
+    if (!strip(read('src/notifications.tsx')).includes("'bulten'")) {
+      return 'src/notifications.tsx bülten bildirimine dokunmayı ele almıyor';
+    }
+    return null;
+  },
+);
+
 const failed = results.filter((r) => r.problem);
 
 for (const r of results) {

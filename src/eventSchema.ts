@@ -440,6 +440,18 @@ export function clubCalendar(instant: Date): {
 }
 
 /**
+ * Bir anın kulüp saatindeki saati (0-23).
+ *
+ * `todayLocal` ve `clubCalendar` ile aynı kaydırma. Sunucu tarafı için ayrıca
+ * gerekiyor: panel bir konteynerde koşuyor ve o konteynerin saat dilimi
+ * genellikle UTC. `new Date().getHours()` ile hesaplanan bir "sessiz saatler"
+ * kontrolü orada üç saat kaymış olurdu — 23:00 UTC, Kocaeli'de 02:00.
+ */
+export function clubHour(instant: Date): number {
+  return new Date(instant.getTime() + 3 * 60 * 60_000).getUTCHours();
+}
+
+/**
  * Etkinlikleri takvim ve arşiv olarak ikiye ayırır.
  *
  * Arşiv ayrı bir koleksiyon değil; geçmiş etkinliğin ta kendisi. Ayrı tutmak,

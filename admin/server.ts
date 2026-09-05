@@ -54,6 +54,13 @@ import {
   type RaffleFieldType,
 } from '../src/raffleSchema';
 import { parseServiceAccount } from './credentials';
+import { alreadyAnnounced, announce, autoPushEnabled, startPushFlusher } from './push';
+import {
+  decideCancelledEvent,
+  decideNewEvent,
+  decideRaffleResult,
+  pushLogId,
+} from '../src/pushPolicy';
 import { resolvePort } from './port';
 import { cookieHeader } from './session';
 import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
@@ -466,6 +473,13 @@ async function saveEventWithPhotos(
   const removed = before.filter((url) => !built.event.photos?.includes(url));
   if (removed.length) await deletePhotos(removed);
 
+  // Duyuru kayıttan **sonra**: bildirim gidip kayıt başarısız olsaydı,
+  // kullanıcılar olmayan bir etkinliğe yönlendirilmiş olurdu. `announce` hiçbir
+  // hatayı yukarı taşımıyor — bildirim gönderilememesi kaydı bozmamalı.
+  await announce(db, decideNewEvent({ event: built.event, editing: opts.editing, now: new Date() }), {
+    eventId: built.event.id,
+  });
+
   res.redirect(opts.archive ? '/arsiv' : '/');
 }
 
@@ -500,6 +514,16 @@ app.post('/events/:id', photoUpload, async (req, res) => {
 });
 
 app.post('/events/:id/delete', async (req, res) => {
+  // Silmeden **önce** okunuyor: silinmiş bir dokümandan başlık ve tarih
+  // çıkarılamaz, ve iptal bildirimi ikisini de söylemek zorunda.
+  const doomed = await db.collection('events').doc(req.params.id).get();
+  const event = doomed.exists
+    ? ({ id: doomed.id, ...(doomed.data() as Omit<ClubEvent, 'id'>) } as ClubEvent)
+    : null;
+  const announced = event
+    ? await alreadyAnnounced(db, pushLogId('event_created', event.id))
+    : false;
+
   await Promise.all([
     db.collection('events').doc(req.params.id).delete(),
     // Görseller de gitsin, yoksa bucket'ta kimsenin işaret etmediği dosyalar
@@ -509,6 +533,11 @@ app.post('/events/:id/delete', async (req, res) => {
     // açılırsa eski kayıtların koltuklarıyla dolu başlardı.
     db.collection('eventSeats').doc(req.params.id).delete(),
   ]);
+
+  if (event) {
+    await announce(db, decideCancelledEvent({ event, announced, now: new Date() }));
+  }
+
   res.redirect('/');
 });
 
@@ -952,6 +981,13 @@ app.post('/raffles/:eventId/winners', async (req, res) => {
     { winners, drawnAt: winners.length ? new Date().toISOString() : '' },
     { merge: true },
   );
+
+  const doc = await db.collection('events').doc(eventId).get();
+  if (doc.exists) {
+    const event = { id: doc.id, ...(doc.data() as Omit<ClubEvent, 'id'>) } as ClubEvent;
+    await announce(db, decideRaffleResult({ event, winners }), { eventId });
+  }
+
   res.redirect(`/raffles/${encodeURIComponent(eventId)}`);
 });
 
@@ -984,4 +1020,13 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(PORT, () => {
   console.log(`Yönetim paneli: http://localhost:${PORT}`);
+  // Hangi modda olduğu açılışta yazılıyor: sessizce çalışmayan bir bildirim
+  // otomasyonu, bu deponun iki kez yaşadığı hatanın aynısı olurdu.
+  console.log(
+    autoPushEnabled()
+      ? '[push] otomatik bildirim AÇIK. Kapatmak için ADMIN_AUTO_PUSH=off.'
+      : '[push] otomatik bildirim KAPALI (ADMIN_AUTO_PUSH=off).',
+  );
+  // Sessiz saatlerde biriken bildirimleri sabah gönderen zamanlayıcı.
+  startPushFlusher(db);
 });
