@@ -109,4 +109,10 @@ export const KV_KEYS = {
   readArticles: 'v1:kyk.gundem.user.read',
   settings: 'v1:kyk.gundem.user.settings',
   recentSearches: 'v1:kyk.gundem.user.recent_searches',
+
+  /**
+   * Arka plan zenginleştirmesinin günlük bütçesi. Cihaza özel: sunucudaki
+   * `request_enrichment_miss` sayacı da cihaz kimliğine göre tutuluyor.
+   */
+  warmBudget: 'v1:kyk.gundem.enrichment.warm_budget',
 } as const;

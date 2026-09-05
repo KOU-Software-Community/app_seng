@@ -9,8 +9,10 @@ import {
   PixelTxt,
   Txt,
 } from '../../components/ui';
+import { hasSummary } from '../article/segment';
 import { ArticleCard } from '../components/ArticleCard';
-import { useFeed } from '../data-access/hooks';
+import { useEnrichmentWarmup } from '../enrichment/useEnrichmentWarmup';
+import { asDataError, useFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useEnabledSources, useReadArticles } from '../user-state/hooks';
 import { clubCalendar } from '../../eventSchema';
@@ -61,6 +63,22 @@ export function FeedView() {
     [feed.data],
   );
 
+  /**
+   * Özeti olmayan en yeni haberlerin zenginleştirmesi, kullanıcı listeyi
+   * kaydırırken arka planda başlıyor.
+   *
+   * Sunucudaki iş talep güdümlü: haber çekimi özet işi yaratmıyor, işi yaratan
+   * şey bu çağrı. Olmadığında bir haberi ilk açan kişi her seferinde worker'ın
+   * bir sonraki turunu bekliyor — ekranda görülen "Özet hazırlanıyor" tam olarak
+   * bu. `summaryReady` satırdan okunuyor, yani zaten özeti olanlar için hiç
+   * istek çıkmıyor.
+   */
+  const warmCandidates = useMemo(
+    () => articles.map((article) => ({ id: article.id, summaryReady: hasSummary(article.summary) })),
+    [articles],
+  );
+  useEnrichmentWarmup(warmCandidates);
+
   const open = (id: string) => {
     markRead(id);
     router.push(`/gundem/${id}`);
@@ -69,6 +87,17 @@ export function FeedView() {
   // Önbellekteki satırlar ekranda dururken yenileme başarısız oluyorsa: göster,
   // ama sessiz kalma. Boş ekran göstermek, eskimiş içerikten daha kötü.
   const stale = feed.isError && articles.length > 0;
+
+  /**
+   * Yapılandırması olmadan çıkmış bir derlemede sebep ağ değil, ve öyle demek
+   * kullanıcıyı düzeltemeyeceği bir yere yollar. `env.problem` hangi değişkenin
+   * eksik olduğunu adıyla söylüyor; ekranda görünecek olan o. Yeniden deneme
+   * düğmesi de yok: aynı paket her denemede aynı cevabı verir.
+   */
+  const unconfigured =
+    feed.isError && asDataError(feed.error)?.code === 'unconfigured'
+      ? asDataError(feed.error)
+      : null;
 
   return (
     <View style={styles.screen}>
@@ -93,7 +122,12 @@ export function FeedView() {
         }}
         ListHeaderComponent={
           <>
-            {feed.isError ? (
+            {unconfigured ? (
+              <ContentNotice
+                title="AI Gündem yapılandırılmamış"
+                body={unconfigured.message}
+              />
+            ) : feed.isError ? (
               <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
             ) : null}
 

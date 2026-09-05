@@ -25,7 +25,7 @@ import { REPOSITORY_CONTRACT_VERSION, type Repositories } from './repositories';
  * derleme zamanında pakete girmemiş bir değişken.
  */
 export function createUnconfiguredRepositories(problem: string): Repositories {
-  const fail = <T>(): Result<T> => err<T>('not_implemented', problem, { retryable: false });
+  const fail = <T>(): Result<T> => err<T>('unconfigured', problem, { retryable: false });
 
   return {
     version: REPOSITORY_CONTRACT_VERSION,

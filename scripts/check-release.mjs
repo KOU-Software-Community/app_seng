@@ -831,6 +831,32 @@ check(
   },
 );
 
+check(
+  'AI Gündem: ısıtma bağlı ve yapılandırma hatası doğru anlatılıyor',
+  'İki ayrı sessiz arıza. (1) Zenginleştirme talep güdümlü: haber çekimi özet ' +
+    'işi yaratmıyor, işi yaratan tek şey `request-enrichment`. Akıştaki ısıtma ' +
+    'çağrısı düşerse bir haberi ilk açan herkes worker\'ın turunu beklemeye ' +
+    'geri döner ve hiçbir test bunu göremez. (2) Yapılandırması olmadan çıkmış ' +
+    'bir sürüm derlemesi, `unconfigured` dalı olmadan "bağlantını kontrol et" ' +
+    'diyor — kullanıcıyı düzeltemeyeceği bir yere yollayıp gerçek sebebi ' +
+    'gizliyor, ve sürüm derlemesinde konsol yok.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const feed = strip(read('src/gundem/screens/FeedView.tsx'));
+
+    if (!feed.includes('useEnrichmentWarmup(')) {
+      return 'FeedView arka plan ısıtmasını çağırmıyor';
+    }
+    if (!feed.includes("'unconfigured'")) {
+      return 'FeedView yapılandırma hatasını ağ hatasından ayırmıyor';
+    }
+    if (!strip(read('src/gundem/data-access/unconfigured.ts')).includes("'unconfigured'")) {
+      return 'unconfigured.ts hatayı `unconfigured` koduyla döndürmüyor';
+    }
+    return null;
+  },
+);
+
 const failed = results.filter((r) => r.problem);
 
 for (const r of results) {

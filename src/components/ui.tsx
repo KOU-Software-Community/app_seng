@@ -652,40 +652,59 @@ export function MissingEvent({ onBack }: { onBack: () => void }) {
  * app with nothing scheduled. The user had no way to tell and no way to retry
  * short of killing the app.
  */
+/**
+ * İçerik alınamadığında görünen şerit.
+ *
+ * `title`/`body` verilmezse varsayılan **ağ** metni çıkıyor, çünkü çağıran
+ * yerlerin çoğunda sebep gerçekten o. Ama her sebep ağ değil: yapılandırması
+ * olmadan çıkmış bir sürüm derlemesinde "bağlantını kontrol et" demek,
+ * kullanıcıyı düzeltemeyeceği bir şeye yollamak ve gerçek sebebi gizlemek olur.
+ * Bir sürüm derlemesinde konsol yoktur; ekranda yazmayan sebep bilinemez.
+ *
+ * `onRetry` isteğe bağlı: yeniden denemenin sonucu değiştiremeyeceği bir
+ * durumda düğme hiç çizilmiyor. Depoda aynı karar bir kez daha verildi —
+ * "yalnızca bir yeniden denemenin düzeltebileceği şeyi yeniden dene".
+ */
 export function ContentNotice({
   onRetry,
   retrying,
+  title,
+  body,
   style,
 }: {
-  onRetry: () => void;
-  retrying: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
+  title?: string;
+  body?: string;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <View style={[noticeStyles.root, style]}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt weight="bold" size={13} color={colors.navy900}>
-          Güncel içeriğe ulaşılamadı
+          {title ?? 'Güncel içeriğe ulaşılamadı'}
         </Txt>
         <Txt size={12} leading={1.45} color={colors.muted} style={{ marginTop: 2 }}>
-          Bağlantını kontrol edip tekrar dene. Gördüklerin son bilinen hâli.
+          {body ?? 'Bağlantını kontrol edip tekrar dene. Gördüklerin son bilinen hâli.'}
         </Txt>
       </View>
 
-      <Pressable
-        onPress={onRetry}
-        disabled={retrying}
-        accessibilityRole="button"
-        accessibilityLabel="İçeriği yeniden yükle"
-        style={({ pressed }) => [
-          noticeStyles.retry,
-          (pressed || retrying) && { opacity: 0.55 },
-        ]}
-      >
-        <Txt weight="bold" size={12.5} color={colors.blue500}>
-          {retrying ? 'Deneniyor…' : 'Yenile'}
-        </Txt>
-      </Pressable>
+      {onRetry ? (
+        <Pressable
+          onPress={onRetry}
+          disabled={retrying}
+          accessibilityRole="button"
+          accessibilityLabel="İçeriği yeniden yükle"
+          style={({ pressed }) => [
+            noticeStyles.retry,
+            (pressed || retrying) && { opacity: 0.55 },
+          ]}
+        >
+          <Txt weight="bold" size={12.5} color={colors.blue500}>
+            {retrying ? 'Deneniyor…' : 'Yenile'}
+          </Txt>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

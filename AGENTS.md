@@ -660,3 +660,42 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   bekletiyor; üstüne elle sökmek çakışan act() kapsamı üretiyor. **Tek başına
   geçip toplu koşuda düşen bir render testinde önce bir önceki testin
   temizliğine bakın.**
+
+### Arka plan zenginleştirmesi ve yapılandırma görünürlüğü
+
+- **Zenginleştirme talep güdümlü, ve bunu kimse yazmamıştı.** `sync-feeds` her
+  15 dakikada bir haberleri çekiyor ama **özet işi kuyruğa koymuyor**; işi
+  yaratan tek şey bir istemcinin `request-enrichment` çağırması, ve onu işleyen
+  worker iki dakikada bir koşuyor. Sonuç: bir haberi **ilk açan kişi her zaman
+  bekliyor** — cihazda görülen "Özet hazırlanıyor, bir dakika sonra geldi" tam
+  olarak bu, hız sınırı değil. Hız sınırı 429 ve `rate_limited` döner, `queued`
+  değil. Karşılığı akış yüklenirken arka planda ısıtmak: özet sunucuda
+  `content_hash`'e göre paylaşıldığı için bir cihazın ısıttığı haber herkes için
+  hazır oluyor.
+- **Ön yükleme bütçesi tahmin edilemez, sunucudan okunur.**
+  `_shared/enrichment.ts`: `request_enrichment_miss` **30/cihaz/gün**,
+  `request_enrichment_check` **120/cihaz/saat**. Isıtma yalnızca özeti olmayan
+  satırlar için yapıldığından her ısıtma bir *miss*. Tavan bu yüzden 12: kalan
+  18 kullanıcının kendi açtıklarına. Kendi okumasını reddettiren bir ön yükleme,
+  düzeltmeye çalıştığı şeyi bozar.
+- **Bütçenin günü UTC olmak zorunda.** Sunucunun penceresi epoch hizalı UTC;
+  cihazın yerel günü kullanılsaydı +03:00'ta gece yarısı istemci bütçesi
+  sunucudan üç saat önce sıfırlanır ve o üç saatteki istekler 429 yerdi.
+- **`ContentNotice` her sebebe "bağlantını kontrol et" diyordu.** Yapılandırması
+  olmadan çıkmış bir sürüm derlemesinde bu, kullanıcıyı düzeltemeyeceği bir yere
+  yollamak ve gerçek sebebi gizlemek — üstelik `env.problem` hangi değişkenin
+  eksik olduğunu adıyla taşıyor ve ekrana hiç ulaşmıyordu. Daha kötüsü: README
+  aylardır *"ekranda hangi değişkenin eksik olduğunu söyler"* diye yazıyordu.
+  **Davranışı anlatan bir belge, davranış değildir** — bu defterde aynı madde
+  bir yorum için zaten var, bu sefer README'de oldu. `unconfigured` artık kendi
+  hata kodu ve şerit sebebi yazıyor; yeniden deneme düğmesi de çizilmiyor,
+  çünkü aynı paket her denemede aynı cevabı verir.
+- **Bir ekranın bir hook'u çağırdığını hiçbir birim testi göremez.** Isıtma
+  hook'unun kendi testleri, `FeedView`'daki çağrı silinse yeşil kalır — ve
+  silindiğinde görünen tek şey haberlerin yine yavaş açılması olur, ki bunu
+  kimse hata diye bildirmez. `check:release` çağrının yerinde durduğunu
+  doğruluyor; üç kırılmanın üçünde de kırmızı verdiği görüldü.
+- **`gcTime: 0` bir önbellek testini kendi kurulumuyla kırar.** Gözlemcisi
+  olmayan bir `setQueryData` girdisi anında toplanıyor, yani "önbelleğe yazdı
+  mı" iddiası her zaman `undefined` görüyor. Sızıntı korkusuyla sıfırlamak
+  yerine sonlu bir değer verip `afterEach`'te `client.clear()` demek gerekiyor.
