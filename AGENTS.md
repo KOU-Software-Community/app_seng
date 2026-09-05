@@ -779,3 +779,18 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   "başvuru dönemleri" yazıyordu; ikisini de tetikleyen hiçbir şey yoktu.
   Açıklamalar artık kodun yaptığını anlatıyor, ve yeni bir kategori
   açıklamasının karşılığı yoksa önce mekanizma yazılmalı.
+- **Duyuru otomasyonunun ilk turu sessiz olmak zorunda.** Duyurular panelde
+  değil kulübün sitesinde yazılıyor, yani panel onları yoklayarak öğreniyor.
+  Defter boşken sitedeki her duyuru "yeni" görünür: otomasyon devreye girdiği
+  gün herkesin telefonu arka arkaya on kez titrerdi. İlk tur yalnızca mevcut
+  listeyi işaretliyor (`pushState/announcements.seededAt`), bildirim bir
+  sonraki gerçekten yeni duyuruyla başlıyor. Yaş sınırı (24 saat) ikinci
+  koruma: panel bir süre kapalı kalıp geri döndüğünde birikmiş listeyi görüyor.
+- **Okunamayan tarihte hangi tarafa düşüleceği içeriğe göre değişir.** Akış
+  kapısında bozuk `publishedAt` haberi **gösteriyor** (içerik saklamamak için);
+  duyuru bildiriminde bozuk `createdAt` **göndermiyor**. Risk ters yönde: orada
+  saklanan bir haber, burada herkese giden bir bildirim.
+- **Bir guard'ın aradığı dize yalnızca korumak istediği yerde geçmeli.** Duyuru
+  dokunma dalını doğrulayan kontrol `announcementId` arıyordu; o ad tip
+  anotasyonunda da geçiyor, dolayısıyla dal silindiğinde kontrol yeşil kaldı —
+  ölçüldü. Artık rotayı (`/duyuru/`) arıyor. Alan adı değil, davranışın izi.

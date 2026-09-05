@@ -1,11 +1,13 @@
 import type { ClubEvent } from '../data';
 import {
+  ANNOUNCEMENT_MAX_AGE_HOURS,
   decideCancelledEvent,
   decideNewEvent,
   decideRaffleResult,
   inClubQuietHours,
   nextQuietEnd,
   pushCategoryFor,
+  planAnnouncementPushes,
   pushLogId,
   selectTargets,
   type DeviceRow,
@@ -231,5 +233,96 @@ describe('sessiz saatler — kulüp saatiyle', () => {
   it('ay sonunu doğru döndürüyor', () => {
     const end = nextQuietEnd(new Date('2026-09-30T23:30:00+03:00'));
     expect(end.toISOString()).toBe(new Date('2026-10-01T08:00:00+03:00').toISOString());
+  });
+});
+
+describe('planAnnouncementPushes', () => {
+  const duyuru = (id: string, minutesAgo = 10) => ({
+    id,
+    title: `Duyuru ${id}`,
+    createdAt: new Date(NOW.getTime() - minutesAgo * 60_000).toISOString(),
+  });
+
+  /**
+   * En önemli iddia. Defter boşken sitedeki her duyuru "yeni" görünür;
+   * otomasyon devreye girdiği gün herkesin telefonu arka arkaya titrerdi.
+   */
+  it('İLK turda hiçbir şey göndermiyor, sadece işaretliyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [duyuru('a'), duyuru('b'), duyuru('c')],
+      seen: new Set(),
+      seeded: false,
+      now: NOW,
+    });
+    expect(plan.announce).toEqual([]);
+    expect(plan.seedOnly).toEqual(['a', 'b', 'c']);
+  });
+
+  it('defter kurulduktan sonra yeni duyuruyu bildiriyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [duyuru('eski'), duyuru('yeni')],
+      seen: new Set(['eski']),
+      seeded: true,
+      now: NOW,
+    });
+    expect(plan.announce).toHaveLength(1);
+    expect(plan.announce[0].id).toBe('yeni');
+    expect(plan.announce[0].logId).toBe('announcement__yeni');
+    expect(plan.announce[0].payload.category).toBe('Duyuru');
+    expect(plan.announce[0].payload.body).toBe('Duyuru yeni');
+    expect(plan.announce[0].payload.data).toEqual({ announcementId: 'yeni' });
+  });
+
+  /**
+   * Panel bir süre kapalı kalırsa geri döndüğünde birikmiş listeyi görüyor.
+   * Yaş sınırı olmadan hepsi aynı anda bildirim olurdu.
+   */
+  it('yaş sınırını aşan duyuruyu sessizce işaretliyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [duyuru('bayat', (ANNOUNCEMENT_MAX_AGE_HOURS + 1) * 60)],
+      seen: new Set(),
+      seeded: true,
+      now: NOW,
+    });
+    expect(plan.announce).toEqual([]);
+    expect(plan.seedOnly).toEqual(['bayat']);
+  });
+
+  /**
+   * Etkinliklerde tersi geçerli (bozuk tarih yüzünden içerik saklanmıyor);
+   * burada risk ters yönde: tarihi okunamayan eski bir kayıt sınırı aşamadığı
+   * için bildirim olurdu.
+   */
+  it('okunamayan tarihte göndermiyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [{ id: 'x', title: 'X', createdAt: 'geçen hafta' }],
+      seen: new Set(),
+      seeded: true,
+      now: NOW,
+    });
+    expect(plan.announce).toEqual([]);
+    expect(plan.seedOnly).toEqual(['x']);
+  });
+
+  it('deftere girmiş duyuruyu iki kez işlemiyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [duyuru('a')],
+      seen: new Set(['a']),
+      seeded: true,
+      now: NOW,
+    });
+    expect(plan.announce).toEqual([]);
+    expect(plan.seedOnly).toEqual([]);
+  });
+
+  it('kimliği olmayan kaydı atlıyor', () => {
+    const plan = planAnnouncementPushes({
+      announcements: [{ id: '  ', title: 'X', createdAt: NOW.toISOString() }],
+      seen: new Set(),
+      seeded: true,
+      now: NOW,
+    });
+    expect(plan.announce).toEqual([]);
+    expect(plan.seedOnly).toEqual([]);
   });
 });

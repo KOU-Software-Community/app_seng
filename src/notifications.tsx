@@ -207,13 +207,17 @@ export function NotificationSync({
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as
-        | { eventId?: unknown; tab?: unknown }
+        | { eventId?: unknown; announcementId?: unknown; tab?: unknown }
         | undefined;
 
       // Silinmiş bir etkinliğin kimliği de buradan geçebilir; o rota kendi
       // "bulunamadı" ekranını çiziyor, bu yüzden burada ayrıca kontrol yok.
       if (typeof data?.eventId === 'string') {
         router.push(`/etkinlik/${data.eventId}`);
+        return;
+      }
+      if (typeof data?.announcementId === 'string') {
+        router.push(`/duyuru/${data.announcementId}`);
         return;
       }
       // Bülten bildirimi. Eskiden `data` boştu ve dokunmak hiçbir yere

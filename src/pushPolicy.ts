@@ -252,3 +252,82 @@ export function nextQuietEnd(now: Date): Date {
   );
   return new Date(utcMs - CLUB_OFFSET_MS);
 }
+
+// ---------------------------------------------------------------------------
+// Duyurular
+// ---------------------------------------------------------------------------
+
+/**
+ * Bir duyurunun bildirim üretebileceği en uzun yaş.
+ *
+ * Duyurular panelde değil kulübün sitesinde yazılıyor, yani panel onları
+ * yoklayarak öğreniyor. Yoklama bir süre çalışmazsa (panel kapalı, API
+ * erişilemez) geri döndüğünde birikmiş listeyi görüyor; yaş sınırı olmadan
+ * hepsi aynı anda bildirim olurdu.
+ */
+export const ANNOUNCEMENT_MAX_AGE_HOURS = 24;
+
+export type AnnouncementLike = {
+  id: string;
+  title: string;
+  createdAt: string;
+};
+
+export type AnnouncementPlan = {
+  /** Bildirim gönderilecekler. */
+  announce: { id: string; logId: string; payload: PushPayload }[];
+  /** Yalnızca deftere yazılacaklar — bir daha bakılmasın diye, ama sessizce. */
+  seedOnly: string[];
+};
+
+/**
+ * Hangi duyurular bildirilecek.
+ *
+ * `seeded` bu fonksiyonun en önemli girdisi: **ilk çalıştırmada hiçbir şey
+ * gönderilmiyor.** Defter boşken sitedeki her duyuru "yeni" görünür ve
+ * otomasyon devreye girdiği gün herkesin telefonu arka arkaya on kez titrerdi.
+ * İlk tur yalnızca mevcut listeyi işaretliyor; bildirim bir sonraki gerçekten
+ * yeni duyuruyla başlıyor.
+ */
+export function planAnnouncementPushes(input: {
+  announcements: readonly AnnouncementLike[];
+  seen: ReadonlySet<string>;
+  seeded: boolean;
+  now: Date;
+  maxAgeHours?: number;
+}): AnnouncementPlan {
+  const maxAgeMs = (input.maxAgeHours ?? ANNOUNCEMENT_MAX_AGE_HOURS) * 60 * 60_000;
+  const plan: AnnouncementPlan = { announce: [], seedOnly: [] };
+
+  for (const item of input.announcements) {
+    const id = (item.id ?? '').trim();
+    if (!id || input.seen.has(id)) continue;
+
+    if (!input.seeded) {
+      plan.seedOnly.push(id);
+      continue;
+    }
+
+    const created = Date.parse(item.createdAt);
+    // Okunamayan tarihte **göndermiyoruz**. Etkinliklerde tersi geçerliydi
+    // (bozuk tarih yüzünden içerik saklamamak için); burada risk ters yönde:
+    // tarihi okunamayan eski bir kayıt, sınırı aşamadığı için bildirim olurdu.
+    if (Number.isNaN(created) || input.now.getTime() - created > maxAgeMs) {
+      plan.seedOnly.push(id);
+      continue;
+    }
+
+    plan.announce.push({
+      id,
+      logId: pushLogId('announcement', id),
+      payload: {
+        category: 'Duyuru',
+        title: 'Yeni duyuru',
+        body: item.title,
+        data: { announcementId: id },
+      },
+    });
+  }
+
+  return plan;
+}

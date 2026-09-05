@@ -54,7 +54,13 @@ import {
   type RaffleFieldType,
 } from '../src/raffleSchema';
 import { parseServiceAccount } from './credentials';
-import { alreadyAnnounced, announce, autoPushEnabled, startPushFlusher } from './push';
+import {
+  alreadyAnnounced,
+  announce,
+  autoPushEnabled,
+  startAnnouncementPoller,
+  startPushFlusher,
+} from './push';
 import {
   decideCancelledEvent,
   decideNewEvent,
@@ -1029,4 +1035,7 @@ app.listen(PORT, () => {
   );
   // Sessiz saatlerde biriken bildirimleri sabah gönderen zamanlayıcı.
   startPushFlusher(db);
+  // Duyurular panelde yazılmıyor — kulübün sitesinde yazılıyor, o yüzden tek
+  // yol yoklamak. İlk tur hiçbir şey göndermiyor, mevcut listeyi işaretliyor.
+  startAnnouncementPoller(db);
 });

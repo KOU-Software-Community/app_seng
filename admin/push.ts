@@ -8,10 +8,15 @@
  */
 import type { Firestore } from 'firebase-admin/firestore';
 
+import { fetchAnnouncements } from '../src/announcementApi';
+
 import {
+  planAnnouncementPushes,
+  pushLogId,
   inClubQuietHours,
   nextQuietEnd,
   selectTargets,
+  type AnnouncementLike,
   type DeviceRow,
   type PushDecision,
   type PushPayload,
@@ -347,4 +352,88 @@ export async function announce(
     // Kaydı bozmuyoruz; operatör panelde bir şey görmüyor, sebep günlükte.
     console.error('[push] bildirim gönderilemedi:', err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Duyurular
+// ---------------------------------------------------------------------------
+
+const PUSH_STATE = 'pushState';
+const ANNOUNCEMENT_STATE = 'announcements';
+
+/**
+ * Kulübün sitesindeki duyuruları yoklar, yeni olanı bildirir.
+ *
+ * Duyurular panelde yazılmıyor — kulübün kendi sitesinde yazılıyor ve
+ * `api.kouseng.com` üzerinden yayımlanıyor. Etkinliklerdeki gibi bir "kaydet"
+ * anı olmadığı için tek yol yoklamak.
+ *
+ * **İlk tur hiçbir şey göndermiyor**, yalnızca mevcut listeyi işaretliyor:
+ * defter boşken sitedeki her duyuru "yeni" görünür ve otomasyon devreye girdiği
+ * gün herkesin telefonu arka arkaya titrerdi.
+ */
+export async function syncAnnouncements(
+  db: Firestore,
+  opts: {
+    now?: Date;
+    fetchImpl?: typeof fetch;
+    /** Test tohumu. */
+    load?: () => Promise<AnnouncementLike[]>;
+  } = {},
+): Promise<{ announced: number; seeded: number }> {
+  const now = opts.now ?? new Date();
+  const load = opts.load ?? fetchAnnouncements;
+
+  const stateRef = db.collection(PUSH_STATE).doc(ANNOUNCEMENT_STATE);
+  const state = await stateRef.get();
+  const seeded = state.exists && typeof state.data()?.seededAt === 'string';
+
+  const announcements = await load();
+  if (!announcements.length) return { announced: 0, seeded: 0 };
+
+  // Hangileri deftere girmiş. Liste on kalem civarı, tek tek okumak yeterli.
+  const seen = new Set<string>();
+  await Promise.all(
+    announcements.map(async (item) => {
+      if (await alreadyAnnounced(db, pushLogId('announcement', item.id))) seen.add(item.id);
+    }),
+  );
+
+  const plan = planAnnouncementPushes({ announcements, seen, seeded, now });
+
+  for (const id of plan.seedOnly) {
+    await claimOnce(db, pushLogId('announcement', id), { kind: 'announcement', silent: true });
+  }
+  for (const item of plan.announce) {
+    await announce(db, { send: true, logId: item.logId, payload: item.payload }, { now });
+  }
+
+  if (!seeded) {
+    await stateRef.set({ seededAt: now.toISOString() });
+    console.log(
+      `[push] duyuru defteri kuruldu: ${plan.seedOnly.length} mevcut duyuru ` +
+        'sessizce işaretlendi. Bildirimler bundan sonraki duyurularla başlıyor.',
+    );
+  }
+
+  return { announced: plan.announce.length, seeded: plan.seedOnly.length };
+}
+
+/** Duyuruları düzenli aralıklarla yoklayan zamanlayıcı. */
+export function startAnnouncementPoller(
+  db: Firestore,
+  everyMs = 15 * 60_000,
+): ReturnType<typeof setInterval> {
+  const run = () => {
+    void syncAnnouncements(db)
+      .then(({ announced }) => {
+        if (announced) console.log(`[push] ${announced} yeni duyuru bildirildi.`);
+      })
+      // Kulübün sitesi bakıma girerse panel çalışmaya devam etmeli.
+      .catch((err: unknown) => console.error('[push] duyurular yoklanamadı:', err));
+  };
+  run();
+  const timer = setInterval(run, everyMs);
+  (timer as unknown as { unref?: () => void }).unref?.();
+  return timer;
 }

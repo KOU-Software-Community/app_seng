@@ -879,6 +879,7 @@ check(
       'decideCancelledEvent(',
       'decideRaffleResult(',
       'startPushFlusher(',
+      'startAnnouncementPoller(',
     ].filter((call) => !server.includes(call));
     if (missing.length) return `admin/server.ts çağırmıyor: ${missing.join(', ')}`;
 
@@ -891,8 +892,16 @@ check(
 
     // Bülten bildirimi `{ tab: 'bulten' }` taşıyor; onu okuyan dal düşerse
     // dokunmak yine hiçbir yere gitmez.
-    if (!strip(read('src/notifications.tsx')).includes("'bulten'")) {
+    const app = strip(read('src/notifications.tsx'));
+    if (!app.includes("'bulten'")) {
       return 'src/notifications.tsx bülten bildirimine dokunmayı ele almıyor';
+    }
+    // Duyuru push'u `announcementId` taşıyor; okuyan dal düşerse dokunmak
+    // yine hiçbir yere gitmez. Aranan şey **rota**, alan adı değil:
+    // `announcementId` tip anotasyonunda da geçiyor ve dal silindiğinde bu
+    // kontrol yeşil kalıyordu — ölçüldü.
+    if (!app.includes('/duyuru/')) {
+      return 'src/notifications.tsx duyuru bildirimine dokunmayı ele almıyor';
     }
     return null;
   },
