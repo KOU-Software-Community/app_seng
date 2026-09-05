@@ -202,6 +202,25 @@ Tanımlanmazsa bölüm **sessizce fixture göstermez**: "yapılandırılmamış"
 düşer ve ekranda hangi değişkenin eksik olduğunu söyler. Bu bilinçli — mock
 verisi uydurma haber başlıkları ve mağaza sürümünde gerçek gibi görünürdü.
 
+Aynısını `preview` için de yapın — dahili (ad-hoc) derlemeler o ortamı okuyor ve
+`eas.json`'daki her profil `environment` alanını açıkça adlandırıyor:
+
+```bash
+eas env:create --environment preview --name EXPO_PUBLIC_AIGUNDEM_DATA_MODE --value "supabase" --visibility plaintext
+# ...diğer ikisi
+```
+
+Ne girildiğini görmek için:
+
+```bash
+eas env:list --environment production
+```
+
+Bu liste değişkeni göstermiyorsa o derleme onsuz çıkmıştır — `.env`'de olması
+hiçbir şey ifade etmez, `.env` EAS sunucusuna gitmiyor. Mağaza derlemesinde
+"Güncel içeriğe ulaşılamadı" yerine **"AI Gündem yapılandırılmamış"** ve eksik
+değişkenin adı çıkıyorsa, tam olarak bu olmuştur.
+
 `SUPABASE_SERVICE_ROLE_KEY` bu üçlünün arasında **yok** ve olmayacak: o anahtar
 panelin, sunucuda kalıyor. `npm run check:bundle` derlenmiş paketi tarayıp
 sızmadığını doğruluyor — ve gömülü bir JWT varsa yükünü çözüp `anon` olduğuna

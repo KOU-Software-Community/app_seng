@@ -85,6 +85,9 @@ describe('unconfigured repositories', () => {
     if (feed.ok) return;
     expect(feed.error.message).toBe(PROBLEM);
     expect(feed.error.retryable).toBe(false);
-    expect(feed.error.code).toBe('not_implemented');
+    // Kendi kodu var, `not_implemented` değil: ekranda söylenecek şey
+    // bambaşka. Yapılandırması olmadan çıkmış bir derlemede "bağlantını
+    // kontrol et" demek, kullanıcıyı düzeltemeyeceği bir yere yollamak.
+    expect(feed.error.code).toBe('unconfigured');
   });
 });

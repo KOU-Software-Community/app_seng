@@ -8,6 +8,13 @@
 export type DataErrorCode =
   /** The selected data mode has no implementation yet (the `supabase` stub). */
   | 'not_implemented'
+  /**
+   * Derleme, AI Gündem yapılandırması olmadan çıkmış: `EXPO_PUBLIC_AIGUNDEM_*`
+   * pakete girmemiş. `not_implemented`'tan ayrı bir kod, çünkü ekranda
+   * söylenecek şey bambaşka — "bağlantını kontrol et" demek burada yanlış
+   * yönlendirme olur, eksik olan ağ değil derleme zamanı değişkeni.
+   */
+  | 'unconfigured'
   /** Caller passed something the layer rejects — bad id, empty URL, bad cursor. */
   | 'invalid_input'
   | 'not_found'
