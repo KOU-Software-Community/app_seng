@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PixelIcon } from '../../src/components/Pixel';
@@ -22,9 +22,24 @@ import { colors, gradients } from '../../src/theme';
  */
 type Tab = 'akis' | 'bulten' | 'kayitli';
 
+const isTab = (value: unknown): value is Tab =>
+  value === 'akis' || value === 'bulten' || value === 'kayitli';
+
 export default function GundemRoute() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('akis');
+  /**
+   * Bülten bildirimine dokunmak bu rotayı `?tab=bulten` ile açıyor.
+   *
+   * Başlangıç değeri olarak okumak yetmiyor: sekme zaten monte edilmişse
+   * (kullanıcı uygulamayı Gündem'de bırakmışsa) `useState` yeniden
+   * çalışmıyor ve bildirim hiçbir şey değiştirmiyordu.
+   */
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(isTab(params.tab) ? params.tab : 'akis');
+
+  useEffect(() => {
+    if (isTab(params.tab)) setTab(params.tab);
+  }, [params.tab]);
 
   return (
     <View style={styles.screen}>

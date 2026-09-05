@@ -170,6 +170,26 @@ describe('planNotifications — digest', () => {
     expect(item.daily).toEqual({ hour: 7, minute: 0 });
   });
 
+  /**
+   * Yerel bir günlük zamanlayıcı, kurulduğu gün yarının bülteninin var olup
+   * olmadığını bilemez. Eskiden metin "Bugünün beş başlığı hazır." diyordu ve
+   * bülten üretilmemişken de aynen çalıyordu — olmayan bir şeyin hazır
+   * olduğunu söylemek.
+   */
+  it('içerik hakkında iddiada bulunmuyor', () => {
+    const [item] = planNotifications({ ...noEvents, prefs: prefs(), now });
+    if (item.kind !== 'digest') throw new Error('bülten bekleniyordu');
+    expect(item.body).not.toMatch(/hazır/i);
+    expect(item.body).not.toMatch(/beş/i);
+  });
+
+  /** Eskiden `data` boştu; dokunmak hiçbir yere gitmiyordu. */
+  it('dokununca Bülten sekmesini açacak veriyi taşıyor', () => {
+    const [item] = planNotifications({ ...noEvents, prefs: prefs(), now });
+    if (item.kind !== 'digest') throw new Error('bülten bekleniyordu');
+    expect(item.data).toEqual({ tab: 'bulten' });
+  });
+
   it('is absent when the category is off', () => {
     const plan = planNotifications({
       ...noEvents,

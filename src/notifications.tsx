@@ -206,8 +206,19 @@ export function NotificationSync({
   // Tapping a notification opens the event it is about.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const eventId = response.notification.request.content.data?.eventId;
-      if (typeof eventId === 'string') router.push(`/etkinlik/${eventId}`);
+      const data = response.notification.request.content.data as
+        | { eventId?: unknown; tab?: unknown }
+        | undefined;
+
+      // Silinmiş bir etkinliğin kimliği de buradan geçebilir; o rota kendi
+      // "bulunamadı" ekranını çiziyor, bu yüzden burada ayrıca kontrol yok.
+      if (typeof data?.eventId === 'string') {
+        router.push(`/etkinlik/${data.eventId}`);
+        return;
+      }
+      // Bülten bildirimi. Eskiden `data` boştu ve dokunmak hiçbir yere
+      // gitmiyordu: kullanıcı uygulamanın kaldığı ekrana düşüyordu.
+      if (data?.tab === 'bulten') router.push('/gundem?tab=bulten');
     });
     return () => sub.remove();
   }, [router]);

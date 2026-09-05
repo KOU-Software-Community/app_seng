@@ -37,7 +37,8 @@ export type PlannedNotification =
       kind: 'digest';
       title: string;
       body: string;
-      data: Record<string, never>;
+      /** Dokununca hangi ekranın açılacağı. */
+      data: { tab: 'bulten' };
       /** Her gün tekrarlıyor. */
       daily: { hour: number; minute: number };
     };
@@ -110,11 +111,25 @@ export function planNotifications(input: {
     // seçiyor. Seçilen saati "sessiz" diye kaydırmak, ayarın söylediğinden
     // başka bir zamanda çalan bir bildirim demek olurdu — bu deponun why-log'u
     // aynı hatayı takvim tarafında bir kez kaydetmiş.
+    /**
+     * Metin hiçbir şey **iddia etmiyor**, ve bu bilinçli.
+     *
+     * Eskiden "Bugünün beş başlığı hazır." yazıyordu. Bu bildirim yerel bir
+     * günlük zamanlayıcı: kurulduğu an ile çaldığı an arasında bir gün var ve
+     * kurulurken yarının bülteninin var olup olmadığı bilinemiyor. Bülten
+     * üretilmemişse, boşsa ya da bölüm hiç yapılandırılmamışsa da aynı cümle
+     * çalıyordu — kullanıcıya olmayan bir şeyin hazır olduğunu söylemek.
+     *
+     * İçeriğe göre konuşan bir bildirim ancak sunucudan gelen bir push olabilir.
+     * Elimizdeki zamanlayıcıyla söylenebilecek doğru şey bir hatırlatma:
+     * "bakma vakti". Bülten yoksa kullanıcı boş bir sekme görüyor — yanlış
+     * bilgilendirilmiş olmuyor.
+     */
     planned.push({
       kind: 'digest',
       title: 'Günün AI bülteni',
-      body: 'Bugünün beş başlığı hazır.',
-      data: {},
+      body: 'Bülten sekmesine göz atma vakti.',
+      data: { tab: 'bulten' },
       daily: { hour: prefs.digestHour, minute: 0 },
     });
   }
