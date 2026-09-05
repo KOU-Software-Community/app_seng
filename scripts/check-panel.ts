@@ -13,6 +13,7 @@ import { parseServiceAccount } from '../admin/credentials';
 import { cookieHeader } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
 import { resolvePort } from '../admin/port';
+import { announce } from '../admin/push';
 import { archiveList, eventForm } from '../admin/views';
 
 let failed = 0;
@@ -241,5 +242,149 @@ assert('sıfır kabul edilmiyor', resolvePort({ ADMIN_PORT: '0' }) === 4000);
 assert('aralık dışı kabul edilmiyor', resolvePort({ ADMIN_PORT: '70000' }) === 4000);
 assert('ondalık kabul edilmiyor', resolvePort({ ADMIN_PORT: '40.5' }) === 4000);
 
-console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
-process.exit(failed ? 1 : 0);
+
+
+// ---------------------------------------------------------------------------
+// Bildirim kilidi — gönderim başarısızsa geri veriliyor mu
+// ---------------------------------------------------------------------------
+//
+// Kilit gönderimden **önce** alınıyor, çünkü yinelenen bildirim eksik
+// bildirimden çok daha fazla zarar veriyor. Bedeli şu: gönderim patlarsa kilit
+// kalır ve o olay bir daha asla duyurulamaz — hata yutulduğu için de kimse fark
+// etmez. Aşağısı o dalın gerçekten geri aldığını gösteriyor.
+
+/** Yalnızca `announce`/`deliver`'ın dokunduğu yüzeyi taklit eden Firestore. */
+function fakeDb(devices: { id: string; data: Record<string, unknown> }[]) {
+  const store = new Map<string, Map<string, Record<string, unknown>>>();
+  store.set('devices', new Map(devices.map((d) => [d.id, d.data])));
+
+  const col = (name: string) => {
+    if (!store.has(name)) store.set(name, new Map());
+    return store.get(name)!;
+  };
+
+  const api = {
+    collection(name: string) {
+      const c = col(name);
+      return {
+        doc(id: string) {
+          return {
+            async create(data: Record<string, unknown>) {
+              if (c.has(id)) throw new Error('ALREADY_EXISTS');
+              c.set(id, data);
+            },
+            async get() {
+              return { exists: c.has(id), data: () => c.get(id) };
+            },
+            async set(data: Record<string, unknown>, opts?: { merge?: boolean }) {
+              c.set(id, opts?.merge ? { ...(c.get(id) ?? {}), ...data } : data);
+            },
+            async delete() {
+              c.delete(id);
+            },
+          };
+        },
+        async add(data: Record<string, unknown>) {
+          c.set(`auto${c.size}`, data);
+        },
+        async get() {
+          const docs = [...c.entries()].map(([id, data]) => ({ id, data: () => data }));
+          return { docs, empty: docs.length === 0, size: docs.length };
+        },
+      };
+    },
+    batch() {
+      const ops: (() => void)[] = [];
+      return {
+        delete(ref: { _name: string; _id: string }) {
+          ops.push(() => col(ref._name).delete(ref._id));
+        },
+        async commit() {
+          ops.forEach((op) => op());
+        },
+      };
+    },
+    _peek: (name: string, id: string) => col(name).get(id),
+  };
+  return api as unknown as Parameters<typeof announce>[0] & { _peek: typeof api._peek };
+}
+
+const okDevice = {
+  id: 'dev1',
+  data: { token: 'ExponentPushToken[x]', master: true, categories: {}, quietHours: false },
+};
+
+const decision = {
+  send: true as const,
+  logId: 'event_created__test',
+  payload: { category: 'Atölye', title: 'Yeni atölye', body: 'Test', data: {} },
+};
+
+/** Expo'nun cevabını taklit eden fetch. */
+const fakeFetch = (status: string) =>
+  (async () =>
+    ({
+      ok: true,
+      status: 200,
+      async json() {
+        return { data: [{ status }] };
+      },
+      async text() {
+        return '';
+      },
+    }) as unknown as Response) as unknown as typeof fetch;
+
+const NOW = new Date('2026-09-10T12:00:00+03:00');
+
+void (async () => {
+  // 1. Kayıtlı cihaz yok → kimseye ulaşmadı → kilit geri veriliyor.
+  const empty = fakeDb([]);
+  await announce(empty, decision, { now: NOW, fetchImpl: fakeFetch('ok') });
+  assert(
+    'kimseye ulaşmayan gönderim kilidi geri veriyor',
+    empty._peek('pushLog', decision.logId) === undefined,
+    'kilit kaldı — o etkinlik bir daha asla duyurulamaz',
+  );
+
+  // 2. Gönderim fırlıyor → kilit geri veriliyor.
+  const throwing = fakeDb([okDevice]);
+  const boom = (async () => {
+    throw new Error('ağ yok');
+  }) as unknown as typeof fetch;
+  await announce(throwing, decision, { now: NOW, fetchImpl: boom });
+  assert(
+    'gönderim fırlarsa kilit geri veriliyor',
+    throwing._peek('pushLog', decision.logId) === undefined,
+    'kilit kaldı',
+  );
+
+  // 3. Başarılı gönderim: kilit duruyor ve sonuç deftere yazılıyor.
+  const good = fakeDb([okDevice]);
+  await announce(good, decision, { now: NOW, fetchImpl: fakeFetch('ok') });
+  const row = good._peek('pushLog', decision.logId) as { sent?: number } | undefined;
+  assert('başarılı gönderimde kilit duruyor', row !== undefined);
+  assert('sonuç deftere yazılıyor', row?.sent === 1, JSON.stringify(row));
+
+  // 4. İkinci çağrı hiçbir şey göndermiyor.
+  let calls = 0;
+  const counting = (async () => {
+    calls += 1;
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { data: [{ status: 'ok' }] };
+      },
+      async text() {
+        return '';
+      },
+    } as unknown as Response;
+  }) as unknown as typeof fetch;
+  await announce(good, decision, { now: NOW, fetchImpl: counting });
+  assert('aynı olay ikinci kez gönderilmiyor', calls === 0, `${calls} istek çıktı`);
+})().then(() => {
+  // Çıkış burada: yukarıdaki blok asenkron, dosyanın sonunda çağrılsaydı
+  // iddialar sayılmadan önce koşardı.
+  console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');
+  process.exit(failed ? 1 : 0);
+});

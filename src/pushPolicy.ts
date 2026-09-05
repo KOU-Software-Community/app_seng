@@ -158,6 +158,8 @@ export function decideRaffleResult(input: {
 
 export type DeviceDoc = {
   token?: unknown;
+  /** 'ios' | 'android' — yalnızca panelin özet tablosu okuyor. */
+  platform?: unknown;
   master?: unknown;
   categories?: Record<string, unknown>;
   quietHours?: unknown;

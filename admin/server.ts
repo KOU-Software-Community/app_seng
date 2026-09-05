@@ -58,9 +58,15 @@ import {
   alreadyAnnounced,
   announce,
   autoPushEnabled,
+  pendingSummary,
+  recentPushLog,
+  sendTestPush,
   startAnnouncementPoller,
   startPushFlusher,
+  summariseDevices,
 } from './push';
+import { notificationsPage, type LogRow } from './notificationsView';
+import { NOTIFICATION_CATEGORIES } from '../src/data';
 import {
   decideCancelledEvent,
   decideNewEvent,
@@ -785,6 +791,55 @@ async function countEntries(eventId: string): Promise<number> {
   const snap = await db.collection('raffleEntries').where('eventId', '==', eventId).get();
   return snap.size;
 }
+
+/**
+ * Bildirim zincirinin görünür hâli.
+ *
+ * Bu sayfanın varlık sebebi: zincirin her halkası sessizce kopuyordu — cihaz
+ * kaydı yazılmamış olabilir, panel eski kodu çalıştırıyor olabilir, gönderim
+ * kimseye ulaşmamış olabilir. Üçünün de tek belirtisi "bildirim gelmedi"ydi.
+ */
+app.get('/bildirimler', async (req, res) => {
+  const categories = NOTIFICATION_CATEGORIES.map((c) => c.key);
+  const [devices, log, pending] = await Promise.all([
+    summariseDevices(db, categories),
+    recentPushLog(db),
+    pendingSummary(db),
+  ]);
+
+  res.type('html').send(
+    notificationsPage({
+      autoPush: autoPushEnabled(),
+      devices,
+      log: log as LogRow[],
+      pending,
+      categories,
+      notice: typeof req.query.sonuc === 'string' ? req.query.sonuc : undefined,
+    }),
+  );
+});
+
+app.post('/bildirimler/test', async (req, res) => {
+  const category = String(req.body.category ?? '').trim();
+  const title = String(req.body.title ?? '').trim();
+  const body = String(req.body.body ?? '').trim();
+
+  if (!category || !title || !body) {
+    return res.redirect('/bildirimler?sonuc=' + encodeURIComponent('Alanların hepsi dolu olmalı.'));
+  }
+
+  const outcome = await sendTestPush(db, { category, title, body });
+  const summary =
+    `${outcome.registered} kayıtlı cihaz · ${outcome.sent} gönderildi` +
+    (outcome.deferred ? ` · ${outcome.deferred} sessiz saate ertelendi` : '') +
+    (outcome.failed ? ` · ${outcome.failed} başarısız` : '') +
+    (outcome.sent === 0 && outcome.deferred === 0
+      ? ` — kimseye ulaşmadı. Kategorisi kapalı: ${outcome.skipped.category}, ` +
+        `bildirimleri kapalı: ${outcome.skipped.master}, token'ı yok: ${outcome.skipped.noToken}.`
+      : '');
+
+  res.redirect('/bildirimler?sonuc=' + encodeURIComponent(summary));
+});
 
 app.get('/raffles', async (_req, res) => {
   const [eventsSnap, rafflesSnap] = await Promise.all([

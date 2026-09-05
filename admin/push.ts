@@ -211,7 +211,29 @@ export async function claimOnce(
   }
 }
 
-/** Bu olay için bildirim daha önce gönderildi mi. */
+/**
+ * Alınmış bir kilidi geri verir.
+ *
+ * Kilit gönderimden **önce** alınıyor (yinelenen bildirim, eksik bildirimden
+ * çok daha fazla zarar veriyor). Bunun bedeli şu: gönderim patlarsa kilit
+ * kalıyor ve o olay bir daha asla duyurulamıyor — hata yutulduğu için de kimse
+ * fark etmiyor. Kimseye ulaşmamış bir bildirimin kilidi geri veriliyor;
+ * gönderilmemiş bir şeyin ikinci denemesi yinelenen bildirim üretemez.
+ */
+export async function releaseClaim(db: Firestore, logId: string): Promise<void> {
+  try {
+    await db.collection(PUSH_LOG).doc(logId).delete();
+  } catch (err) {
+    console.error(`[push] "${logId}" kilidi geri verilemedi:`, err);
+  }
+}
+
+/**
+ * Bu olay için bildirim daha önce **birine ulaştı mı**.
+ *
+ * Kimseye ulaşmamış gönderimin kaydı silindiği için bu, "denendi mi" değil
+ * "duyuruldu mu" sorusunun cevabı — iptal bildiriminin dayandığı şey de bu.
+ */
 export async function alreadyAnnounced(db: Firestore, logId: string): Promise<boolean> {
   const doc = await db.collection(PUSH_LOG).doc(logId).get();
   return doc.exists;
@@ -342,12 +364,47 @@ export async function announce(
       return;
     }
 
-    const outcome = await deliver(db, decision.payload, opts);
+    let outcome: SendOutcome;
+    try {
+      outcome = await deliver(db, decision.payload, opts);
+    } catch (err) {
+      // Kilit geri veriliyor, yoksa bu olay bir daha hiç duyurulamaz.
+      await releaseClaim(db, decision.logId);
+      throw err;
+    }
+
+    // Sonuç deftere yazılıyor: panelin bildirim sayfası "gitti mi" sorusunu
+    // buradan cevaplıyor. Bir sürüm derlemesinde konsol yok — sunucuda var ama
+    // operatör ona bakmıyor.
+    await db
+      .collection(PUSH_LOG)
+      .doc(decision.logId)
+      .set(
+        {
+          sent: outcome.sent,
+          deferred: outcome.deferred,
+          failed: outcome.failed,
+          registered: outcome.registered,
+          sentAt: (opts.now ?? new Date()).toISOString(),
+        },
+        { merge: true },
+      );
+
     console.log(
       `[push] "${decision.payload.title}" → ${outcome.sent} gönderildi, ` +
         `${outcome.deferred} sessiz saate ertelendi, ${outcome.failed} başarısız ` +
         `(${outcome.registered} kayıtlı cihaz).`,
     );
+
+    if (outcome.sent === 0 && outcome.deferred === 0) {
+      // Kimseye ulaşmadı: kilit kalırsa bu olay bir daha denenemez ve iptal
+      // bildirimi de "duyurulmuştu" sanıp gider.
+      await releaseClaim(db, decision.logId);
+      console.log(
+        `[push] "${decision.payload.title}" kimseye ulaşmadı; defter kaydı geri ` +
+          'alındı. Kayıtlı cihaz yoksa sebep budur.',
+      );
+    }
   } catch (err) {
     // Kaydı bozmuyoruz; operatör panelde bir şey görmüyor, sebep günlükte.
     console.error('[push] bildirim gönderilemedi:', err);
@@ -437,3 +494,93 @@ export function startAnnouncementPoller(
   (timer as unknown as { unref?: () => void }).unref?.();
   return timer;
 }
+
+// ---------------------------------------------------------------------------
+// Panel için özet
+// ---------------------------------------------------------------------------
+
+export type DeviceSummary = {
+  total: number;
+  byPlatform: Record<string, number>;
+  masterOn: number;
+  byCategory: Record<string, number>;
+};
+
+/**
+ * Cihaz kaydının özeti.
+ *
+ * Kategori sayımı `selectTargets` ile aynı kuralı uyguluyor — bilinmeyen
+ * kategori **açık** sayılıyor. İki yer farklı sayarsa panel "12 cihaz açık"
+ * derken gönderim 3 cihaza gider ve kimse sebebini anlamaz.
+ */
+export async function summariseDevices(
+  db: Firestore,
+  categories: readonly string[],
+): Promise<DeviceSummary> {
+  const devices = await readDevices(db);
+  const summary: DeviceSummary = {
+    total: devices.length,
+    byPlatform: {},
+    masterOn: 0,
+    byCategory: {},
+  };
+
+  for (const category of categories) summary.byCategory[category] = 0;
+
+  for (const { data } of devices) {
+    const platform = typeof data.platform === 'string' ? data.platform : 'bilinmiyor';
+    summary.byPlatform[platform] = (summary.byPlatform[platform] ?? 0) + 1;
+    if (data.master !== true) continue;
+    summary.masterOn += 1;
+    for (const category of categories) {
+      if (data.categories?.[category] !== false) summary.byCategory[category] += 1;
+    }
+  }
+
+  return summary;
+}
+
+/** Son gönderimler, en yeni önce. */
+export async function recentPushLog(db: Firestore, limit = 25): Promise<Record<string, unknown>[]> {
+  // `claimedAt` her kayıtta var; `sentAt` yalnızca gönderilenlerde. Sıralama
+  // ilkine göre, yoksa sessiz işaretlenenler listeden düşerdi.
+  const snapshot = await db.collection(PUSH_LOG).orderBy('claimedAt', 'desc').limit(limit).get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+/** Sessiz saat kuyruğunda bekleyenler. */
+export async function pendingSummary(db: Firestore): Promise<
+  { notBefore?: string; title?: string; tokens: number }[]
+> {
+  const snapshot = await db.collection(PENDING).limit(25).get();
+  return snapshot.docs.map((doc) => {
+    const row = doc.data() as { notBefore?: string; payload?: PushPayload; tokens?: unknown };
+    return {
+      notBefore: row.notBefore,
+      title: row.payload?.title,
+      tokens: Array.isArray(row.tokens) ? row.tokens.length : 0,
+    };
+  });
+}
+
+/**
+ * Panelden elle gönderilen test bildirimi.
+ *
+ * `announce` değil `deliver`: deftere yazılmıyor, dolayısıyla tekrar tekrar
+ * gönderilebiliyor. Bir testin tek işi "gidiyor mu" sorusunu cevaplamak; kilit
+ * alsaydı ikinci deneme sessizce hiçbir şey yapmazdı.
+ */
+export async function sendTestPush(
+  db: Firestore,
+  input: { category: string; title: string; body: string },
+): Promise<SendOutcome> {
+  return deliver(db, {
+    category: input.category,
+    title: input.title,
+    body: input.body,
+    data: {},
+  });
+}
+
+/** `PushPayload` tipini dışarı taşımak için — panel sayfası okuyor. */
+export type { PushPayload };

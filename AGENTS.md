@@ -794,3 +794,21 @@ it belongs here. **A mistake made twice has earned a line in this file.**
   dokunma dalını doğrulayan kontrol `announcementId` arıyordu; o ad tip
   anotasyonunda da geçiyor, dolayısıyla dal silindiğinde kontrol yeşil kaldı —
   ölçüldü. Artık rotayı (`/duyuru/`) arıyor. Alan adı değil, davranışın izi.
+- **Kilit gönderimden önce alınıyorsa, başarısız gönderimde geri verilmeli.**
+  Yinelenen bildirim eksik bildirimden çok daha fazla zarar verdiği için sıra
+  doğru; ama gönderim patladığında `catch` hatayı yutuyor ve kilit kalıyordu —
+  o olay bir daha asla duyurulamaz, ve kimse fark etmez. Kimseye ulaşmamış bir
+  gönderimin kilidi siliniyor: gönderilmemiş bir şeyin ikinci denemesi
+  yinelenen bildirim üretemez. Yan etkisi de doğru yöne bakıyor —
+  `alreadyAnnounced` artık "denendi mi" değil "duyuruldu mu" diyor, ki iptal
+  bildiriminin dayandığı şey tam olarak bu.
+- **Zincirin her halkası sessizce koptuğunda teşhis bir özelliktir.** Cihaz
+  kaydı yazılmamış olabilir, panel eski kodu çalıştırıyor olabilir, gönderim
+  kimseye ulaşmamış olabilir — üçünün de tek belirtisi "bildirim gelmedi"ydi ve
+  üçü de sunucu günlüğünde yazıyordu, ki operatör ona bakmıyor. Panelin
+  `/bildirimler` sayfası bunu ekrana taşıyor. Aynı soruyu üç kez yaşadıktan
+  sonra eklendi.
+- **`tsx` üst düzey `await`'i CJS'e çeviremiyor** (`ERR_REQUIRE_ASYNC_MODULE`).
+  `check:panel`'e asenkron bir kontrol eklerken IIFE gerekiyor — ve çıkış
+  satırları da o bloğun içine taşınmalı, yoksa iddialar sayılmadan
+  `process.exit` koşar ve kontrol her zaman yeşil verir.
