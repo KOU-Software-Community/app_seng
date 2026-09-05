@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoGallery } from '../../src/components/PhotoGallery';
+import { RaffleNotice } from '../../src/components/RaffleNotice';
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
   Card,
@@ -178,6 +179,11 @@ export default function EventDetailRoute() {
               </View>
             </Card>
           ) : null}
+
+          {/* Guideline 5.3.1: düzenleyen, ücretsizlik, rastgelelik ve Apple
+              feragati çekiliş kartında görünmek zorunda. Bir kez tam olarak bu
+              eksik olduğu için reddedildik. */}
+          {raffle ? <RaffleNotice style={{ marginTop: 14 }} /> : null}
         </View>
 
         {/* Konuşmacı bloğunun dışında: şerit kenara kadar kayabilsin diye kendi
