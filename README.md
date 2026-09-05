@@ -200,6 +200,30 @@ Panel açılışta hangi modda olduğunu yazıyor. Duyuru yoklaması **ilk turda
 hiçbir şey göndermez** — mevcut listeyi sessizce işaretler, bildirimler bir
 sonraki gerçekten yeni duyuruyla başlar.
 
+### Bildirim gelmedi, nereye bakılır
+
+Panelde **Bildirimler** sayfası var (`/bildirimler`). Zincirin hangi halkasının
+koptuğunu orada görürsünüz:
+
+| sayfada gördüğünüz | anlamı |
+|---|---|
+| `Kayıtlı cihaz: 0` | hiçbir cihaz token yazmamış — uygulamayı bir kez açıp izin vermek gerekiyor; simülatörde ve Expo Go'da token hiç üretilmez |
+| `Otomatik gönderim: KAPALI` | `ADMIN_AUTO_PUSH=off` tanımlı |
+| Son gönderimler boş | panel ya yeni kodu çalıştırmıyor ya da hiç etkinlik kaydedilmedi |
+| `0 gönderildi` | hedef vardı ama ulaşılamadı; satırdaki `başarısız` sayısına ve sunucu günlüğüne bakın |
+
+**Test bildirimi** düğmesi deftere yazmadan gönderiyor, yani tekrar tekrar
+denenebilir. Kategorisi açık olan her cihaza gider.
+
+Panel açılışında görülmesi gereken satırlar:
+
+```
+Yönetim paneli: http://localhost:4000
+[push] otomatik bildirim AÇIK. Kapatmak için ADMIN_AUTO_PUSH=off.
+```
+
+Bunlar yoksa panel yeni kodu çalıştırmıyor demektir.
+
 > **Simülatörde push test edilemez.** iOS Simulator'da APNs yok, dolayısıyla
 > token da yok — `requestPushToken` orada bilerek `null` dönüyor. Simülatörde
 > çalışan tek şey **yerel** bildirimler (hatırlatma ve bülten). Uzaktan push

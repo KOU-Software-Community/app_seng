@@ -108,6 +108,7 @@ export function page(title: string, body: string, opts: { nav?: boolean } = {}):
          <a href="/arsiv">Arşiv</a>
          <a href="/raffles">Çekilişler</a>
          <a href="/registrations">Kayıtlar</a>
+         <a href="/bildirimler">Bildirimler</a>
          <form method="post" action="/logout" style="margin:0">
            <button class="btn-ghost" style="padding:6px 12px;font-size:13px">Çıkış</button>
          </form>
