@@ -76,6 +76,16 @@ import {
 } from '../src/pushPolicy';
 import { startDeletionSweeper } from './deletion';
 import { registerAccountApi } from './accountApi';
+import { certificateHtml } from './certificate';
+import {
+  belgeTarihi,
+  findCertificate,
+  publishCertificates,
+  revokeCertificate,
+} from './certificates';
+import { deliverCertificates, dogrulamaUrl } from './certificateDelivery';
+import { sertifikaPage, sertifikaYokPage } from './certificateView';
+import { FONT_DIR, pdfDumanTesti, pdfDurumu, sertifikaPdf } from './pdf';
 import {
   attendanceRows,
   ensureQr,
@@ -316,6 +326,58 @@ app.post('/hesap-sil', async (req, res) => {
 // ÖNÜNDE ve bilerek: okutan kişi öğrenci, yönetici parolası yok. Sayfa hiçbir
 // şey doğrulamıyor, yalnızca "uygulamayı aç" diyor.
 app.get('/qr/:eventId/:token', (_req, res) => res.type('html').send(qrLandingPage()));
+
+/**
+ * Belgenin üstünde basılı olan doğrulama adresi.
+ *
+ * Giriş duvarının ÖNÜNDE olmak zorunda: belgeyi açan kişi öğrenci ya da bir
+ * işveren, yönetici parolası yok. Sonra kayıt edilseydi sayfa açılıyor görünür
+ * ve giriş ekranına yönlendirirdi — basılı adres çalışmazdı ve bunu kimse fark
+ * etmezdi, çünkü kimse kendi belgesini test etmiyor.
+ *
+ * Fontlar da buradan servis ediliyor; aksi hâlde herkese açık sayfa sistem
+ * fontuna düşer ve PDF ile GÖRSEL OLARAK ayrışır — aynı tanımdan çıkıyor
+ * olmaları bir şey ifade etmez.
+ */
+app.use(
+  '/sertifika-fontlari',
+  express.static(FONT_DIR, { maxAge: '30d', immutable: true, index: false }),
+);
+
+app.get('/sertifika/:no', async (req, res) => {
+  const no = String(req.params.no).replace(/\.pdf$/i, '');
+  const pdfMi = /\.pdf$/i.test(String(req.params.no));
+  const bulunan = await findCertificate(db, no);
+  if (!bulunan) {
+    return res.status(404).type('html').send(sertifikaYokPage(no));
+  }
+
+  const event = (await db.collection('events').doc(bulunan.eventId).get()).data() as
+    | ClubEvent
+    | undefined;
+  const url = dogrulamaUrl(panelKoku(req), bulunan.no);
+  const veri = {
+    adSoyad: bulunan.adSoyad,
+    etkinlik: event?.title ?? '(etkinlik kaydı bulunamadı)',
+    tarih: belgeTarihi(event?.startsAt ?? ''),
+    belgeNo: bulunan.no,
+    dogrulamaUrl: url,
+    qrSvg: await QRCode.toString(url, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }),
+  };
+
+  if (pdfMi) {
+    // PDF, sayfanın kendisinin basılmış hâli — ayrı bir çizim değil.
+    const [dosya] = await sertifikaPdf([veri]);
+    res.type('application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="KOU-Yazilim-Kulubu-Katilim-Belgesi-${bulunan.no}.pdf"`,
+    );
+    return res.send(dosya);
+  }
+
+  res.type('html').send(certificateHtml({ ...veri, fontBase: '/sertifika-fontlari' }));
+});
 
 // Uygulamanın hesap uç noktaları. Kimliği yönetici parolası değil, çağıranın
 // Firebase kimlik jetonu belirliyor — bu yüzden giriş duvarının önünde.
@@ -769,6 +831,128 @@ app.post('/events/:id/yoklama', async (req, res) => {
   res.redirect(`/events/${encodeURIComponent(eventId)}/qr?sonuc=` + encodeURIComponent(sonuc));
 });
 
+// ------------------------------------------------------------- sertifikalar
+
+async function sertifikaSayfasi(req: Request, res: Response, notice?: string) {
+  const eventId = String(req.params.id);
+  const doc = await db.collection('events').doc(eventId).get();
+  if (!doc.exists) {
+    return res.status(404).type('html').send(page('Bulunamadı', '<div class="card">Etkinlik bulunamadı.</div>'));
+  }
+  const event = doc.data() as ClubEvent;
+  const durum = pdfDurumu();
+  res.type('html').send(
+    sertifikaPage({
+      eventId,
+      baslik: event.title,
+      tarih: belgeTarihi(event.startsAt ?? ''),
+      yoklama: await attendanceRows(db, eventId),
+      // Duman testi hiç koşmadıysa (açılışta hata yutulduysa) "hazır" DEMİYORUZ:
+      // bilinmeyeni iyimser saymak, bu defterde birkaç kez yazılmış hata.
+      pdfHazir: durum?.hazir === true,
+      pdfHata: durum?.hata ?? (durum ? undefined : 'Açılıştaki deneme hiç koşmadı.'),
+      notice,
+    }),
+  );
+}
+
+app.get('/events/:id/sertifika', async (req, res) => {
+  await sertifikaSayfasi(req, res, typeof req.query.sonuc === 'string' ? req.query.sonuc : undefined);
+});
+
+/**
+ * Yayınla ve gönder.
+ *
+ * İki adım ayrı fonksiyonlarda ve öyle kalmalı: yayınlama belgeyi var ediyor,
+ * teslim onu ulaştırıyor. Posta patladığında belge yayınlanmış kalıyor ve
+ * "Tekrar gönder" AYNI numarayı yeniden gönderiyor — tek adım olsaydı ikinci
+ * deneme yeni bir numara üretir ve dışarıda paylaşılmış adresi kırardı.
+ */
+app.post('/events/:id/sertifika', async (req, res) => {
+  const eventId = String(req.params.id);
+  const doc = await db.collection('events').doc(eventId).get();
+  if (!doc.exists) return res.redirect('/');
+  const event = doc.data() as ClubEvent;
+
+  const govde = req.body as Record<string, unknown>;
+  const secilen = ([] as string[]).concat((govde.sec as string[] | string) ?? []).filter(Boolean);
+  if (!secilen.length) {
+    return res.redirect(
+      `/events/${encodeURIComponent(eventId)}/sertifika?sonuc=` +
+        encodeURIComponent('Kimse seçilmedi, hiçbir şey yayınlanmadı.'),
+    );
+  }
+
+  // Ad formdan geliyor çünkü operatör düzeltebiliyor; profilden okunan hâli
+  // yalnızca varsayılan. Yayın anında donuyor (bkz. `publishCertificates`).
+  const girdiler = secilen.map((uid) => ({
+    uid,
+    adSoyad: String(govde[`ad__${uid}`] ?? '').trim(),
+  }));
+
+  const yayin = await publishCertificates(db, eventId, girdiler, new Date());
+
+  const satirlar = await attendanceRows(db, eventId);
+  const epostalar = new Map(satirlar.map((y) => [y.uid, y.email]));
+  const teslim = await deliverCertificates(
+    db,
+    eventId,
+    event.title,
+    event.startsAt ?? '',
+    panelKoku(req),
+    secilen.map((uid) => ({ uid, email: epostalar.get(uid) ?? '' })),
+  );
+
+  const parcalar = [`${yayin.yayinlanan} belge yayınlandı`, `${teslim.gonderilen} posta gitti`];
+  if (yayin.atlanan.length) parcalar.push(`${yayin.atlanan.length} atlandı`);
+  if (teslim.hatali.length) {
+    // Sebebi de yazılıyor: "3 gönderilemedi" tek başına operatöre hiçbir şey
+    // söylemiyor ve sunucu loguna bakmıyor.
+    parcalar.push(`gönderilemeyen: ${teslim.hatali.map((h) => h.sebep).join('; ')}`);
+  }
+  res.redirect(
+    `/events/${encodeURIComponent(eventId)}/sertifika?sonuc=` + encodeURIComponent(parcalar.join(' · ')),
+  );
+});
+
+app.post('/events/:id/sertifika/gonder', async (req, res) => {
+  const eventId = String(req.params.id);
+  const uid = String(req.body.uid ?? '').trim();
+  const doc = await db.collection('events').doc(eventId).get();
+  if (!doc.exists || !uid) return res.redirect('/');
+  const event = doc.data() as ClubEvent;
+
+  const satir = (await attendanceRows(db, eventId)).find((y) => y.uid === uid);
+  const teslim = await deliverCertificates(
+    db,
+    eventId,
+    event.title,
+    event.startsAt ?? '',
+    panelKoku(req),
+    [{ uid, email: satir?.email ?? '' }],
+  );
+  res.redirect(
+    `/events/${encodeURIComponent(eventId)}/sertifika?sonuc=` +
+      encodeURIComponent(
+        teslim.gonderilen ? 'Posta gönderildi.' : `Gönderilemedi: ${teslim.hatali[0]?.sebep ?? 'sebep yok'}`,
+      ),
+  );
+});
+
+app.post('/events/:id/sertifika/iptal', async (req, res) => {
+  const eventId = String(req.params.id);
+  const uid = String(req.body.uid ?? '').trim();
+  const silindi = uid ? await revokeCertificate(db, eventId, uid) : false;
+  res.redirect(
+    `/events/${encodeURIComponent(eventId)}/sertifika?sonuc=` +
+      encodeURIComponent(
+        silindi
+          ? 'Sertifika iptal edildi. Doğrulama adresi artık çalışmıyor; yoklama kaydı duruyor.'
+          : 'İptal edilecek sertifika bulunamadı.',
+      ),
+  );
+});
+
 app.get('/arsiv', async (_req, res) => {
   const past = (await allEvents())
     .filter((e) => isPast(e, today()))
@@ -1005,6 +1189,7 @@ app.get('/bildirimler', async (req, res) => {
       pending,
       categories,
       mail: { ready: mailReady(), from: mailFrom(), eksik: mailEksik },
+      pdf: pdfDurumu(),
       notice: typeof req.query.sonuc === 'string' ? req.query.sonuc : undefined,
     }),
   );
@@ -1346,4 +1531,15 @@ app.listen(PORT, () => {
   // Hesap silme temizliği. Cloud Functions olmadığı için (Blaze istiyor) bu
   // iş panelin üçüncü yoklayıcısı; Apple silmenin tamamlanmasını istiyor.
   startDeletionSweeper(db);
+
+  // SERTİFİKA PDF'İ AÇILIŞTA BİR KEZ BASILIYOR, ve bu satırın varlık sebebi
+  // şu: Chromium'lu bir panel boot'ta ÖLMÜYOR. Süreç açılıyor, sağlık
+  // kontrolü geçiyor, Coolify yeşil; ölüm ilk sertifika isteğinde, etkinlikten
+  // haftalar sonra geliyor. Bu deneme hatayı boot'a geri çekiyor.
+  //
+  // Sonuç paneli DÜŞÜRMÜYOR (kayıt, bildirim, OTP ve giriş de burada); yalnızca
+  // görünür oluyor: açılış satırı ve /events/:id/sertifika sayfasının üstündeki
+  // kırmızı şerit. "Zincirin her halkası sessizce koptuğunda teşhis bir
+  // özelliktir" — bu defterde yazılı.
+  void pdfDumanTesti();
 });

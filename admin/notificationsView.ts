@@ -49,6 +49,8 @@ export type MailStatus = { ready: boolean; from: string | null; eksik: string[] 
 export function notificationsPage(input: {
   autoPush: boolean;
   mail: MailStatus;
+  /** Sertifika PDF'i açılışta basılabildi mi. `null` ise deneme hiç koşmadı. */
+  pdf: { hazir: boolean; sure: number; bayt?: number; hata?: string } | null;
   devices: DeviceSummary;
   log: LogRow[];
   pending: PendingRow[];
@@ -152,6 +154,27 @@ export function notificationsPage(input: {
         </label>
         <div class="actions"><button type="submit">Test postası gönder</button></div>
       </form>
+    </div>
+
+    <div class="card">
+      <h2>Sertifika PDF'i</h2>
+      <p class="hint">
+        ${
+          input.pdf?.hazir
+            ? `Açılışta bir belge basıldı: <b>${input.pdf.sure} ms</b>, ` +
+              `<code>${input.pdf.bayt ?? 0}</code> bayt. PDF üretimi çalışıyor.`
+            : input.pdf
+              ? `<b style="color:#B3261E">PDF üretilemiyor.</b> ` +
+                `<code>${esc(input.pdf.hata ?? 'sebep bilinmiyor')}</code>`
+              : '<b>Açılıştaki deneme hiç koşmadı.</b> Panel eski kodu çalıştırıyor olabilir.'
+        }
+      </p>
+      <p class="hint">
+        Bu satır bir süs değil: Chromium'lu bir panel <b>boot'ta ölmüyor</b>.
+        Süreç açılır, sağlık kontrolü geçer, Coolify yeşil görünür ve ölüm ilk
+        sertifika isteğinde — etkinlikten haftalar sonra, bir öğrenci belgesini
+        beklerken — gelir. Açılışta bir belge basmak hatayı buraya çekiyor.
+      </p>
     </div>
 
     <div class="card">

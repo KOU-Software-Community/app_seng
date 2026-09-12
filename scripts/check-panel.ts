@@ -47,6 +47,13 @@ import { otpMail } from '../admin/mailTemplate';
 import { claimIdentity } from '../admin/claims';
 import { registerAccountApi, type AuthLike } from '../admin/accountApi';
 import { adSinifi, certificateHtml } from '../admin/certificate';
+import {
+  BELGE_NO_UZUNLUK,
+  belgeTarihi,
+  makeBelgeNo,
+  publishCertificates,
+} from '../admin/certificates';
+import { sertifikaPage } from '../admin/certificateView';
 
 let failed = 0;
 function assert(name: string, condition: boolean, detail = '') {
@@ -754,19 +761,26 @@ void (async () => {
     // Uzun ad çerçeveyi taşırırsa belge bozuk çıkar ve bunu ancak o adın sahibi
     // görür — yani hiç görülmez. Punto kademesi uzunluğa göre iniyor.
     //
-    // Sınırlar BASILARAK belirlendi, tahminle değil: 21 ve 34 karakterlik
-    // adlar tam puntoda ve bir kademe inikte çerçeveye sığıyor (biri tek, biri
-    // iki satır). İlk yazılışta bu iddia daha dar sınırlar bekliyordu ve
-    // KIRMIZI VERDİ — yanlış olan kod değil, beklentiydi.
+    // Sınırlar BASILARAK belirlendi, tahminle değil, ve punto büyütüldüğünde
+    // yeniden ölçüldü: 46pt'de 21 karakter sığıyordu, 52pt'de sığmıyor. Bu
+    // iddia bir kez daha kırmızı verdi ve yine yanlış olan kod değil beklentiydi
+    // — sayılar rendere göre düzeltildi, render sayılara göre değil.
+    //
+    // BU İDDİA SINIRIN DOĞRU YERDE OLDUĞUNU SÖYLEYEMEZ, yalnızca kaymadığını.
+    // Sınırın doğru yerde olduğunu yalnızca basıp bakmak söylüyor; punto her
+    // değiştiğinde o ölçüm tekrarlanmak zorunda.
     assert('kısa ad tam punto', adSinifi('Ali Öz') === 'ad');
-    assert('21 karakter hâlâ tam punto', adSinifi('Ayşegül Nur Şahinoğlu') === 'ad');
+    // Sınırın İKİ YANI da tutuluyor: yalnızca "20 tam punto" yazsaydım eşiği
+    // 40'a çekmek de yeşil kalırdı ve uzun ad sessizce çerçeveyi taşardı.
+    assert('20 karakter tam punto', adSinifi('Ayşegül Nur Şahinoğl') === 'ad');
+    assert('21 karakter bir kademe iniyor', adSinifi('Ayşegül Nur Şahinoğlu') === 'ad uzun');
     assert(
-      '34 karakter bir kademe iniyor',
-      adSinifi('Muhammed Emin Küçükçelebi Oğulları') === 'ad uzun',
+      '31 karakter hâlâ bir kademe inik',
+      adSinifi('Muhammed Emin Küçükçelebi Oğulu') === 'ad uzun',
     );
     assert(
-      '40 karakter iki kademe iniyor',
-      adSinifi('Muhammed Emin Küçükçelebioğulları Yıldırım') === 'ad cokUzun',
+      '32 karakter iki kademe iniyor',
+      adSinifi('Muhammed Emin Küçükçelebi Oğullu') === 'ad cokUzun',
     );
     assert('boşluklar kırpılıyor', adSinifi('   Ali Öz   ') === 'ad');
   }
@@ -1054,6 +1068,109 @@ void (async () => {
         !capraz.ok && capraz.reason === 'yanlis',
       );
     }
+  }
+
+  // --- Sertifika yayınlama ------------------------------------------------
+  {
+    function sertDb() {
+      const store = new Map<string, Record<string, unknown>>();
+      const api = {
+        collection: (n: string) => ({
+          doc: (id: string) => ({
+            async get() {
+              const d = store.get(`${n}/${id}`);
+              return {
+                exists: d !== undefined,
+                get: (k: string) => d?.[k],
+              };
+            },
+            async set(data: Record<string, unknown>, opt?: { merge?: boolean }) {
+              const eski = opt?.merge ? (store.get(`${n}/${id}`) ?? {}) : {};
+              store.set(`${n}/${id}`, { ...eski, ...data });
+            },
+          }),
+        }),
+        _get: (yol: string) => store.get(yol),
+        _set: (yol: string, d: Record<string, unknown>) => store.set(yol, d),
+      };
+      return api;
+    }
+
+    const NOW = new Date('2026-03-13T10:00:00Z');
+    const db = sertDb();
+    db._set('attendance/e1__u1', { eventId: 'e1', uid: 'u1' });
+    db._set('attendance/e1__u2', { eventId: 'e1', uid: 'u2' });
+
+    const ilk = await publishCertificates(
+      db as never,
+      'e1',
+      [
+        { uid: 'u1', adSoyad: '  Ayşe   Gülşah  Öztürk ' },
+        { uid: 'u2', adSoyad: 'Ali Can Yıldız' },
+        // Yoklaması olmayana belge çıkmamalı: doğrulama sayfası neye bakacak?
+        { uid: 'u3', adSoyad: 'Hayalet Kişi' },
+        { uid: 'u4', adSoyad: 'X' },
+      ],
+      NOW,
+    );
+    assert('yoklaması olan yayınlanıyor', ilk.yayinlanan === 2, JSON.stringify(ilk));
+    assert(
+      'yoklaması olmayana belge çıkmıyor',
+      ilk.atlanan.some((a) => a.uid === 'u3' && a.sebep === 'yoklama kaydı yok'),
+    );
+    assert('çok kısa ad reddediliyor', ilk.atlanan.some((a) => a.uid === 'u4'));
+
+    const kayit = (db._get('attendance/e1__u1') as { certificate: Record<string, string> })
+      .certificate;
+    // Ad YAYIN ANINDA donuyor ve normalleşiyor: belge dışarıda ve adresi
+    // paylaşılmış olabilir, kişi profilini değiştirince belgenin sessizce
+    // değişmesi onu belge olmaktan çıkarır.
+    assert('ad normalleşerek donuyor', kayit.adSoyad === 'Ayşe Gülşah Öztürk', kayit.adSoyad);
+    assert('belge no doğru uzunlukta', kayit.no.length === BELGE_NO_UZUNLUK);
+    assert(
+      'belge no tahmin edilebilir bir şey DEĞİL',
+      kayit.no !== 'u1' && !kayit.no.includes('e1') && makeBelgeNo() !== kayit.no,
+    );
+
+    // İKİNCİ YAYIN YENİ NUMARA ÜRETMEMELİ: üretseydi eskisi geçersiz olurdu ve
+    // dışarıda paylaşılmış bir adres kırılırdı.
+    const ikinci = await publishCertificates(
+      db as never,
+      'e1',
+      [{ uid: 'u1', adSoyad: 'Başka Bir Ad' }],
+      NOW,
+    );
+    assert('zaten yayınlanmış olan atlanıyor', ikinci.yayinlanan === 0);
+    assert(
+      'ikinci yayın belgeyi değiştirmiyor',
+      (db._get('attendance/e1__u1') as { certificate: { no: string; adSoyad: string } })
+        .certificate.adSoyad === 'Ayşe Gülşah Öztürk',
+    );
+
+    assert('belge tarihi okunur hâle geliyor', belgeTarihi('2026-03-12T18:00:00+03:00') === '12 Mart 2026');
+    assert('okunamayan tarihte boş', belgeTarihi('bilinmiyor') === '');
+
+    // PDF üretimi bozukken sayfa bunu EN ÜSTTE söylüyor: söylemezse operatör
+    // "yayınla ve gönder"e basar, belgeler yayınlanır, hiçbir posta gitmez ve
+    // sebep yalnızca sunucu logunda kalır.
+    const bozuk = sertifikaPage({
+      eventId: 'e1',
+      baslik: 'Git Atölyesi',
+      tarih: '12 Mart 2026',
+      yoklama: [],
+      pdfHazir: false,
+      pdfHata: 'Chromium açılamadı',
+    });
+    assert('PDF bozukken sayfa uyarıyor', bozuk.includes('PDF üretimi çalışmıyor'));
+    assert('uyarı sebebi de yazıyor', bozuk.includes('Chromium açılamadı'));
+    const saglam = sertifikaPage({
+      eventId: 'e1',
+      baslik: 'Git Atölyesi',
+      tarih: '12 Mart 2026',
+      yoklama: [],
+      pdfHazir: true,
+    });
+    assert('PDF sağlamken uyarı çizilmiyor', !saglam.includes('PDF üretimi çalışmıyor'));
   }
 
 })().then(() => {

@@ -152,6 +152,20 @@ export default function HesapRoute() {
           </View>
         )}
 
+        <GroupLabel style={styles.groupLabel}>BELGELERİM</GroupLabel>
+        <View style={styles.card}>
+          {/* Ekranın var olması ona erişilebildiği anlamına GELMİYOR — bu
+              defterde "yazılmış ama bağlanmamış bir ekranın maliyeti" diye bir
+              bölüm var ve sebebi tam olarak buydu. `check:release` bu satırı
+              doğruluyor. */}
+          <SatirLink
+            icon="star"
+            label="Sertifikalarım"
+            hint="QR ile yoklaman alınan etkinliklerin katılım belgeleri"
+            onPress={() => router.push('/sertifikalarim')}
+          />
+        </View>
+
         <GroupLabel style={styles.groupLabel}>AYARLAR</GroupLabel>
         <View style={styles.card}>
           <SatirLink

@@ -54,13 +54,36 @@ const RENK = {
  * Sertifikanın ortasında bir mühür olmasının sebebi boşluk doldurmak değil:
  * belgenin dikey ekseninde bir çapa yok ve kompozisyon dağılıyordu.
  */
-function muhur(boyMm: number): string {
-  return `<svg viewBox="0 0 8 8" width="${boyMm}mm" height="${boyMm}mm" aria-hidden="true">
-    <rect x="0" y="0" width="8" height="8" rx="1.4" fill="${RENK.lacivert}"/>
-    <g transform="translate(1.15 1.15) scale(0.72)">
-      <path d="${ICON.star}" fill="${RENK.mavi200}"/>
+function muhur(boyMm: number, yil: string): string {
+  // İlk hâl dolu lacivert bir yuvarlak kareydi ve basılınca sayfanın EN AĞIR
+  // öğesi oluyordu: adla yarışıyor, piksel yıldızı da o ölçekte yıldız değil
+  // bir blob olarak okunuyordu — bu defterde bildirim ikonu ve hesap ikonu
+  // için aynı ders iki kez yazılı, "sekiz piksellik bir glif yolu okunarak
+  // değerlendirilemez". Damga artık çizgisel: iki eşmerkezli halka, tepede
+  // küçük bir yıldız, ortada iki satır aralıklı kapital. Yıldız burada bir
+  // kahraman değil bir aksan, ve o ölçekte yıldız gibi okunuyor.
+  const yariAd = boyMm / 2;
+  return `<svg viewBox="0 0 100 100" width="${boyMm}mm" height="${boyMm}mm" aria-hidden="true"
+      style="overflow:visible" data-yari="${yariAd}">
+    <circle cx="50" cy="50" r="48" fill="none" stroke="${RENK.lacivert}" stroke-width="2"/>
+    <circle cx="50" cy="50" r="42.5" fill="none" stroke="${RENK.mavi200}" stroke-width="0.9"/>
+    <g transform="translate(41 20) scale(2.25)">
+      <path d="${ICON.star}" fill="${RENK.mavi}"/>
     </g>
+    <text x="50" y="55" text-anchor="middle"
+      font-size="10.5" font-weight="800" letter-spacing="2.2" fill="${RENK.lacivert}">KATILIM</text>
+    <text x="50" y="67" text-anchor="middle"
+      font-size="10.5" font-weight="800" letter-spacing="2.2" fill="${RENK.lacivert}">BELGESİ</text>
+    <line x1="34" y1="73.5" x2="66" y2="73.5" stroke="${RENK.mavi200}" stroke-width="0.9"/>
+    <text x="50" y="84" text-anchor="middle"
+      font-size="8" font-weight="600" letter-spacing="1.6" fill="${RENK.soluk}">${esc(yil)}</text>
   </svg>`;
+}
+
+/** `12 Mart 2026` → `2026`. Bulunamazsa damgadaki yıl satırı boş kalıyor. */
+function yilOf(tarih: string): string {
+  const m = /\b(\d{4})\b/.exec(tarih ?? '');
+  return m ? m[1] : '';
 }
 
 /** Uygulamanın başlıklarındaki kare dizisi — aynı görsel dil. */
@@ -102,7 +125,13 @@ export function certificateHtml(v: SertifikaVerisi): string {
   /* A4 yatay. Yazdırmada da PDF'e basmada da aynı ölçü. */
   @page { size: A4 landscape; margin: 0; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  /* p etiketinin varsayılan alt payı .ortaMetin ölçüsünden KAÇIYOR (pay
+     birleşmesi): kutu göründüğünden kısa ölçülüyor, dolayısıyla dikey
+     ortalama metni yukarı itiyor ve altta ~25 mm ölü alan bırakıyordu.
+     Basılmadan görünmeyen cinsten — ölçüldü.
+     NOT: bu şablonun içinde ters tırnak KULLANILAMAZ, template literal'i
+     kapatıyor ve hata CSS'te değil TypeScript'te çıkıyor. İkinci kez oldu. */
+  html, body, h1, p { margin: 0; padding: 0; }
   body {
     width: 297mm; height: 210mm;
     background: ${RENK.kagit};
@@ -158,7 +187,7 @@ export function certificateHtml(v: SertifikaVerisi): string {
   }
 
   .icerik {
-    position: absolute; left: 38mm; right: 22mm; top: 20mm; bottom: 20mm;
+    position: absolute; left: 38mm; right: 22mm; top: 22mm; bottom: 21mm;
     display: flex; flex-direction: column;
   }
 
@@ -174,7 +203,7 @@ export function certificateHtml(v: SertifikaVerisi): string {
   .orta {
     flex: 1;
     display: grid; grid-template-columns: 1fr auto; gap: 18mm;
-    align-items: center; padding: 0 0 6mm;
+    align-items: center; padding: 0;
   }
   .ortaMetin { min-width: 0; }
 
@@ -185,28 +214,30 @@ export function certificateHtml(v: SertifikaVerisi): string {
 
   .etiket {
     font-family: 'Pixel', monospace;
-    font-size: 7.5pt; letter-spacing: 2px; color: ${RENK.mavi};
-    margin-bottom: 11mm;
+    font-size: 8.5pt; letter-spacing: 2px; color: ${RENK.mavi};
+    margin-bottom: 7mm;
   }
 
-  .giris { font-size: 12pt; color: ${RENK.soluk}; letter-spacing: 0.2px; }
+  .giris { font-size: 12.5pt; color: ${RENK.soluk}; letter-spacing: 0.2px; }
 
   /* Ad: belgenin tek gerçek kahramanı. Uzun adlarda küçülüyor ama satırı
      asla taşırmıyor — clamp() yerine iki basamak, çünkü yazdırma motorları
      viewport birimlerine güvenilmez cevap veriyor. */
   .ad {
-    font-size: 46pt; font-weight: 800; letter-spacing: -1.6px; line-height: 1.06;
+    font-size: 52pt; font-weight: 800; letter-spacing: -1.8px; line-height: 1.05;
     color: ${RENK.lacivert}; margin: 6mm 0 0;
     word-break: break-word;
   }
-  .ad.uzun { font-size: 34pt; letter-spacing: -1px; }
-  .ad.cokUzun { font-size: 26pt; letter-spacing: -0.6px; }
+  .ad.uzun { font-size: 38pt; letter-spacing: -1.2px; }
+  .ad.cokUzun { font-size: 29pt; letter-spacing: -0.7px; }
 
-  .altCizgi { width: 74mm; height: 1.6pt; background: ${RENK.mavi}; margin: 9mm 0 10mm; }
+  .altCizgi { width: 82mm; height: 1.8pt; background: ${RENK.mavi}; margin: 8mm 0 9mm; }
 
-  .aciklama { font-size: 13pt; line-height: 1.85; color: ${RENK.metin}; max-width: 158mm; }
+  .aciklama { font-size: 14pt; line-height: 1.9; color: ${RENK.metin}; max-width: 158mm; }
   .aciklama .etkinlik { font-weight: 800; color: ${RENK.lacivert700}; }
-  .aciklama .tarih { font-weight: 600; }
+  /* Tarih satır sonunda BÖLÜNMEMELİ: "12 Mart / 2026" bir tarih gibi
+     okunmuyor ve belgenin tek anlamlı sayısı o. */
+  .aciklama .tarih { font-weight: 600; white-space: nowrap; }
 
   .altAyrac { height: 0.5pt; background: ${RENK.mavi200}; margin-bottom: 7mm; }
   .alt { display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; }
@@ -215,10 +246,10 @@ export function certificateHtml(v: SertifikaVerisi): string {
   .imza .kim { font-size: 9.5pt; font-weight: 600; color: ${RENK.lacivert}; }
   .imza .rol { font-size: 8pt; color: ${RENK.soluk}; margin-top: 2px; letter-spacing: 0.3px; }
 
-  .dogrula { display: flex; align-items: flex-end; gap: 5mm; }
-  .dogrula .yazi { text-align: right; font-size: 7.5pt; line-height: 1.6; color: ${RENK.soluk}; max-width: 62mm; }
+  .dogrula { display: flex; align-items: flex-end; gap: 6mm; }
+  .dogrula .yazi { text-align: right; font-size: 7.5pt; line-height: 1.6; color: ${RENK.soluk}; max-width: 64mm; }
   .dogrula .yazi b { display: block; color: ${RENK.lacivert700}; font-weight: 600; font-size: 8pt; }
-  .dogrula .kod { width: 20mm; height: 20mm; }
+  .dogrula .kod { width: 18mm; height: 18mm; flex: none; }
   .dogrula .kod svg { width: 100%; height: 100%; display: block; }
 
   .kareSeridi { display: flex; gap: 3px; margin-bottom: 5mm; }
@@ -260,7 +291,7 @@ export function certificateHtml(v: SertifikaVerisi): string {
             <span class="tarih">${esc(v.tarih)}</span> tarihinde katıldığını belgeler.
           </p>
         </div>
-        <div class="muhurSutun">${muhur(34)}</div>
+        <div class="muhurSutun">${muhur(36, yilOf(v.tarih))}</div>
       </div>
 
       <div class="altAyrac"></div>
@@ -294,8 +325,12 @@ export function certificateHtml(v: SertifikaVerisi): string {
  * güvenilir değil ve PDF'te sayfa dışına taşan bir satır geri alınamıyor.
  */
 export function adSinifi(ad: string): 'ad' | 'ad uzun' | 'ad cokUzun' {
+  // Eşikler basılarak bulundu, hesapla değil: 52pt'de 20 karakter çerçeveye
+  // sığıyor, 21 sığmıyor. Punto her değiştiğinde bu üç sayı yeniden ölçülmek
+  // zorunda — `check:panel` sınır değerlerini tutuyor ama sınırın DOĞRU yerde
+  // olduğunu yalnızca render söyleyebiliyor.
   const n = (ad ?? '').trim().length;
-  if (n <= 22) return 'ad';
-  if (n <= 34) return 'ad uzun';
+  if (n <= 20) return 'ad';
+  if (n <= 31) return 'ad uzun';
   return 'ad cokUzun';
 }

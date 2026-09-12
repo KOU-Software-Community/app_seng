@@ -96,6 +96,7 @@ function RootStack() {
         <Stack.Screen name="kayit-ol" />
         <Stack.Screen name="dogrula" />
         <Stack.Screen name="sifre-sifirla" />
+        <Stack.Screen name="sertifikalarim" />
         <Stack.Screen name="qr" />
         <Stack.Screen name="hesap-sil" />
         <Stack.Screen name="bildirim-ayarlari" />
