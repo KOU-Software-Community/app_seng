@@ -82,8 +82,18 @@ export const LOGIN_LOCK_MS = 15 * 60 * 1000;
  * var. Pencere kayan: son hatadan itibaren 15 dakika içinde 10 hata kilitler.
  * `req.ip`, `trust proxy 1` ile proxy'nin yazdığı adres — istemcinin
  * uydurduğu başlık değil.
+ *
+ * Tavan ve pencere parametre: parola sıfırlama uç noktaları aynı mekanizmayı
+ * başka bütçelerle kullanıyor (`accountApi.ts`). Kampüs NAT'ının arkasında
+ * yüzlerce öğrenci tek IP'den geliyor, o yüzden oradaki sayılar buradakinden
+ * cömert — dar tutulursa belirti "yurtta kimse parolasını sıfırlayamıyor" olur
+ * ve kimse bunu NAT'a bağlamaz.
  */
-export function loginLimiter(now: () => number = Date.now) {
+export function loginLimiter(
+  now: () => number = Date.now,
+  maxFailures: number = LOGIN_MAX_FAILURES,
+  lockMs: number = LOGIN_LOCK_MS,
+) {
   // ponytail: süreç içi Map, tek örnek; birden çok panel örneği olursa paylaşımlı depo.
   const failures = new Map<string, { count: number; until: number }>();
   return {
@@ -96,7 +106,7 @@ export function loginLimiter(now: () => number = Date.now) {
         failures.delete(ip);
         return 0;
       }
-      return f.count >= LOGIN_MAX_FAILURES ? left : 0;
+      return f.count >= maxFailures ? left : 0;
     },
     fail(ip: string): void {
       const t = now();
@@ -107,7 +117,7 @@ export function loginLimiter(now: () => number = Date.now) {
       }
       const f = failures.get(ip);
       const count = f && f.until > t ? f.count + 1 : 1;
-      failures.set(ip, { count, until: t + LOGIN_LOCK_MS });
+      failures.set(ip, { count, until: t + lockMs });
     },
     succeed(ip: string): void {
       failures.delete(ip);

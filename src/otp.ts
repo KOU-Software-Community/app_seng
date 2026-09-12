@@ -11,6 +11,7 @@
  * tarayıcıya çıkarıyor ve uygulama olup bittiğini bilmiyor (`refreshVerification`
  * tam olarak bu yüzden var). Altı hane kullanıcıyı ekrandan hiç çıkarmıyor.
  */
+import { MIN_PASSWORD } from './accountSchema';
 import { currentUser } from './auth';
 import { PANEL_BASE_URL } from './data';
 
@@ -30,6 +31,8 @@ export type OtpError =
   | 'numara_gecersiz'
   | 'telefon_kullanimda'
   | 'numara_kullanimda'
+  | 'parola_zayif'
+  | 'eposta_gecersiz'
   | 'panel_yok'
   | 'panel_eski'
   | 'aglar';
@@ -44,23 +47,34 @@ export class OtpHata extends Error {
   }
 }
 
-async function cagir(yol: string, govde: Record<string, unknown>): Promise<Record<string, unknown>> {
+/**
+ * `opt.auth === false` kimliksiz uç noktalar için (parola sıfırlama): elde
+ * oturum yok, olması da gerekmiyor. Geri kalan her şey — taban adres kontrolü,
+ * JSON ayrıştırma, `!res.ok` → `OtpHata`, ve özellikle `panel_eski` koruması —
+ * paylaşılıyor. İki ayrı `cagir` yazmak o korumayı yalnızca birinde bırakırdı.
+ */
+async function cagir(
+  yol: string,
+  govde: Record<string, unknown>,
+  opt: { auth?: boolean } = {},
+): Promise<Record<string, unknown>> {
   // Taban adres yoksa istek atmanın anlamı yok: `fetch('/api/…')` React
   // Native'de göreli adresi çözemiyor ve hata "Network request failed" olarak
   // görünür, ki bu yapılandırma eksikliğini bağlantı sorunu gibi gösterir.
   if (!PANEL_BASE_URL) throw new OtpHata('panel_yok');
 
-  const user = currentUser();
-  if (!user) throw new OtpHata('oturum_yok');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (opt.auth !== false) {
+    const user = currentUser();
+    if (!user) throw new OtpHata('oturum_yok');
+    headers.Authorization = `Bearer ${await user.getIdToken()}`;
+  }
 
   let res: Response;
   try {
     res = await fetch(`${PANEL_BASE_URL}${yol}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${await user.getIdToken()}`,
-      },
+      headers,
       body: JSON.stringify(govde),
     });
   } catch {
@@ -113,6 +127,28 @@ export async function kodDogrula(
   await cagir('/api/hesap/dogrula', { code, ...duzeltme });
 }
 
+/**
+ * Parola sıfırlama kodu ister. **Oturum gerekmiyor** — parolasını unutan
+ * kişinin zaten oturumu yok.
+ *
+ * Sunucu adres kayıtlı olsun olmasın aynı cevabı veriyor, dolayısıyla bu
+ * fonksiyonun başarıyla dönmesi "adres kayıtlı" demek DEĞİL. Ekran da buna
+ * bağlanmamalı: kod adımına her iki durumda da geçiliyor, yoksa oracle tam
+ * orada olurdu.
+ */
+export async function sifreKodIste(email: string): Promise<void> {
+  await cagir('/api/hesap/sifre-kod', { email }, { auth: false });
+}
+
+/** Kodu doğrular ve parolayı aynı istekte değiştirir. Oturum gerekmiyor. */
+export async function sifreDegistir(
+  email: string,
+  code: string,
+  parola: string,
+): Promise<void> {
+  await cagir('/api/hesap/sifre-degistir', { email, code, parola }, { auth: false });
+}
+
 /** Kullanıcıya gösterilecek cümle. Sunucu kodu asla ekrana çıkmıyor. */
 export function otpMesaj(err: unknown): string {
   const kod = err instanceof OtpHata ? err.kod : 'aglar';
@@ -142,6 +178,10 @@ export function otpMesaj(err: unknown): string {
       return 'Telefon numarasını 5xx xxx xx xx biçiminde yaz.';
     case 'numara_gecersiz':
       return 'Öğrenci numaran dokuz haneli olmalı.';
+    case 'parola_zayif':
+      return `Parola en az ${MIN_PASSWORD} karakter olmalı.`;
+    case 'eposta_gecersiz':
+      return 'E-posta adresi geçerli görünmüyor.';
     case 'posta_yapilandirilmamis':
     case 'posta_gonderilemedi':
       return 'Posta gönderilemedi. Kulüple iletişime geçebilirsin: info@kouseng.com';

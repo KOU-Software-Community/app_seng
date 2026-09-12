@@ -33,9 +33,12 @@ export const OTP_RESEND_MS = 60_000;
 export const OTP_MAX_SENDS = 5;
 export const OTP_SEND_WINDOW_MS = 60 * 60_000;
 
-/** `emailOtp/{uid}` dokümanının şekli. İstemciye tamamen kapalı. */
+/**
+ * `emailOtp/{uid}` ve `passwordReset/{sha256(eposta)}` dokümanlarının şekli.
+ * İkisi de istemciye tamamen kapalı.
+ */
 export type OtpRecord = {
-  /** Kodun kendisi değil: `sha256(uid.kod)`. Doküman sızsa bile kod okunmuyor. */
+  /** Kodun kendisi değil: `sha256(tuz.kod)`. Doküman sızsa bile kod okunmuyor. */
   hash: string;
   createdAt: number;
   /** Bu penceredeki gönderim sayısı ve pencerenin başlangıcı. */
@@ -52,11 +55,18 @@ export function makeCode(): string {
 /**
  * Kodu saklanabilir hâle getirir.
  *
- * `uid` karışıma giriyor: aynı kodu alan iki kullanıcının kaydı aynı
- * görünmesin, ve bir kaydın hash'i başka bir kullanıcıda kullanılamasın.
+ * `tuz` karışıma giriyor: aynı kodu alan iki kaydın hash'i aynı görünmesin, ve
+ * bir kaydın hash'i başka bir kayıtta kullanılamasın.
+ *
+ * **Tuz kaydın kimliği, kullanıcının kimliği değil — ve bu bir yetki sınırı.**
+ * Doğrulama kaydı `emailOtp/{uid}`, sıfırlama kaydı `passwordReset/{sha256(eposta)}`
+ * ile tuzlanıyor. İkisi de `uid` kullansaydı bir amaç için üretilmiş altı hane
+ * öteki amaç için de geçerli olurdu: doğrulama ekranına yazılan bir sıfırlama
+ * kodu e-postayı doğrulardı, doğrulama kodu parola değişimini yetkilendirirdi.
+ * İki kimlik hiçbir zaman eşit olmadığı için bu yapısal olarak imkânsız.
  */
-export function hashCode(uid: string, code: string): string {
-  return createHash('sha256').update(`${uid}.${code}`).digest('hex');
+export function hashCode(tuz: string, code: string): string {
+  return createHash('sha256').update(`${tuz}.${code}`).digest('hex');
 }
 
 /** Sabit zamanlı karşılaştırma. Uzunluk farkı `timingSafeEqual`'ı fırlatıyor. */
@@ -107,7 +117,7 @@ export function decideSend(record: OtpRecord | null, now: number): SendDecision 
 
 function kayit(code: string, now: number, sendCount: number, windowStart: number): OtpRecord {
   // `hash` burada kodun kendisiyle dolduruluyor gibi görünüyor ama dolmuyor:
-  // çağıran `hashCode(uid, code)` ile değiştiriyor. Uid bu modülde yok çünkü
+  // çağıran `hashCode(tuz, code)` ile değiştiriyor. Tuz bu modülde yok çünkü
   // saf fonksiyonların kimlik bilmesi gerekmiyor.
   return { hash: code, createdAt: now, sendCount, windowStart, attempts: 0 };
 }
@@ -125,7 +135,7 @@ export type VerifyDecision =
  */
 export function decideVerify(
   record: OtpRecord | null,
-  uid: string,
+  tuz: string,
   code: string,
   now: number,
 ): VerifyDecision {
@@ -133,7 +143,7 @@ export function decideVerify(
   if (record.attempts >= OTP_MAX_ATTEMPTS) return { ok: false, reason: 'kilitli' };
   if (now - record.createdAt > OTP_TTL_MS) return { ok: false, reason: 'suresi_doldu' };
 
-  if (!sameHash(record.hash, hashCode(uid, code))) {
+  if (!sameHash(record.hash, hashCode(tuz, code))) {
     const kalan = OTP_MAX_ATTEMPTS - (record.attempts + 1);
     return { ok: false, reason: 'yanlis', kalan: Math.max(0, kalan) };
   }

@@ -16,7 +16,6 @@ import {
   initializeAuth,
   onAuthStateChanged,
   reauthenticateWithCredential,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
   deleteUser,
@@ -113,9 +112,12 @@ export function signOut(): Promise<void> {
   return fbSignOut(getAuthClient());
 }
 
-export function resetPassword(email: string): Promise<void> {
-  return sendPasswordResetEmail(getAuthClient(), normalizeEmail(email));
-}
+// `resetPassword` SİLİNDİ — Firebase'in sıfırlama postası `noreply@<proje>
+// .firebaseapp.com`'dan gidiyor ve o alan adı kulübün değil, yani kouseng.com
+// için yayımlanan SPF/DKIM ile hizalanmıyor ve posta spam'e düşüyor (cihazda
+// gözlendi). Sıfırlama artık doğrulama ile aynı OTP hattından: `src/otp.ts` →
+// `sifreKodIste` / `sifreDegistir`. Fonksiyon bırakılsaydı biri tekrar
+// çağırırdı; bu defterdeki "yazılmış ama bağlanmamış" maddesinin tersi.
 
 /**
  * Doğrulama durumunu sunucudan tazeler.

@@ -383,6 +383,70 @@ check(
 );
 
 check(
+  'parola sıfırlama OTP hattında',
+  'Firebase\'in kendi sıfırlama postası `noreply@<proje>.firebaseapp.com`\'dan ' +
+    'gidiyor; o alan adı kulübün değil, SPF/DKIM hizalanmıyor ve posta spam\'e ' +
+    'düşüyor — doğrulama postasında birebir bu yaşandı. Ekran ya da uç nokta ' +
+    'kopunca belirti sessiz: "parolamı unuttum" hiçbir şey yapmaz.',
+  () => {
+    // strip() İSTİSNASIZ: bu depoda bir kontrol dört kez kendi gerekçesini
+    // bulup yanlış cevap verdi. `sendPasswordResetEmail` adı aşağıdaki
+    // açıklamanın kendisinde de geçiyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    if (!existsSync(join(root, 'app/sifre-sifirla.tsx'))) return 'app/sifre-sifirla.tsx yok';
+    if (!/name="sifre-sifirla"/.test(read('app/_layout.tsx'))) {
+      return 'sifre-sifirla rotası kök yığına kayıtlı değil';
+    }
+
+    // Aranan şey ROTA, fonksiyon adı değil: `sifremiUnuttum` bir yorumda da
+    // geçebilir ve kontrol ekran silinmişken yeşil kalırdı.
+    const giris = strip(read('app/giris.tsx'));
+    if (!/['"]\/sifre-sifirla['"]/.test(giris)) {
+      return 'giriş ekranındaki "parolamı unuttum" /sifre-sifirla\'ya gitmiyor';
+    }
+
+    const auth = strip(read('src/auth.ts'));
+    if (/sendPasswordResetEmail/.test(auth)) {
+      return 'src/auth.ts hâlâ Firebase sıfırlama postası gönderiyor';
+    }
+
+    const api = strip(read('admin/accountApi.ts'));
+    for (const yol of ['/api/hesap/sifre-kod', '/api/hesap/sifre-degistir']) {
+      if (!api.includes(yol)) return `panelde ${yol} uç noktası yok`;
+    }
+    // Parolasını ÇALINDIĞI İÇİN sıfırlayan kullanıcının asıl istediği bu.
+    // Çağrılmazsa saldırgan hesapta süresiz kalır ve kimse fark etmez.
+    if (!/revokeRefreshTokens\(/.test(api)) {
+      return 'sıfırlama diğer cihazlardaki oturumları düşürmüyor';
+    }
+    // İstemcideki uzunluk kontrolü bir ipucu, sınır değil: ham istek onu atlar.
+    if (!/MIN_PASSWORD/.test(api)) return 'panel parola uzunluğunu zorlamıyor';
+
+    // `emailVerified: true` sıfırlamaya SIZMAMALI: bu dosyanın değişmezi
+    // "doğrulanmış ⇒ telefon ve numara sahiplenilmiş", ve sıfırlama hiçbir
+    // sahiplenme yapmıyor.
+    const degistir = api.slice(api.indexOf("'/api/hesap/sifre-degistir'"));
+    if (/emailVerified/.test(degistir)) {
+      return 'sıfırlama uç noktası emailVerified yazıyor — sahiplenme değişmezini kırar';
+    }
+
+    // Tuz doküman kimliği olmazsa doğrulama kodu ile sıfırlama kodu birbirini
+    // doğrular; bu bir yetki geçişi.
+    if (!/hashCode\(ref\.id,/.test(api)) {
+      return 'sıfırlama kodu doküman kimliğiyle tuzlanmıyor';
+    }
+
+    const blok = rulesBlock('passwordReset');
+    if (!blok) return 'firestore.rules passwordReset bloğunu hiç tanımlamıyor';
+    if (!/allow read, write: if false/.test(blok)) {
+      return 'passwordReset istemciye açık — kullanıcı kendi deneme sayacını sıfırlayabilir';
+    }
+    return null;
+  },
+);
+
+check(
   'hesap uç noktaları giriş duvarının önünde',
   'Bu rotaları çağıran öğrencinin kendisi; yönetici parolası isteyemezler. ' +
     '`app.use(requireAuth)` sonrasına düşerlerse uygulama kod isteyemez ve ' +

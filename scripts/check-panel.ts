@@ -9,6 +9,7 @@
  * veriyi silmemesi** (gizlenen alan formdan da düşerse kaydetmek onu sessizce
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
+import { createHash } from 'node:crypto';
 import { parseServiceAccount } from '../admin/credentials';
 import { csvCell } from '../admin/csv';
 import {
@@ -44,6 +45,7 @@ import {
 import { readMailConfig } from '../admin/mail';
 import { otpMail } from '../admin/mailTemplate';
 import { claimIdentity } from '../admin/claims';
+import { registerAccountApi, type AuthLike } from '../admin/accountApi';
 import { adSinifi, certificateHtml } from '../admin/certificate';
 
 let failed = 0;
@@ -834,6 +836,226 @@ void (async () => {
     assert('eski telefon serbest bırakılıyor', db2._get('phoneClaims', TEL) === undefined);
     assert('yeni telefon sahiplenildi', db2._get('phoneClaims', '+905559998877') !== undefined);
   }
+
+  // --- Parola sıfırlama uç noktaları --------------------------------------
+  //
+  // Bunlar KİMLİKSİZ, yani tek koruma buradaki dört katman. Aşağıdaki
+  // iddiaların her biri koruduğu şey kırılarak kırmızı verdiği görülerek
+  // yazıldı; en önemlisi birincisi — "kayıtlı olmayan adres birebir aynı
+  // cevabı veriyor" — çünkü o tek başına kullanıcı numaralandırmasının
+  // tamamını kapatıyor.
+  {
+    type Rota = (req: unknown, res: unknown) => unknown | Promise<unknown>;
+    const rotalar = new Map<string, Rota>();
+    const app = { post: (yol: string, h: Rota) => rotalar.set(yol, h) };
+
+    // Sahte Firestore: yalnızca bu uç noktaların kullandığı yüzey.
+    function resetDb() {
+      const store = new Map<string, Record<string, unknown>>();
+      const ref = (yol: string) => ({
+        id: yol.slice(yol.lastIndexOf('/') + 1),
+        async get() {
+          const d = store.get(yol);
+          return { exists: d !== undefined, data: () => d };
+        },
+        async set(data: Record<string, unknown>) {
+          store.set(yol, { ...data });
+        },
+        async update(patch: Record<string, unknown>) {
+          const d = store.get(yol);
+          if (!d) throw new Error('yok');
+          for (const [k, v] of Object.entries(patch)) {
+            // Sahte `FieldValue.increment(n)`: gerçek nesnede `operand` var.
+            const n = (v as { operand?: number })?.operand;
+            d[k] = typeof n === 'number' ? Number(d[k] ?? 0) + n : v;
+          }
+        },
+        async delete() {
+          store.delete(yol);
+        },
+      });
+      return {
+        collection: (n: string) => ({ doc: (id: string) => ref(`${n}/${id}`) }),
+        doc: (yol: string) => ref(yol),
+        _store: store,
+      };
+    }
+
+    function sahteAuth(varOlan: string | null) {
+      const cagrilar: string[] = [];
+      const auth = {
+        async verifyIdToken() {
+          throw new Error('kullanılmıyor');
+        },
+        async updateUser(uid: string, p: Record<string, unknown>) {
+          cagrilar.push(`updateUser:${uid}:${Object.keys(p).join(',')}`);
+          return {} as never;
+        },
+        async getUserByEmail(email: string) {
+          if (varOlan && email === varOlan) return { uid: 'u1', email } as never;
+          throw new Error('auth/user-not-found');
+        },
+        async revokeRefreshTokens(uid: string) {
+          cagrilar.push(`revoke:${uid}`);
+        },
+      };
+      return { auth: auth as unknown as AuthLike, cagrilar };
+    }
+
+    async function cagir(yol: string, govde: unknown, ip = '1.2.3.4') {
+      const h = rotalar.get(yol);
+      if (!h) throw new Error(`rota yok: ${yol}`);
+      let kod = 200;
+      let gonderildi: unknown;
+      let cozuldu: () => void = () => {};
+      const bitti = new Promise<void>((r) => (cozuldu = r));
+      const res = {
+        status(c: number) {
+          kod = c;
+          return res;
+        },
+        json(v: unknown) {
+          gonderildi = v;
+          cozuldu();
+          return res;
+        },
+      };
+      await h({ ip, body: govde, header: () => '' }, res);
+      await bitti;
+      // Arka plandaki gönderim mikro görevlerini boşalt.
+      await new Promise((r) => setImmediate(r));
+      return { kod, govde: gonderildi as Record<string, unknown> };
+    }
+
+    const VAR = 'elif@example.com';
+    const YOK = 'kimse@example.com';
+
+    // Posta gerçekten gönderilmemeli: `mailReady()` bu süreçte false, o yüzden
+    // uç nokta 503 döner. Sınamak için SMTP'yi yapılandırmıyoruz — onun yerine
+    // 503'ün de HER İKİ ADRES İÇİN aynı olduğunu doğruluyoruz, ki bu da bir
+    // oracle kapısı.
+    {
+      const db = resetDb();
+      const { auth } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+
+      const a = await cagir('/api/hesap/sifre-kod', { email: VAR }, '10.0.0.1');
+      const b = await cagir('/api/hesap/sifre-kod', { email: YOK }, '10.0.0.2');
+      assert(
+        'posta yapılandırılmamışken cevap iki adres için de aynı',
+        a.kod === b.kod && JSON.stringify(a.govde) === JSON.stringify(b.govde),
+        `${a.kod} ${JSON.stringify(a.govde)} ≠ ${b.kod} ${JSON.stringify(b.govde)}`,
+      );
+      assert('posta yapılandırılmamışken 503', a.kod === 503);
+      assert(
+        'e-posta biçimi bozuksa kayıt yazılmıyor',
+        (await cagir('/api/hesap/sifre-kod', { email: 'bu bir adres değil' })).kod === 400 &&
+          db._store.size === 0,
+      );
+    }
+
+    // Kodu elle yerleştirip doğrulama tarafını sınıyoruz: gönderim adımı
+    // SMTP istiyor, doğrulama adımı istemiyor.
+    const KOD = '123456';
+    function kayitYaz(db: ReturnType<typeof resetDb>, email: string, attempts = 0) {
+      const id = createHash('sha256').update(email).digest('hex');
+      db._store.set(`passwordReset/${id}`, {
+        hash: hashCode(id, KOD),
+        createdAt: Date.now(),
+        sendCount: 1,
+        windowStart: Date.now(),
+        attempts,
+      });
+      return `passwordReset/${id}`;
+    }
+
+    {
+      const db = resetDb();
+      const { auth, cagrilar } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+      const yol = kayitYaz(db, VAR);
+
+      const yanlis = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: '000000',
+        parola: 'yeterince-uzun-parola',
+      });
+      assert('yanlış kod parolayı değiştirmiyor', yanlis.kod === 400 && cagrilar.length === 0);
+      assert(
+        'yanlış kod deneme sayacını artırıyor',
+        (db._store.get(yol) as { attempts: number }).attempts === 1,
+      );
+
+      // Kod TÜKETİLMEMELİ: kullanıcı parolayı düzeltip aynı kodla tekrar
+      // denemeli, yoksa her zayıf parolada yeni posta beklemek gerekirdi.
+      const zayif = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: KOD,
+        parola: 'kisa',
+      });
+      assert('sunucu MIN_PASSWORD zorluyor', zayif.kod === 400 && zayif.govde.hata === 'parola_zayif');
+      assert('zayıf parola kodu tüketmiyor', db._store.has(yol));
+      assert('zayıf parolada updateUser çağrılmıyor', cagrilar.length === 0);
+
+      const ok = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: KOD,
+        parola: 'yeterince-uzun-parola',
+      });
+      assert('doğru kod parolayı değiştiriyor', ok.kod === 200 && ok.govde.durum === 'degistirildi');
+      assert(
+        'parola değişince diğer oturumlar düşürülüyor',
+        cagrilar.includes('revoke:u1'),
+        cagrilar.join(' | '),
+      );
+      assert('başarıda kod siliniyor', !db._store.has(yol));
+    }
+
+    {
+      // KAYITLI OLMAYAN ADRES: hesap yoksa cevap "hesap yok" değil "yanlış".
+      // Aksi hâlde kod isteme adımındaki bütün tekdüzelik son adımda geri
+      // açılırdı — adresi yazıp rastgele bir kod denemek yeterli olurdu.
+      const db = resetDb();
+      const { auth, cagrilar } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+      kayitYaz(db, YOK);
+      const r = await cagir('/api/hesap/sifre-degistir', {
+        email: YOK,
+        code: KOD,
+        parola: 'yeterince-uzun-parola',
+      });
+      assert(
+        'hesabı olmayan adreste doğru kod da "yanlış" diyor',
+        r.kod === 400 && r.govde.hata === 'yanlis' && cagrilar.length === 0,
+        JSON.stringify(r.govde),
+      );
+    }
+
+    {
+      // TUZ AYRIMI: doğrulama kaydı uid ile, sıfırlama kaydı doküman kimliği
+      // ile tuzlanıyor. Aynı altı hane iki hatta birden geçerli olsaydı
+      // doğrulama ekranına yazılan bir sıfırlama kodu e-postayı doğrulardı.
+      const uid = 'u1';
+      const resetId = createHash('sha256').update(VAR).digest('hex');
+      const kayit: OtpRecord = {
+        hash: hashCode(uid, KOD),
+        createdAt: Date.now(),
+        sendCount: 1,
+        windowStart: Date.now(),
+        attempts: 0,
+      };
+      assert('doğrulama kodu kendi hattında geçerli', decideVerify(kayit, uid, KOD, Date.now()).ok);
+      const capraz = decideVerify(kayit, resetId, KOD, Date.now());
+      assert(
+        'doğrulama kodu sıfırlama hattında geçersiz',
+        !capraz.ok && capraz.reason === 'yanlis',
+      );
+    }
+  }
+
 })().then(() => {
   // Çıkış burada: yukarıdaki blok asenkron, dosyanın sonunda çağrılsaydı
   // iddialar sayılmadan önce koşardı.
