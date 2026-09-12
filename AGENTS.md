@@ -1280,3 +1280,112 @@ sayın** — sayaç, olmayan bir soruna yazılmış bir mekanizmaydı.
 - **Yoklama "bu kişi salondaydı" demiyor, "bu hesap pencere açıkken jetonu
   gönderdi" diyor.** Kodun paylaşılması bilinçli olarak engellenmiyor ve
   sertifikanın üstüne bundan fazlası yazılamaz.
+
+### Parola sıfırlama, sertifika ve sunucuda PDF
+
+- **Bir cevabın kendisi bir oracle olabiliyor — gövdesi aynı olsa bile.**
+  Kimliksiz sıfırlama uç noktası her durumda birebir aynı JSON'u döndürüyor,
+  ama `getUserByEmail` + SMTP el sıkışması "hiçbir şey yapma"dan yüzlerce ms
+  uzun; zamanlama tek başına "bu adres kayıtlı mı" sorusunu cevaplıyor. Posta
+  bu yüzden **cevap döndükten sonra** gönderiliyor ve bu, `/api/hesap/kod`'un
+  kuralını (gönderim patlarsa kaydı sil, 502 dön) bilerek ihlal ediyor: orada
+  çağıran kimliği bilinen kişi, burada gönderim sonucunu söylemek adresin
+  kayıtlı olduğunu söylemek demek.
+- **Ekranın adım geçişi sunucu cevabına bağlanmamalı.** Sunucu tarafı kusursuz
+  tekdüze olsa bile, istemci kod ekranını yalnızca "kullanıcı var" cevabında
+  açsaydı oracle tam orada olurdu. Kayıtlı olmayan adresi yazan kişi kod
+  ekranını görüyor ve her kod "hatalı" diyor — kabul edilen maliyet bu.
+- **İki OTP hattı aynı tuzu kullanamaz.** Doğrulama kaydı `emailOtp/{uid}`,
+  sıfırlama kaydı `passwordReset/{sha256(eposta)}`; `hashCode`'un tuzu artık
+  **kaydın doküman kimliği**, kullanıcı kimliği değil. İkisi de `uid` ile
+  tuzlansaydı bir amaç için üretilmiş altı hane öteki amaç için geçerli olurdu:
+  doğrulama ekranına yazılan bir sıfırlama kodu e-postayı doğrulardı. Bu bir
+  yetki geçişi, ve iki kimlik hiçbir zaman eşit olmadığı için artık yapısal
+  olarak imkânsız. Aynı dokümanda dursalardı da biri ötekinin kodunu ezer,
+  `attempts`/`sendCount` sayaçlarını paylaşır ve `/api/hesap/dogrula`'nın
+  başarıdaki `ref.delete()`'i akıştaki sıfırlamayı sessizce öldürürdü.
+- **`revokeRefreshTokens` çağrılıyor ve ne YAPMADIĞI da yazılı:** yenileme
+  jetonlarını geçersizleştiriyor, ama elde duran ID jetonları süreleri dolana
+  kadar (bir saate kadar) geçerli kalıyor ve **Firestore kuralları iptali
+  görmüyor**. Yine de çağrılıyor: parolasını çalındığı için sıfırlayan
+  kullanıcının asıl istediği bu, ve çağrılmazsa saldırgan hesapta süresiz
+  kalır.
+- **Sıfırlama `emailVerified`'a DOKUNMUYOR ve bu bir unutma değil.**
+  `accountApi.ts`'in değişmezi "e-posta doğrulanmış ⇒ telefon ve öğrenci
+  numarası sahiplenilmiş" (ikisi aynı işlemde oluyor). Sıfırlamada
+  `emailVerified: true` yazmak, hiç sahiplenme yapılmamış bir hesabı
+  doğrulanmış gösterir ve o değişmezi sessizce kırar.
+- **Nixpacks `puppeteer` ALT DİZESİNİ arıyor.** Node sağlayıcısı
+  `package.json`/lockfile'da o diziyi görünce (yani `puppeteer-core` de
+  tetikliyor) kendi apt listesine `chromium` ekliyor; Ubuntu noble'da gerçek
+  bir chromium deb'i yok, `chromium-browser 2:1snap1` snap saplamasına
+  çözülüyor ve konteynerde snapd yok. Hiçbir apt satırı yazmamış olursunuz,
+  `nixpacks.toml`'a bakınca hiçbir şey görünmez, apt "kurdum" der, derleme
+  yeşil geçer. Sertifika PDF'i bu yüzden `playwright-core` ile basılıyor: o
+  diziyi taşımıyor ve apt listesi bizim yazdığımız, tamamı görünen liste.
+- **Chromium'lu bir panel BOOT'TA ÖLMÜYOR, ve kötü haber bu.** `admin/server.ts`
+  tarayıcıya hiç dokunmuyor: süreç açılıyor, sağlık kontrolü geçiyor, Coolify
+  yeşil, `/bildirimler` normal. Ölüm **ilk sertifika isteğinde** geliyor —
+  etkinlikten haftalar sonra, bir öğrenci beklerken. `Cannot find module
+  'express'` iyi bir hatadır: crash-loop, deploy ekranında görünür, sebebi ilk
+  satırda yazar. Bunun geciktirilmiş ve tekil versiyonu operatör paneli çalışır
+  gördüğü için hiç aranmaz. `pdfDumanTesti()` açılışta bir belge basıp hatayı
+  boot'a geri çekiyor; paneli **düşürmüyor** (kayıt, bildirim, OTP ve giriş de
+  burada), yalnızca görünür kılıyor.
+- **Sistem fontu olmayan bir konteynerde PDF ÜRETİLİYOR ama boş çıkıyor**
+  (~1.1 KB), ve base64 `@font-face` gömmek bile kurtarmıyor. Yani
+  `fonts-liberation`/`fonts-dejavu-core` süs değil; duman testi de bu yüzden
+  bayt sayısına bakıyor, "hata fırlattı mı"ya değil.
+- **`setContent` ile yüklenen sayfanın kaynağı `about:blank`, dolayısıyla
+  `file://` fontları YÜKLENMİYOR.** Ölçüldü: `document.fonts` dört
+  `@font-face`'in dördü için de `error` diyor, data-URI ile dördü de `loaded`.
+  Belirti sessiz — PDF yine üretiliyor, bayt sayısı makul, metin çıkarımı
+  geçiyor, yalnızca yanlış font. `admin/pdf.ts` fontları bu yüzden gömüyor.
+- **Panel kendi fontlarına sahip olmalı.** İlk hâl
+  `node_modules/@expo-google-fonts/...` okuyordu; o paket **mobil tarafın**
+  bağımlılığı, dolayısıyla biri onu mobilden kaldırdığı gün deploy yeşil geçer
+  ve sertifika üretimi ölür — hata da ancak ay sonunda, ilk belge basılırken
+  çıkar. Dört dosya `admin/fonts/` altında, 400 KB.
+- **Belgenin tek bir tanımı var ve PDF onun basılmış hâli.** `certificateHtml`
+  hem herkese açık doğrulama sayfasını hem PDF'i besliyor. pdfkit ya da
+  @react-pdf ile PDF'i ayrıca çizmek belgeyi ikinci kez tanımlamak olurdu ve
+  ikisinin senkron kalması bir **gelenek** olurdu, iddia değil — bu defterdeki
+  "aynı kararı iki yerde uygulamak" maddesi. Bedeli `nixpacks.toml`'a üç yeni
+  load-bearing parça; karşılığı ayrışmanın yapısal olarak imkânsız olması.
+- **Yayınlama ile teslim ayrı iki adım.** Yayınlama belgeyi var ediyor (numara
+  + donmuş ad), teslim ulaştırıyor. Tek adım olsaydı posta patladığında belge
+  de yayınlanmamış sayılırdı ve ikinci deneme **yeni bir numara** üretirdi —
+  dışarıda paylaşılmış bir adres kırılırdı. Şimdi kayıtta `mailError` duruyor
+  ve panel aynı belgeyi yeniden gönderiyor.
+- **Belgeye basılan ad yayın anında donuyor.** Profilden canlı okunsaydı kişi
+  adını değiştirdiğinde dışarıda paylaşılmış belge sessizce değişirdi — bu onu
+  belge olmaktan çıkarır. Operatör yayından ÖNCE düzeltiyor; sonrası iptal +
+  yeniden yayın, yani yeni numara.
+- **Bir tasarım yanlış görüntü alanında yargılanamaz.** Sertifika 297×210 mm,
+  96 dpi'de 1123×794 px. İlk ekran görüntüsü 1587 px genişlikte alındı ve
+  belge köşeye sıkışmış, sayfanın dörtte biri boş göründü — "tasarım bitmemiş"
+  diye okundu ve bir tur kaybettirdi. Tasarım değil ölçekti.
+- **Piksel yıldız mühür boyunda yıldız değil.** Dolu lacivert yuvarlak kare
+  sayfanın en ağır öğesiydi ve adla yarışıyordu; içindeki `ICON.star` o ölçekte
+  artı işareti gibi okunuyordu. Bu defterde aynı ders iki kez yazılı (bildirim
+  ikonu 24dp'de, hesap ikonu 8×8'de) — **üçüncüsü.** Damga artık çizgisel: iki
+  halka, tepede küçük bir yıldız aksanı, ortada iki satır kapital.
+- **`adSinifi` eşikleri puntoya bağlı ve punto her değiştiğinde YENİDEN
+  ölçülmek zorunda.** 46pt'de 21 karakter sığıyordu, 52pt'de sığmıyor; eşikler
+  22/34'ten 20/31'e indi ve `check:panel` iddiası kırmızı verdi — yanlış olan
+  kod değil beklentiydi, ikinci kez. **İddia sınırın DOĞRU YERDE olduğunu
+  söyleyemez, yalnızca kaymadığını.** Doğru yerde olduğunu yalnızca
+  `npm run sertifika:onizle` çıktısına bakmak söylüyor, ve iddia sınırın iki
+  yanını birden tutuyor: yalnızca "20 tam punto" yazılsaydı eşiği 40'a çekmek
+  de yeşil kalırdı.
+- **`<p>`nin varsayılan alt payı ölçüyü kaçırıyor.** Sertifikanın orta bloğu
+  dikey ortalanmıştı ama altta ~25 mm ölü alan bırakıyordu: pay birleşmesi
+  yüzünden `.ortaMetin` göründüğünden kısa ölçülüyor ve ortalama metni yukarı
+  itiyordu. Sıfırlanınca düzeldi; basılmadan görünmeyen cinsten.
+- **`admin/certificate.ts` şablonunun içinde TERS TIRNAK kullanılamaz** —
+  template literal'i kapatıyor ve hata CSS'te değil TypeScript'te,
+  "This expression is not callable" diye çıkıyor. **İkinci kez oldu**, ikisi de
+  bir CSS yorumunda. Aynı sınıfın başka bir hâli: `scripts/check-release.mjs`
+  içindeki bir JSDoc bloğuna `/*` ve `*/` yazmak bloğu erken kapatıyor ve dosya
+  `SyntaxError` ile hiç yüklenmiyor — yani **bütün kontroller** düşüyor, ki bu
+  yanlış cevaptan daha iyi ama aynı kökten.

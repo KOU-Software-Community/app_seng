@@ -49,11 +49,12 @@ export const FONT_DOSYALARI = [
 /**
  * `@font-face`'lerin okuyacağı taban.
  *
- * `file://` **yetmiyor**: `setContent` ile yüklenen sayfanın kaynağı
- * `about:blank`, dolayısıyla yerel dosya isteği aynı-kaynak politikasına
- * takılıyor ve font sessizce yüklenmiyor — PDF üretiliyor, metin çıkarımı bile
- * geçiyor, ekranda yanlış font duruyor. Fontlar bu yüzden data-URI olarak
- * gömülüyor: hiçbir ağ ya da dosya isteği kalmıyor.
+ * `file://` **yetmiyor, ve bu ölçüldü.** `setContent` ile yüklenen sayfanın
+ * kaynağı `about:blank`; `document.fonts` dört `@font-face`'in dördü için de
+ * `error` diyor. Font sessizce yüklenmiyor — PDF yine ÜRETİLİYOR, bayt sayısı
+ * makul, metin çıkarımı bile geçiyor, yalnızca yanlış fontla. Data-URI ile
+ * aynı ölçüm dördü için de `loaded` veriyor; hiçbir ağ ya da dosya isteği
+ * kalmadığı için de gömme yolu seçildi.
  */
 function fontTabani(): string {
   return 'data:font-base';
