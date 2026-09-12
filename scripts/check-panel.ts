@@ -54,6 +54,7 @@ import {
   publishCertificates,
 } from '../admin/certificates';
 import { sertifikaPage } from '../admin/certificateView';
+import { deliverCertificates, dogrulamaUrl } from '../admin/certificateDelivery';
 
 let failed = 0;
 function assert(name: string, condition: boolean, detail = '') {
@@ -1171,6 +1172,35 @@ void (async () => {
       pdfHazir: true,
     });
     assert('PDF sağlamken uyarı çizilmiyor', !saglam.includes('PDF üretimi çalışmıyor'));
+
+    // TESLİM EDİLEMEYEN BELGE "gönderildi" İŞARETLENMEMELİ. Bu süreçte SMTP
+    // yapılandırılmamış, yani `deliverCertificates` en baştan hatayla dönüyor —
+    // ve o yolda kayda dokunulmadığı doğrulanıyor. Yanlışlıkla `mailedAt`
+    // yazılsaydı panel "gönderildi" gösterir, kimse tekrar göndermez ve belge
+    // hiç ulaşmaz; bu defterdeki "sessizce başarılı olma" sınıfı.
+    const teslim = await deliverCertificates(
+      db as never,
+      'e1',
+      'Git Atölyesi',
+      '2026-03-12T18:00:00+03:00',
+      'https://mobil.kouseng.com',
+      [{ uid: 'u1', email: 'elif@example.com' }],
+    );
+    assert('SMTP yokken teslim başarısız sayılıyor', teslim.gonderilen === 0);
+    assert(
+      'başarısız teslim mailedAt yazmıyor',
+      !(db._get('attendance/e1__u1') as { certificate: { mailedAt?: string } }).certificate
+        .mailedAt,
+    );
+
+    // Doğrulama adresi belgenin ÜSTÜNE basılıyor; biçimi değişirse basılı
+    // belgelerdeki adres bozulur ve bunu kimse fark etmez.
+    assert(
+      'doğrulama adresi /sertifika/<no> biçiminde',
+      dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90') ===
+        'https://mobil.kouseng.com/sertifika/K7M2QX90',
+      dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90'),
+    );
   }
 
 })().then(() => {
