@@ -213,6 +213,30 @@ export function splitLocal(startsAt: string): { date: string; time: string } {
 }
 
 /**
+ * Bir `Date`’i kulüp saatinin duvar saati olarak ISO’ya çevirir.
+ *
+ * `toISOString()` UTC veriyor (`…T14:00:00.000Z`), yani ekranda 17:00 olan bir
+ * an 14:00 diye görünürdü. Bu depoda gösterilen her zaman +03:00 duvar saati:
+ * `joinLocal` onu üretiyor, `splitLocal` geri okuyor, bu da bir mutlak andan
+ * aynı biçime dönüyor — Firestore’dan `Timestamp` olarak okunan bir
+ * pencerenin panele geri yazılabilmesi için gereken yön.
+ *
+ * Konteynerin saat dilimi işe karışmıyor: değer önce +3 saat kaydırılıp `getUTC*`
+ * ile okunuyor. `getHours()` kullanılsaydı sonuç panelin koştuğu kutuya bağlı
+ * olurdu ve Coolify’daki konteyner genellikle UTC — bu defterde sessiz saat
+ * penceresi tam olarak bu yüzden `clubHour`’a taşınmıştı.
+ */
+export function toLocalIso(date: Date): string {
+  const ms = date instanceof Date ? date.getTime() : NaN;
+  if (!Number.isFinite(ms)) return '';
+  const k = new Date(ms + 3 * 60 * 60 * 1000);
+  return (
+    `${k.getUTCFullYear()}-${pad(k.getUTCMonth() + 1)}-${pad(k.getUTCDate())}` +
+    `T${pad(k.getUTCHours())}:${pad(k.getUTCMinutes())}:${pad(k.getUTCSeconds())}${LOCAL_OFFSET}`
+  );
+}
+
+/**
  * What the panel offers in the category dropdown.
  *
  * It used to be a free-text box, and free text means one person types "atölye"

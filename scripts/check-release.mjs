@@ -818,6 +818,30 @@ check(
 );
 
 check(
+  'QR penceresi kuralın okuyabileceği tipte yazılıyor',
+  'Kural `request.time >= qrTanimi(eventId).opensAt` diyor ve `request.time` bir ' +
+    '`timestamp`. Alan dize olduğu sürece bu bir tip uyuşmazlığı; kural dili hata ' +
+    'veren ifadeyi reddederek bitiriyor, yani pencere HİÇ açılmıyor — ne varsayılan ' +
+    'ne panelden elle girilen. Belirti bir hata değil: cihazda "Bu kod şu anda ' +
+    'geçerli değil", ve operatör tarihi değiştirip tekrar denediğinde de aynısı. ' +
+    'Bu kontrol yazma tarafını tutuyor; kuralın kendisi buradan çalıştırılamıyor.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const qr = strip(read('admin/qr.ts'));
+    if (!/Timestamp\.fromDate\(/.test(qr)) {
+      return 'admin/qr.ts pencereyi Timestamp olarak yazmıyor';
+    }
+    // Doküman bir kez doğduktan sonra hiçbir yazıcı ona dokunmuyor: tip
+    // düzeltmesi tek başına üretimdeki dize kayıtları onarmaz ve o
+    // etkinliklerde yoklama çalışmamaya devam eder.
+    if (!/tipiDogru\(d\)/.test(qr)) {
+      return 'ensureQr eski dize kayıtları onarmıyor';
+    }
+    return null;
+  },
+);
+
+check(
   'yığın ekranlarında geri düğmesi var',
   'Sekme çubuğu olmayan bir ekranda geri çıkmanın tek yolu telefonun kendi ' +
     'hareketi kalıyor ve iOS\u2019ta o hareket her ekranda çalışmıyor. Kullanıcı ' +
