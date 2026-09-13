@@ -1547,3 +1547,68 @@ turu YARIM: 22 bulgunun 18'i üç oyla doğrulandı, geri kalanı hiç oylanamad
 Bir tarama raporunun "doğrulanan" sayısı, taranan şeyin tamamı değil —
 **ölmeyen ajanların gördüğü kadarı.** Sonraki tur, kalan bulguların
 listesinden devam etmeli.
+
+### `npm audit` — atlanan bulgu, ve "ulaşılabilir mi" sorusunun tek cevabı
+
+Tarama raporunda `npm-audit-ulasilmiyor` diye bir bulgu vardı: "21 danışma var
+ama çağrı yolları kapalı". Oylanamayan listede olduğu için **doğrulamadan**
+geçildi. Kullanıcı `npm ci` çıktısını yapıştırıp sordu; bakınca dördünden biri
+gerçekten ulaşılabilir çıktı. **Bir tarama bulgusunu "erişilemez" diye kapatan
+şey, o paketi kimin ÇAĞIRDIĞINI okumaktır — paketin nerede durduğunu değil.**
+
+Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağlandı:
+
+| paket | ulaşılabilir mi | neden |
+|---|---|---|
+| `qs` <6.16.0 | **evet** | panelde her form POST'u |
+| `decode-uri-component` | hayır | expo-router çağrıyı fork'ta silmiş |
+| `@xmldom/xmldom` 0.8.13 | hayır | yalnızca `expo-updates/cli` (derleme anı) |
+| `uuid` <11.1.1 | hayır | yalnızca `v4()` çağrılıyor, danışma v3/v5/v6 |
+
+- **`extended: false` qs'i devre dışı bırakmıyor.** Express 5'in varsayılan
+  `query parser`'ı `simple`, yani `req.query` qs'e gitmiyor — buraya bakıp
+  "qs kullanmıyoruz" demek kolay. Ama `body-parser/lib/types/urlencoded.js`
+  `extended` ne olursa olsun `qs.parse(body, …)` çağırıyor (`depth: 0` ile).
+  Panelin gördüğü her form gövdesi oradan geçiyor. Düzeltme tek satır:
+  `overrides: { "qs": "^6.16.0" }` — express `^6.14.0` istediği için aralık
+  uyuyor, hiçbir şey kırılmıyor (ölçüldü: gerçek bir form gövdesi ayrıştırıldı).
+- **Bir `overrides` satırı silindiğinde hiçbir şey hata vermiyor**; npm sessizce
+  6.15.x'e dönüyor ve panel yeniden açık olur. `check:release`'te iki yanı da
+  tutan bir iddia var (satır duruyor mu, kurulu sürüm ne) ve ikisi de tek tek
+  kırılıp kırmızı verdiği görüldü.
+- **`decode-uri-component` gerçekten patlıyor ve gerçekten çağrılmıyor.**
+  Ölçüldü: `'%C2'.repeat(1024)` — 3 KB'lık bir sorgu dizesi — kurulu 0.2.2'de
+  **22,6 saniye** sürüyor (256 → 1,2 sn, 512 → 4,5 sn; girdi iki katına çıkınca
+  süre dörde katlanıyor). Derin bağlantı dışarıdan geldiği için bu, uygulamayı
+  donduran gerçek bir yol olurdu — ama Expo `getStateFromPath`'te
+  `queryString.parse` çağrısını fork ederken silmiş (yorum satırı olarak
+  duruyor) ve yerine `URLSearchParams` koymuş. Canlı tek kullanım
+  `queryString.stringify`, o da `encodeURIComponent` kullanıyor. **Savunmasız
+  kod pakete giriyor, çağıran yok.**
+- **Ve düzeltilemiyor:** danışmanın kapsadığı aralık `<=0.4.2`, tek temiz sürüm
+  0.5.0 ve o **yalnızca ESM** (`"type": "module"`). `query-string@7` CJS ve
+  `require` ediyor; override etmek Metro'da çözülme kumarı olurdu. Ulaşılamayan
+  bir danışma için alınacak risk değil.
+- **`npm audit fix`'in önerdiği "düzeltme" burada bir SÜRÜM DÜŞÜRME.**
+  `fixAvailable` alanları `expo-router@5.1.11`, `expo-splash-screen@55.0.25` ve
+  `expo@46.0.21` diyor — hepsi SDK 57'nin altında, biri 11 majör geride.
+  `npm audit fix --force` çalıştırmak projeyi yıllar geriye alırdı ve çıktı
+  bunu "düzeltildi" diye yazardı. **`isSemVerMajor: true` gördüğünüzde önerilen
+  sürümün ileri mi geri mi olduğuna bakın.**
+- **Deprecation uyarılarının dokuzu da geçişli.** `abab`, `domexception`,
+  `whatwg-encoding` jsdom'dan (yalnızca test), `node-domexception`
+  firebase-admin'in `gcp-metadata`'sından, `inflight`/`glob` jest ve Expo
+  CLI'ından, iki `uuid` yukarıdaki zincirlerden. Hiçbiri bizim doğrudan
+  bağımlılığımız değil, hiçbiri buradan düzeltilemez.
+- **`allowScripts` npm 11'de uyarı, npm 12'de ENGEL.** `npm ci` çıktısındaki
+  "4 packages have install scripts not yet covered" satırı yeni bir npm
+  özelliği; npm 12'de aynı paketlerin postinstall'ları **çalıştırılmıyor**.
+  Konteynerin npm'i 10.9.7 olduğu için özellik burada yoktu: npm@latest
+  `npm pack` ile indirilip `lib/utils/allow-scripts-writer.js` okundu, alanın
+  `package.json` kökünde `allowScripts` olduğu ve çıplak ad kabul ettiği
+  görüldü, sonra o npm ile `install --dry-run` koşturulup uyarının önce çıktığı
+  sonra kaybolduğu ölçüldü. Dördü (`@firebase/util`, `esbuild`, `fsevents`,
+  `protobufjs`) bilinen ve meşru; listeye yazılmalarının asıl faydası, bundan
+  sonra **yeni** bir paketin install script'i eklemesinin görünür olması.
+  **Bir aracın davranışını belgeden tahmin etmek yerine aracı indirip okumak,
+  burada bir komut tarifi kadar ucuzdu.**
