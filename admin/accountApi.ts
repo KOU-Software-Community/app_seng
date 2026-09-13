@@ -47,22 +47,37 @@ const OTP_COLLECTION = 'emailOtp';
 const RESET_COLLECTION = 'passwordReset';
 
 /**
- * Günde gönderilebilecek toplam sıfırlama postası.
+ * Günlük posta tavanları — **iki ayrı kova, ve ayrı olmaları şart.**
  *
- * IP sınırını dağıtık bir saldırı baypas ediyor ve adres sınırı adres başına
- * olduğu için toplamı sınırlamıyor. Bu tavan Workspace kotasını koruyor — o
- * kota yanarsa **doğrulama postası da ölür**, yani bu sayı sıfırlamanın değil
- * kayıt akışının da sigortası.
+ * IP sınırını dağıtık bir istek baypas ediyor; adres/hesap sınırı da başına
+ * olduğu için toplamı sınırlamıyor. Bu tavanlar Workspace kotasını koruyor ve
+ * o kota **ikisinin de sigortası**: yanarsa hem doğrulama hem sıfırlama ölür.
+ *
+ * Tek kova olsaydı sıfırlama trafiği doğrulamayı susturabilirdi — yeni
+ * kullanıcının kaydolamaması, parolasını unutan birinin bekleyebilmesinden
+ * daha ağır bir hata. Ayrı kovalar bu sırayı koruyor.
  */
+const KOD_DAILY_CAP = 300;
+const KOD_STATE_DOC = 'pushState/emailOtpDaily';
 const RESET_DAILY_CAP = 200;
 const RESET_STATE_DOC = 'pushState/passwordReset';
 
 /**
- * IP başına gönderim sınırı — 20 / saat.
+ * IP başına posta sınırı — 20 / saat, iki hat için ayrı sayaç.
  *
- * Kıt olan kaynak posta kotası, o yüzden sayı buraya konuyor. Kampüs NAT'ı
- * yüzünden cömert; tek başına hiçbir şeye güvenilmiyor (bkz. dosya başlığı).
+ * **Hesap başına sınır, hesap açmak bedavayken sınır değil.** `decideSend`
+ * `emailOtp/{uid}` dokümanına bakıyor, yani yeni hesap = sıfır sayaç; Firebase
+ * kaydı herkese açık ve doğrulanmamış hesap da geçerli bir kimlik jetonu
+ * alıyor. Elli hesap açan biri kulübün alan adından 250 posta gönderebiliyordu.
+ *
+ * Sonucu bir veri sızıntısı değil, daha sinsi bir şey: Workspace'in günlük
+ * tavanı dolunca **hiçbir gerçek öğrenci kod alamıyor** ve tek belirti "kod
+ * gelmiyor" — kimse sebebi göremiyor. Alan adının spam itibarı da aynı kapıdan.
+ *
+ * Kalıcı cevap Firebase App Check (kimliksiz kayıt spam'iyle aynı kalem);
+ * bu sayaçlar onun yerine geçmiyor, tavanı yaklaşılamaz hâle getiriyor.
  */
+const kodLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
 const sifreGonderLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
 
 /**
@@ -92,18 +107,23 @@ function utcGun(now: number): string {
 }
 
 /**
- * Günlük tavanı bir artırır; tavan aşılmışsa `false`.
+ * Bir günlük tavanı bir artırır; tavan aşılmışsa `false`.
  *
- * İşlem değil, oku + `increment(1)`: sınırda birkaç fazla posta göndermek kabul
- * edilebilir, kotayı yakmak değil.
+ * İşlem değil, oku + yaz: sınırda birkaç fazla posta göndermek kabul
+ * edilebilir, kotayı yakmak değil. Doküman ve tavan **parametre** — iki hat
+ * aynı fonksiyonu kullanıyor ama aynı kovayı kullanmıyor.
  */
-async function gunlukTavan(db: Firestore, now: number): Promise<boolean> {
-  const ref = db.doc(RESET_STATE_DOC);
-  const snap = await ref.get();
-  const data = snap.data() ?? {};
+async function gunlukTavan(
+  db: Firestore,
+  now: number,
+  yol: string,
+  tavan: number,
+): Promise<boolean> {
+  const ref = db.doc(yol);
+  const data = (await ref.get()).data() ?? {};
   const gun = utcGun(now);
   const sayi = data.gun === gun && typeof data.sayi === 'number' ? data.sayi : 0;
-  if (sayi >= RESET_DAILY_CAP) return false;
+  if (sayi >= tavan) return false;
   await ref.set({ gun, sayi: sayi + 1 });
   return true;
 }
@@ -174,6 +194,15 @@ export function registerAccountApi(
    * almadan bir dakika beklemek zorunda kalırdı.
    */
   app.post('/api/hesap/kod', async (req, res) => {
+    // IP kilidi kimlik çözümünden ÖNCE: jeton doğrulama da bir Firebase
+    // çağrısı, ve kilitli bir IP'nin onu harcamasına gerek yok.
+    const ip = req.ip ?? 'bilinmiyor';
+    const kilit = kodLimiti.lockedFor(ip);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_fazla', saniye: Math.ceil(kilit / 1000) });
+    }
+    kodLimiti.fail(ip);
+
     const kim = await kimlikCoz(req, res, authOf);
     if (!kim) return;
     if (kim.dogrulanmis) return res.json({ durum: 'zaten_dogrulandi' });
@@ -189,6 +218,15 @@ export function registerAccountApi(
     const karar = decideSend(await otpOku(db, kim.uid), now);
     if (!karar.ok) {
       return res.status(429).json({ hata: karar.reason, saniye: karar.saniye });
+    }
+
+    // Günlük tavan gönderimden ÖNCE: kaydı yazıp sonra göndermemek,
+    // kullanıcıyı hiç gelmeyecek bir postayı beklemeye mahkûm ederdi.
+    if (!(await gunlukTavan(db, now, KOD_STATE_DOC, KOD_DAILY_CAP))) {
+      console.error(
+        `[posta] günlük doğrulama kodu tavanı (${KOD_DAILY_CAP}) doldu — kod gönderilmedi.`,
+      );
+      return res.status(503).json({ hata: 'posta_gonderilemedi' });
     }
 
     const ref = db.collection(OTP_COLLECTION).doc(kim.uid);
@@ -246,7 +284,13 @@ export function registerAccountApi(
       // Yanlış denemeler sayılıyor; süresi dolmuş ya da hiç olmayan kodda
       // sayacı artırmak anlamsız (artıracak bir kayıt da yok).
       if (karar.reason === 'yanlis' && kayit) {
-        await ref.update({ attempts: kayit.attempts + 1 });
+        // `attempts + 1` DEĞİL: eşzamanlı iki yanlış deneme aynı değeri okur,
+        // ikisi de aynı sayıyı yazar ve beş denemelik tavan paralelleştirilerek
+        // delinir — altı hane 10^6, yeterince paralel istekle tahmin edilebilir
+        // hâle geliyor. Bu, defterdeki "increment kullanma" maddesinin TERSİ
+        // durum: orada idempotent bir yeniden gönderim sayıyı şişiriyordu,
+        // burada her deneme ayrı ayrı sayılmak zorunda.
+        await ref.update({ attempts: FieldValue.increment(1) });
       }
       return res.status(400).json({ hata: karar.reason, kalan: karar.kalan });
     }
@@ -337,7 +381,7 @@ export function registerAccountApi(
     res.json({ durum: 'gonderildi', saniye: Math.round(OTP_TTL_MS / 1000) });
 
     void (async () => {
-      if (!(await gunlukTavan(db, now))) {
+      if (!(await gunlukTavan(db, now, RESET_STATE_DOC, RESET_DAILY_CAP))) {
         console.warn(
           `[posta] sıfırlama kodu gönderilmedi: günlük tavan (${RESET_DAILY_CAP}) doldu.`,
         );

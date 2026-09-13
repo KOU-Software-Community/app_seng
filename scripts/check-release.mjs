@@ -36,7 +36,12 @@ function check(name, why, run) {
  * Bir kere tam olarak bu oldu.
  */
 function rulesBlock(collection) {
-  const rules = read('firestore.rules');
+  // YORUMLAR ATILIYOR, ve bu istisnasız kuralın kurallar dosyasına geç gelen
+  // hâli. Bu defterde bir kontrolün kendi gerekçesini bulup yanlış cevap
+  // vermesi ALTI kez oldu; altıncısı tam buradaydı: `deletionRequests`
+  // bloğundaki "hasOnly OLMADAN istemci…" açıklaması, gerçek `hasOnly` satırı
+  // silindiğinde kontrolü yeşil bıraktı — ölçüldü.
+  const rules = read('firestore.rules').replace(/\/\/.*$/gm, '');
   const start = rules.indexOf(`match /${collection}/`);
   if (start < 0) return '';
   const next = rules.indexOf('\n    match /', start + 1);
@@ -545,6 +550,94 @@ check(
     if (!blok) return 'firestore.rules passwordReset bloğunu hiç tanımlamıyor';
     if (!/allow read, write: if false/.test(blok)) {
       return 'passwordReset istemciye açık — kullanıcı kendi deneme sayacını sıfırlayabilir';
+    }
+    return null;
+  },
+);
+
+check(
+  'güvenlik sertleştirmesi yerinde',
+  'Sekiz ayrı delik, hepsi sessiz: hiçbiri hata vermiyor, hiçbiri log yazmıyor, ' +
+    've hepsinin belirtisi kullanıcı tarafında başka bir şeye benziyor ("kod ' +
+    'gelmiyor", "numaram başkasında", "bildirim gelmiyor").',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const api = strip(read('admin/accountApi.ts'));
+    const server = strip(read('admin/server.ts'));
+    const claims = strip(read('admin/claims.ts'));
+    const deletion = strip(read('admin/deletion.ts'));
+
+    // 1) Hesap başına sınır, hesap açmak bedavayken sınır değil. Aranan şey
+    //    DAVRANIŞIN İZİ (req.ip'nin limitere gitmesi), bir değişken adı değil.
+    if (!/lockedFor\(ip\)/.test(api) || !/loginLimiter\(/.test(api)) {
+      return '/api/hesap/kod IP başına sınırlı değil — hesap açıp kotayı tüketmek bedava';
+    }
+    // 2) Dağıtık istek IP sayacını baypas ediyor; toplamı tutan ikinci kapı.
+    // Fonksiyonun TANIMI değil ÇAĞRISI aranıyor: adı aramak, gövdesi
+    // kısadevre edilmiş bir çağrıda da yeşil verir — ölçüldü, tam olarak oldu.
+    if (!/if \(!\(await gunlukTavan\(/.test(api)) {
+      return 'günlük toplam posta tavanı çağrılmıyor — dağıtık istek IP sayacını baypas eder';
+    }
+
+    // 3) `attempts + 1` eşzamanlı iki denemede aynı değeri okur ve beş
+    //    denemelik tavan paralelleştirilerek delinir.
+    if (/attempts:\s*\w+\.attempts\s*\+\s*1/.test(api)) {
+      return 'OTP deneme sayacı hâlâ oku-değiştir-yaz — tavan paralelleştirilerek delinir';
+    }
+    if (!/attempts:\s*FieldValue\.increment\(/.test(api)) {
+      return 'OTP deneme sayacı atomik değil';
+    }
+
+    // 4) Kimliksiz /hesap-sil sınırsız bir parola orakülüydü ve ödülü silme.
+    const silme = server.slice(server.indexOf("app.post('/hesap-sil'"));
+    if (!/lockedFor\(/.test(silme.slice(0, 2000))) {
+      return '/hesap-sil parola denemesi sınırsız — doğru tahmin geri alınamaz silmeye gidiyor';
+    }
+
+    // 5) Serbest bırakma sahiplik okumadan siliyorsa, profiline kurbanın
+    //    numarasını yazan biri BAŞKASININ teklik kaydını sildirebiliyor.
+    if (!/snap\.get\('uid'\) === uid/.test(claims)) {
+      return 'claims.ts silmeden önce sahipliği doğrulamıyor';
+    }
+    if (!/releaseIdentity\(db, uid,/.test(deletion)) {
+      return 'deletion.ts releaseIdentity’e uid geçirmiyor — sahiplik kontrolü devre dışı';
+    }
+
+    // 6) `uid` taşımayan kayıtlar (mağazadaki hesapsız sürüm) silinmeden
+    //    kalıyordu; numarayla ikinci bir tur şart.
+    if (!/where\('studentNo', '==', /.test(deletion)) {
+      return 'silme uid taşımayan kayıtları bırakıyor — sayfanın verdiği söz tutulmuyor';
+    }
+
+    // 7) CSRF: SameSite "site" diyor, "origin" demiyor.
+    if (!/sameOrigin\(/.test(server)) return 'panelde CSRF kaynak denetimi yok';
+    if (!/startsWith\('\/api\/'\)/.test(server)) {
+      return 'CSRF denetimi /api/ yolunu atlamıyor — uygulamanın fetch’i kırılır';
+    }
+
+    // 8) Kurallar. Blok blok — dosya geneli arama her zaman yeşil verir,
+    //    bu defterde iki kez oldu.
+    const users = rulesBlock('users');
+    if (!/hasOnly/.test(users)) {
+      return 'users/{uid} alan denetimi yapmıyor — panel o alanlara bakıp teklik kaydı siliyor';
+    }
+    if (!/telefon\.matches/.test(users) || !/ogrenciNo\.matches/.test(users)) {
+      return 'users/{uid} telefon ve öğrenci numarası biçimini denetlemiyor';
+    }
+    const devices = rulesBlock('devices');
+    if (!/token\.matches/.test(devices)) {
+      return 'devices doküman kimliğini Expo jeton biçimine zorlamıyor — koleksiyon sınırsız şişebilir';
+    }
+    // `'uid'` aramak yetmiyor: ad, update dalındaki sahiplik kontrolünde de
+    // geçiyor ve create listesinden silinince kontrol yeşil kalıyordu.
+    // Aranan şey listenin KENDİSİ.
+    const entries = rulesBlock('raffleEntries');
+    if (!/hasOnly\(\[[^\]]*'uid'[^\]]*\]\)/.test(entries)) {
+      return 'raffleEntries create listesinde uid yok — hesap silinince katılım verisi kalıyor';
+    }
+    const silmeTalebi = rulesBlock('deletionRequests');
+    if (!/hasOnly/.test(silmeTalebi)) {
+      return 'deletionRequests create alan kısıtı yok — istemci panelin iç bayrağını yazabiliyor';
     }
     return null;
   },

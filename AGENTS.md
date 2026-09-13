@@ -1389,3 +1389,105 @@ sayın** — sayaç, olmayan bir soruna yazılmış bir mekanizmaydı.
   içindeki bir JSDoc bloğuna `/*` ve `*/` yazmak bloğu erken kapatıyor ve dosya
   `SyntaxError` ile hiç yüklenmiyor — yani **bütün kontroller** düşüyor, ki bu
   yanlış cevaptan daha iyi ama aynı kökten.
+### Güvenlik taraması — sekiz sessiz delik ve kapatılmayan ikisi
+
+Sekiz mercek + her bulguya üç bağımsız çürütme denemesi. 56 tekil bulgunun
+18'i çürütülemedi; sekiz ayrı kök sebep çıktı ve **hiçbirinin belirtisi
+"güvenlik açığı" gibi görünmüyor** — hepsi kullanıcı tarafında başka bir şeye
+benziyor.
+
+- **Hesap başına sınır, hesap açmak bedavayken sınır değil.** `/api/hesap/kod`
+  `emailOtp/{uid}` dokümanına bakıyordu, yani yeni hesap = sıfır sayaç; Firebase
+  kaydı herkese açık ve doğrulanmamış hesap da geçerli bir kimlik jetonu alıyor.
+  Elli hesap açan biri kulübün alan adından 250 posta gönderebiliyordu. Sonucu
+  veri sızıntısı değil: Workspace'in günlük tavanı dolunca **hiçbir gerçek
+  öğrenci kod alamıyor** ve tek belirti "kod gelmiyor". Bir sayaç neyi
+  saydığına bakın — **sayılan şeyin maliyeti sıfırsa sayaç bir sınır değil.**
+- **`attempts + 1` beş denemelik tavanı paralelleştirerek deldiriyor.**
+  Eşzamanlı iki yanlış deneme aynı değeri okuyup aynı sayıyı yazıyor.
+  `FieldValue.increment(1)` — ve bu, defterdeki "increment kullanma"
+  maddesinin TERSİ durum: orada idempotent bir yeniden gönderim sayıyı
+  şişiriyordu, burada her deneme ayrı ayrı sayılmak zorunda. Kural tek cümle:
+  **idempotent olması gereken şeyde increment yok, her kez sayılması gereken
+  şeyde increment şart.**
+- **Kimliksiz `/hesap-sil` aynı anda iki şey sunuyordu:** sınırsız bir parola
+  orakülü ve ödülü olarak geri alınamaz silme. Sayaç iki kovada — IP **ve
+  denenen e-posta**: yalnızca IP olsaydı botnet tek kurbanı sınırsız denerdi,
+  yalnızca e-posta olsaydı bir IP bütün adresleri tarardı. Kilit
+  `verifyPassword`'dan önce, yoksa kilitliyken bile her istek bir doğrulama
+  çağrısı harcar ve oracle zamanlamada açık kalır.
+- **Bir kuralın "bu senin dokümanın mı" diye sorması, "ne yazdın" diye
+  sorduğu anlamına gelmiyor.** `users/{uid}` yalnızca sahiplik bakıyordu; panel
+  ise `telefon` ve `ogrenciNo`yu oradan okuyup onlara dayanarak
+  `phoneClaims`/`studentClaims` kaydı SİLİYOR. Kendi profiline kurbanın
+  numarasını yazan biri panele **başkasının teklik kaydını sildirebiliyordu**:
+  numara boşa düşüyor, saldırgan onu alıyor, kurban bir daha kendi numarasıyla
+  doğrulanamıyor. Belirti kurbanda "numaram başkasında" ve kimse bunu bir
+  saldırı olarak bildirmez. İki kapı birden kapandı: panel silmeden önce
+  `uid` okuyor, kural da biçimi denetliyor.
+  **Genel kural: ayrıcalıklı bir tarafın okuduğu her alan, o alanı yazabilen
+  tarafın saldırı yüzeyidir.**
+- **`where('uid','==',uid)` `uid` alanı olmayan satırı görmüyor.** Mağazadaki
+  hesapsız sürümün yazdığı `registrations` dokümanlarında o alan yok, yani
+  hesabını silen kullanıcının adı, numarası ve bölümü veritabanında kalıyordu —
+  ekran "bütün verileriniz silinir" derken. Numara ile ikinci bir tur atılıyor.
+  Aynı sebeple `raffleEntries` kuralı artık `uid` kabul ediyor ve istemci
+  yazıyor; **eski katılımlar için panelde tek seferlik bir temizlik hâlâ
+  gerekiyor** (yazılmadı). Silinmiş bir şeyin geride kaldığını kimse
+  bildiremez: ancak veritabanına bakan biri görür.
+- **`SameSite=Strict` "site" diyor, "origin" demiyor.** Site eTLD+1, yani
+  `kouseng.com`: kulübün kendi sitesindeki bir XSS ya da ele geçmiş bir alt
+  alan adı, panele **çerezi taşıyan** bir POST yollayabiliyordu. Koruma
+  `Origin` başlığı — onu tarayıcı yazıyor ve sayfa JavaScript'i değiştiremiyor,
+  yani gizli jetonu her forma eklemeye gerek yok. `/api/` atlanıyor ve bu bir
+  boşluk değil: o uç noktalar `Authorization: Bearer` ile çalışıyor, çerez
+  taşımıyor — CSRF'in tanımı ambiyans kimlik bilgisi, orada yok.
+- **Kimliksiz yazılabilen bir koleksiyonun doküman kimliği biçimsizse,
+  koleksiyon sınırsız.** `devices` kimliği push jetonu ve cihaz kaydı girişten
+  önce oluyor; biçim denetimi yokken oraya istenen kadar uydurma satır
+  yazılabiliyordu ve panel gönderimi bütün koleksiyonu okuyor. Belirti yine
+  "bildirim gelmiyor".
+- **BİR KONTROLÜN KENDİ GEREKÇESİNİ BULMASI ALTINCI KEZ OLDU**, ve bu sefer
+  `firestore.rules`'ta: `deletionRequests` bloğundaki "hasOnly OLMADAN
+  istemci…" açıklaması, gerçek `hasOnly` satırı silindiğinde kontrolü yeşil
+  bıraktı. `rulesBlock()` artık `//` yorumlarını atıyor. Aynı turda iki
+  varyantı daha çıktı: bir **fonksiyon adını** aramak, gövdesi kısadevre
+  edilmiş bir çağrıda da yeşil veriyor (`gunlukTavan` → çağrı aranıyor), ve bir
+  **alan adını** aramak, o ad başka bir dalda geçiyorsa yeşil veriyor
+  (`raffleEntries`'te `'uid'` → `hasOnly` listesi aranıyor). Üçü de kırılıp
+  kırmızı verdiği görülerek düzeltildi.
+
+- **`matches()` RE2 kullanıyor ve RE2, POSIX'in "sınıfın ilk karakteri olan `]`
+  literaldir" kuralını UYGULAMIYOR.** `devices` jeton biçimi ilk hâlinde
+  `'^Expo(nent)?PushToken[[]([A-Za-z0-9_-]{1,64})[]]$'` yazıldı; `[[]` doğru
+  (sınıf içinde `[` özel değil) ama `[]]` boş bir sınıf + bir `]` olarak
+  ayrıştırılıyor. Ölçüldü: o desen **gerçek bir Expo jetonunu eşlemiyor**, yani
+  deploy edilseydi her cihaz kaydı reddedilir ve push herkes için sessizce
+  ölürdü — belirti yine "bildirim gelmiyor", ve sebebi bir güvenlik
+  düzeltmesinin kendisi olurdu. Kaçışlı hâl (`\\[` / `\\]`) her lehçede aynı
+  şeyi söylüyor; kural dizesindeki `\\` tek bir ters bölü üretiyor, Firebase'in
+  kendi `\\s` örneğiyle aynı. **Bir kural regex'i yazıldığı gibi
+  değerlendirilemez, çalıştırılması gerekiyor** — ve `firestore.rules` hiçbir
+  yerel kontrolle çalıştırılamadığı için desen elle, bir motorda sınandı.
+
+**Kapatılmayan iki bulgu, ve sebepleri:**
+
+- **`registrations` numara işgali** ve **`eventSeats` sahte koltuk.** İkisi de
+  kimliksiz yazmadan geliyor ve ikisinin de cevabı aynı: Firebase App Check.
+  `uid`'i bugün zorunlu kılmak, kural yayınlandığı saniyede mağazadaki
+  hesapsız sürümü kullanan herkesin kaydını reddeder — üretim kırılır. Bu
+  defter o geçişi zaten yazıyor; **bulgu kapatılmadı, sırası beklendi.**
+  Yazılmayan bir kontrolü "yazdım" saymamak için burada duruyor.
+- **Doğrulanmamış e-posta yalnızca ekranda engelleniyor**, kuralda değil — ve
+  `app/kayit/[id].tsx`'teki yorum aylarca tersini yazıyordu. Koşul ancak
+  kimliğe bağlanabilir, yani `uid` zorunlu olduğu gün kurala
+  `request.auth.token.email_verified == true` eklenecek. Yorum gerçeğe
+  indirildi; **davranışı anlatan bir yorum davranış değildir** maddesinin
+  kaçıncı tekrarı olduğunu saymıyorum artık.
+
+**Taramanın kendi maliyeti ölçüldü:** 177 ajan, 75'i tamamlandı, **102'si
+oturum kotasına takılıp öldü** (`You've hit your session limit`). Yani çürütme
+turu YARIM: 22 bulgunun 18'i üç oyla doğrulandı, geri kalanı hiç oylanamadı.
+Bir tarama raporunun "doğrulanan" sayısı, taranan şeyin tamamı değil —
+**ölmeyen ajanların gördüğü kadarı.** Sonraki tur, kalan bulguların
+listesinden devam etmeli.

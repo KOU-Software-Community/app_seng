@@ -19,6 +19,7 @@ import {
   cookieHeader,
   issueToken,
   loginLimiter,
+  sameOrigin,
   verifyToken,
 } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
@@ -44,7 +45,7 @@ import {
 } from '../admin/otp';
 import { readMailConfig } from '../admin/mail';
 import { otpMail } from '../admin/mailTemplate';
-import { claimIdentity } from '../admin/claims';
+import { claimIdentity, releaseIdentity } from '../admin/claims';
 import { registerAccountApi, type AuthLike } from '../admin/accountApi';
 import { adSinifi, certificateHtml } from '../admin/certificate';
 import {
@@ -497,7 +498,13 @@ void (async () => {
             return {
               async get() {
                 const data = c.get(id);
-                return { exists: data !== undefined, data: () => data };
+                return {
+                  exists: data !== undefined,
+                  data: () => data,
+                  // `get(alan)` de gerekiyor: `releaseIdentity` silmeden önce
+                  // kaydın SAHİBİNİ okuyor (başkasınınkini silmemek için).
+                  get: (k: string) => data?.[k],
+                };
               },
               async delete() {
                 c.delete(id);
@@ -512,7 +519,11 @@ void (async () => {
               async get() {
                 const docs = [...c.entries()]
                   .filter(([, d]) => d[field] === value)
-                  .map(([id]) => ({ id, ref: { delete: async () => void c.delete(id) } }));
+                  .map(([id, d]) => ({
+                    id,
+                    get: (k: string) => d[k],
+                    ref: { delete: async () => void c.delete(id) },
+                  }));
                 return { docs };
               },
             };
@@ -520,6 +531,7 @@ void (async () => {
         };
       },
       _count: (name: string) => col(name).size,
+      _get: (name: string, id: string) => col(name).get(id),
       _seed: (name: string, id: string, data: Record<string, unknown>) => col(name).set(id, data),
     };
     return api;
@@ -538,18 +550,39 @@ void (async () => {
   for (const name of USER_QUERY_COLLECTIONS) silme._seed(name, `${name}-1`, { uid: UID });
   // Ve başkasına ait birer kayıt: silme yalnızca kendi verisine dokunmalı.
   for (const name of USER_QUERY_COLLECTIONS) silme._seed(name, `${name}-2`, { uid: 'baskasi' });
+  // MAĞAZADAKİ HESAPSIZ SÜRÜMÜN yazdığı kayıt: `uid` alanı YOK, yani
+  // `where('uid','==',uid)` onu hiç görmüyor. Ad, numara ve bölüm burada
+  // duruyor ve sayfa "bütün verileriniz silinir" diyor.
+  silme._seed('registrations', `etkinlik__${OGRENCI_NO}`, {
+    studentNo: OGRENCI_NO,
+    name: 'Elif Yılmaz',
+  });
+  // Başka bir öğrencinin kaydı: numara eşleşmiyor, dokunulmamalı.
+  silme._seed('registrations', 'etkinlik__999999999', { studentNo: '999999999' });
 
   await processDeletion(silme as never, UID);
 
   for (const name of [...USER_DOC_COLLECTIONS, ...USER_QUERY_COLLECTIONS]) {
     const kalan = silme._count(name);
-    const beklenen = (USER_QUERY_COLLECTIONS as readonly string[]).includes(name) ? 1 : 0;
+    // `registrations`ta başkasının iki kaydı kalıyor (uid'li + numarası
+    // tutmayan), `raffleEntries`te bir.
+    const beklenen = name === 'registrations' ? 2 : name === 'raffleEntries' ? 1 : 0;
     assert(
       `silme ${name} koleksiyonuna dokunuyor`,
       kalan === beklenen,
       `${name}: ${kalan} kayıt kaldı, ${beklenen} bekleniyordu`,
     );
   }
+
+  assert(
+    'uid taşımayan kayıt da siliniyor',
+    silme._get('registrations', `etkinlik__${OGRENCI_NO}`) === undefined,
+    'hesapsız sürümün yazdığı ad ve numara geride kaldı',
+  );
+  assert(
+    'başka öğrencinin kaydına dokunulmuyor',
+    silme._get('registrations', 'etkinlik__999999999') !== undefined,
+  );
 
   // ASIL MESELE: teklik kayıtlarının doküman kimliği `uid` değil, telefonun ve
   // öğrenci numarasının kendisi — yani iki listeye de giremiyorlar ve ayrıca
@@ -1201,6 +1234,133 @@ void (async () => {
         'https://mobil.kouseng.com/sertifika/K7M2QX90',
       dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90'),
     );
+  }
+
+  // --- Güvenlik sertleştirmesi ---------------------------------------------
+  {
+    // Parametreli limiter: /api/hesap/kod ve /hesap-sil kendi bütçeleriyle
+    // aynı mekanizmayı kullanıyor. Sabite geri dönerse ikisi de /login'in
+    // dar penceresine düşer ve kampüs NAT'ının arkasında kimse kod alamaz.
+    let t = 0;
+    const dar = loginLimiter(() => t, 2, 1000);
+    dar.fail('1.1.1.1');
+    assert('parametreli tavan: bir hata kilitlemiyor', dar.lockedFor('1.1.1.1') === 0);
+    dar.fail('1.1.1.1');
+    assert('parametreli tavan: ikinci hata kilitliyor', dar.lockedFor('1.1.1.1') > 0);
+    t += 1001;
+    assert('parametreli pencere doluyor', dar.lockedFor('1.1.1.1') === 0);
+
+    // CSRF: SameSite=Strict "site" diyor, "origin" demiyor — kardeş bir alt
+    // alan adı çerezi taşıyan bir POST yollayabiliyor.
+    const H = 'mobil.kouseng.com';
+    assert('kendi kaynağı geçiyor', sameOrigin(`https://${H}`, undefined, H));
+    assert(
+      'kardeş alt alan adı REDDEDİLİYOR',
+      !sameOrigin('https://www.kouseng.com', undefined, H),
+      'SameSite=Strict bunu geçiriyor; asıl koruma bu satır',
+    );
+    assert('yabancı site reddediliyor', !sameOrigin('https://evil.example', undefined, H));
+    assert('Origin yokken Referer okunuyor', sameOrigin(undefined, `https://${H}/events/x`, H));
+    assert('bozuk başlık reddediliyor', !sameOrigin('bu bir url değil', undefined, H));
+    // Başlıksız istek GEÇİYOR: uygulamanın fetch'i Origin göndermiyor ve
+    // çerez de taşımıyor — reddetmek CSRF'i değil, o istemcileri keserdi.
+    assert('başlıksız istek geçiyor', sameOrigin(undefined, undefined, H));
+  }
+
+  // --- Teklik kaydı: başkasınınkini silmek ---------------------------------
+  {
+    function claimDb2() {
+      const store = new Map<string, Map<string, Record<string, unknown>>>();
+      const col = (n: string) => {
+        if (!store.has(n)) store.set(n, new Map());
+        return store.get(n)!;
+      };
+      const ref = (n: string, id: string) => ({
+        _n: n,
+        _id: id,
+        async get() {
+          const d = col(n).get(id);
+          return { exists: d !== undefined, get: (k: string) => d?.[k] };
+        },
+        async delete() {
+          col(n).delete(id);
+        },
+      });
+      return {
+        collection: (n: string) => ({ doc: (id: string) => ref(n, id) }),
+        async runTransaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
+          const tx = {
+            async get(r: { _n: string; _id: string }) {
+              const d = col(r._n).get(r._id);
+              return { exists: d !== undefined, get: (k: string) => d?.[k] };
+            },
+            set(r: { _n: string; _id: string }, data: Record<string, unknown>) {
+              col(r._n).set(r._id, data);
+            },
+            delete(r: { _n: string; _id: string }) {
+              col(r._n).delete(r._id);
+            },
+          };
+          return fn(tx);
+        },
+        _get: (n: string, id: string) => col(n).get(id),
+        _set: (n: string, id: string, d: Record<string, unknown>) => col(n).set(id, d),
+      };
+    }
+
+    const KURBAN_TEL = '+905551110000';
+    const KURBAN_NO = '210201099';
+
+    // SALDIRI: saldırgan kendi `users/{uid}` dokümanına kurbanın numarasını
+    // yazıyor (kural eskiden alanlara hiç bakmıyordu), sonra doğrulama
+    // uç noktası o değeri "eski değer" sanıp serbest bırakıyordu — kurbanın
+    // numarası boşa düşüyor ve saldırgan onu alabiliyor.
+    const db = claimDb2();
+    db._set('phoneClaims', KURBAN_TEL, { uid: 'kurban' });
+    db._set('studentClaims', KURBAN_NO, { uid: 'kurban' });
+
+    const saldiri = await claimIdentity(
+      db as never,
+      'saldirgan',
+      { telefon: '+905559998877', ogrenciNo: '210201001' },
+      { telefon: KURBAN_TEL, ogrenciNo: KURBAN_NO },
+    );
+    assert('saldırganın kendi sahiplenmesi geçiyor', saldiri.ok);
+    assert(
+      'BAŞKASININ telefon kaydı silinmiyor',
+      db._get('phoneClaims', KURBAN_TEL) !== undefined,
+      'kurbanın numarası serbest bırakıldı — hesap ele geçirme yolu',
+    );
+    assert(
+      'BAŞKASININ öğrenci no kaydı silinmiyor',
+      db._get('studentClaims', KURBAN_NO) !== undefined,
+    );
+
+    // Kendi eski kaydı YİNE serbest bırakılıyor: çakışma yüzünden numarasını
+    // düzelten kullanıcı eski değerini sonsuza kadar kilitli bırakmamalı.
+    const db2 = claimDb2();
+    db2._set('phoneClaims', '+905550001111', { uid: 'u1' });
+    db2._set('studentClaims', '210201002', { uid: 'u1' });
+    await claimIdentity(
+      db2 as never,
+      'u1',
+      { telefon: '+905550002222', ogrenciNo: '210201003' },
+      { telefon: '+905550001111', ogrenciNo: '210201002' },
+    );
+    assert('kendi eski telefonu serbest bırakılıyor', db2._get('phoneClaims', '+905550001111') === undefined);
+    assert('kendi eski numarası serbest bırakılıyor', db2._get('studentClaims', '210201002') === undefined);
+
+    // Hesap silme de aynı kapıdan geçiyor.
+    const db3 = claimDb2();
+    db3._set('phoneClaims', KURBAN_TEL, { uid: 'kurban' });
+    db3._set('phoneClaims', '+905553334444', { uid: 'silinen' });
+    await releaseIdentity(db3 as never, 'silinen', { telefon: KURBAN_TEL });
+    assert(
+      'silme başkasının kaydını serbest bırakmıyor',
+      db3._get('phoneClaims', KURBAN_TEL) !== undefined,
+    );
+    await releaseIdentity(db3 as never, 'silinen', { telefon: '+905553334444' });
+    assert('silme kendi kaydını serbest bırakıyor', db3._get('phoneClaims', '+905553334444') === undefined);
   }
 
 })().then(() => {
