@@ -1,0 +1,69 @@
+# Kuralları yayınlamak bir dizüstü bilgisayara bağlı olmamalı.
+#
+# `firestore.rules` depoda duruyor ama Firestore onu depodan okumuyor: yayınlanana
+# kadar Firestore varsayılanı geçerli ve o her şeyi reddediyor. Bu deponun
+# defterinde aynı sınıfta üç kayıt var, ve dördüncüsü şuydu — operatör kuralları
+# yayınlamak istedi, dizüstü evdeydi, ve yayınlamanın telefondan yolu yoktu.
+#
+# İki tetikleyici, iki ayrı sebep:
+#
+#   workflow_dispatch — GitHub mobil uygulamasından tek dokunuş. "Şimdi yayınla".
+#   push (main, yalnızca firestore.rules) — unutmayı ortadan kaldırıyor. Kural
+#       main'e girdiği an yayınlanıyor; deponun kendi sırası da bunu istiyor
+#       ("kurallar + panel önce, uygulama sonra").
+#
+# `paths` filtresi bilerek dar: her main push'unda yayınlamak, hiçbir şey
+# değişmemişken de yayın üretir ve "yayınlandı" satırını anlamsızlaştırır.
+name: kurallar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['firestore.rules']
+
+# İki push arka arkaya gelirse ikincisi kazanmalı, ama yarıda kesilen bir
+# yayın belirsiz bir durum bırakır — o yüzden iptal YOK, sıraya giriyor.
+concurrency:
+  group: kurallar
+  cancel-in-progress: false
+
+jobs:
+  yayinla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # `npm ci` YOK: `scripts/deploy-rules.mjs` yalnızca node builtin'leri
+      # kullanıyor. Bin paket kurmak burada otuz saniye ve sıfır fayda.
+      - run: npm install -g firebase-tools
+
+      # Anahtar komut satırına DEĞİL dosyaya yazılıyor: komut satırı süreç
+      # listesinde görünüyor ve bir `set -x` ya da hata çıktısı onu loga
+      # taşıyabilir. `printenv` değeri kabuktan hiç geçirmiyor.
+      - name: firestore.rules → projeye yayınla
+        env:
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SA_JSON:-}" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT secret'ı yok — kural YAYINLANMADI." >&2
+            echo "Settings → Secrets and variables → Actions → New repository secret" >&2
+            exit 1
+          fi
+          if [ -z "${EXPO_PUBLIC_FIREBASE_PROJECT_ID:-}" ]; then
+            echo "FIREBASE_PROJECT_ID değişkeni yok — kural YAYINLANMADI." >&2
+            echo "Settings → Secrets and variables → Actions → Variables → New repository variable" >&2
+            exit 1
+          fi
+          printenv SA_JSON > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          # Deponun kendi scripti çağrılıyor: proje kimliğinin UYGULAMANIN
+          # değişkeninden okunması onun var olma sebebi. Buraya `firebase deploy`
+          # yazmak o değişmezi ikinci bir yere kopyalamak olurdu.
+          node scripts/deploy-rules.mjs

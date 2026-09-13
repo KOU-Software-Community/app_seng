@@ -1698,3 +1698,35 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   loglamıyor — `/api/hesap/kod` log satırının "kod YAZILMIYOR" notu aynı
   kuralın bir başka hâli. Kendi ürettiğimiz altı haneli kodlar da düz
   saklanmıyor: `hashCode` SHA-256 ve tuzu kaydın doküman kimliği.
+
+### Kural yayınlamak bir dizüstüne bağlı olmamalı — `.github/workflows/rules.yml`
+
+- **Bu defterde "yayınlanmamış kurallar" sınıfının DÖRDÜNCÜ kaydı, ve bu sefer
+  sebep kod değil coğrafya:** operatör kuralları yayınlamak istedi, dizüstü
+  evdeydi, ve `npm run rules:deploy` yalnızca o makinede çalışıyordu.
+  `workflow_dispatch` GitHub mobil uygulamasından tek dokunuş; `push` (main,
+  yalnızca `firestore.rules` değişince) unutmayı da ortadan kaldırıyor.
+- **İş `npm ci` yapmıyor.** `scripts/deploy-rules.mjs` yalnızca node
+  builtin'leri kullanıyor; bin paket kurmak otuz saniye ve sıfır fayda.
+- **`firebase deploy` doğrudan YAZILMADI, deponun kendi scripti çağrılıyor.**
+  O scriptin var olma sebebi proje kimliğini UYGULAMANIN değişkeninden okuması:
+  workflow'a `--project` yazmak o değişmezi ikinci bir yere kopyalamak olurdu
+  ve ikisi ayrıştığı gün doğru projede yayınlanmış ama yanlış projeye bakan bir
+  uygulama çıkardı.
+- **Servis hesabı anahtarı komut satırına değil dosyaya yazılıyor.** Komut
+  satırı süreç listesinde görünüyor ve bir `set -x` ya da hata çıktısı onu loga
+  taşıyabilir; `printenv` değeri kabuktan hiç geçirmiyor.
+- **Secret yoksa iş KIRMIZI veriyor, atlamıyor.** Sessizce atlanan bir yayın,
+  bu defterin tamamının şikâyet ettiği şeyin ta kendisi: yayınlanmamış bir kural
+  ile yayınlanmış sanılan bir kural arasındaki fark ancak cihazda görülüyor.
+- **Doğrulanan ve doğrulanmayan:** adımın üç dalı (secret yok / proje kimliği
+  yok / ikisi de var) burada koşturulup görüldü — üçüncüsü scripti gerçekten
+  çağırıyor ve hedef projeyi yazdırıyor. **Gerçek `firebase deploy` bu
+  konteynerden doğrulanamadı**; servis hesabı yok. İlk koşum operatörde olacak,
+  ve yetki hatası gelirse cevabı IAM'de `Firebase Rules Admin` rolü.
+- **`firestore.rules` değişikliği her zaman yayın gerektirmiyor.** QR pencere
+  turunda dosyaya yalnızca yorum eklendi; yorumsuz satırlar birebir aynıydı
+  (ölçüldü) ve o değişiklik için yayın gereksizdi. Dosyanın değişmiş olması
+  davranışın değişmiş olması demek değil — `paths` filtresi bu yüzden dosya
+  seviyesinde, ve "gerekli mi" sorusunun cevabı yorumları atıp karşılaştırmak.
+
