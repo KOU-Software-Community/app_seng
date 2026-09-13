@@ -1,30 +1,79 @@
-# KOÜ Yazılım Kulübü — mobil uygulama
+<p align="center">
+  <img src="assets/brand/logo.png" alt="KOÜ Yazılım Kulübü" width="110">
+</p>
 
-Kocaeli Üniversitesi Yazılım Kulübü'nün etkinlik uygulaması. Expo (React Native) ile tek kod
-tabanı; iOS ve Android'e aynı yerden çıkıyor.
+<h1 align="center">KOÜ Yazılım Kulübü</h1>
 
-Uygulama, `design-source/KOU Yazilim Kulubu App.dc.html` içindeki tasarım kanvasından
-birebir uyarlandı.
+<p align="center">
+  Kocaeli Üniversitesi Yazılım Kulübü'nün resmî etkinlik uygulaması.<br>
+  Etkinlik takvimi, QR ile yoklama, katılım sertifikası ve yapay zekâ destekli teknoloji gündemi.
+</p>
+
+<p align="center">
+  <a href="https://github.com/KOU-Software-Community/app_seng/actions/workflows/ci.yml"><img src="https://github.com/KOU-Software-Community/app_seng/actions/workflows/ci.yml/badge.svg" alt="check"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-MIT-blue.svg" alt="MIT"></a>
+</p>
+
+---
+
+Expo (React Native) ile tek kod tabanı; iOS ve Android'e aynı yerden çıkıyor. Depo tek bir
+şey yayınlamıyor — **dört ayrı yere** dağıtılıyor ve hangisinin ne istediği
+[AGENTS.md](AGENTS.md) içinde yazılı: mobil uygulama (EAS derlemesi), yönetim paneli
+(Coolify redeploy), Firestore kuralları (`npm run rules:deploy`) ve yalnızca depoda kalan
+dosyalar.
+
+## Ne yapıyor
+
+- **Etkinlik takvimi ve arşiv** — yaklaşan etkinlikler, kontenjan, geçmiş etkinlikler.
+- **Kayıt** — öğrenci numarası etkinlik başına tek; teklik doküman kimliğiyle zorlanıyor.
+- **QR ile yoklama** — kod yalnızca uygulama içinden okunuyor, jeton hiç kabloya çıkmadan
+  Firestore kuralının `get()`'i ile doğrulanıyor.
+- **Katılım sertifikası** — sunucuda PDF, herkese açık doğrulama adresi, belgeye basılan ad
+  yayın anında donuyor.
+- **AI Gündem** — RSS kaynaklarından toplanan haberlerin üç maddelik Türkçe özeti ve
+  çevirisi, günün bülteni, çevrimdışı okuma.
+- **Bildirimler** — yeni etkinlik, hatırlatma, duyuru ve çekiliş sonucu; sessiz saatler
+  ertelemeyle, atlamayla değil.
+- **Hesap** — e-posta + parola, altı haneli kodla doğrulama, parola sıfırlama, uygulama
+  içinden ve web üzerinden hesap silme.
 
 ## Ekranlar
 
+**Sekmeler**
+
+| Sekme | Rota | Not |
+| --- | --- | --- |
+| Ana sayfa | `/(tabs)` | İstatistikler, yaklaşan etkinlikler, duyurular, QR ve bildirim kısayolları |
+| Takvim | `/(tabs)/takvim` | Liste ve takvim (grid) görünümü |
+| Arşiv | `/(tabs)/arsiv` | Tarihi geçmiş etkinlikler, kategori filtresi |
+| AI Gündem | `/(tabs)/gundem` | Haber akışı, günün bülteni, kaydedilenler |
+| Hesabım | `/(tabs)/hesap` | Kayıtlar, sertifikalar, yoklama, ayarlar — oturum yokken duvar değil, tanıtım kartı |
+
+**Yığın ekranları**
+
 | Ekran | Rota | Not |
 | --- | --- | --- |
-| Splash | `/` | 1.9 sn logo + pixel loader, sonra onboarding ya da ana sayfa |
-| Onboarding | `/onboarding` | 3 sayfa, "Atla" ile geçilebilir, bir kez gösterilir |
-| Ana sayfa | `/(tabs)` | İstatistikler, yaklaşan etkinlikler, kulüp duyuruları |
-| Etkinlik takvimi | `/(tabs)/takvim` | Liste ve takvim (grid) görünümü |
-| Etkinlik arşivi | `/(tabs)/arsiv` | Tarihi geçmiş etkinlikler, kategori filtresi, boş durum |
-| AI Gündem | `/(tabs)/gundem` | Yapay zekâ haber akışı, günün bülteni, kaydedilenler |
+| Splash | `/` | Logo + pixel loader, sonra onboarding ya da ana sayfa |
+| Onboarding | `/onboarding` | 3 sayfa, bir kez gösterilir |
+| Etkinlik detay | `/etkinlik/[id]` | Künye, konuşmacı, kontenjan, kayıt ve QR |
+| Kayıt formu | `/kayit/[id]` | Ad soyad, öğrenci no, bölüm, sınıf, KVKK — giriş ve doğrulanmış e-posta ister |
+| Kayıt başarılı | `/kayit-basarili` | Kayıt kodu ve dönüş aksiyonları |
+| QR yoklama | `/qr` | Kamera; yanlış etkinlik ve kayıtsızlık ayrı ayrı uyarılıyor |
+| Sertifikalarım | `/sertifikalarim` | Yayınlanmış belgeler ve doğrulama adresi |
+| Duyuru | `/duyuru/[id]` | Kulüp sitesinden gelen duyurunun tam metni |
+| Çekiliş | `/cekilis/[id]` | Katılım formu ve kazanan listesi |
+| Çekiliş kuralları | `/cekilis-kurallari` | Düzenleyen, katılım şartı, kazanan seçimi (App Store 5.3.x) |
 | Haber detay | `/gundem/[id]` | Üç maddelik TR özet, Orijinal/Çeviri geçişi, kaydet |
 | Haber arama | `/gundem/ara` | Başlık, kaynak ve kategoride arama; son aramalar |
-| Bildirim ayarları | `/(tabs)/bildirim` | Ana anahtar, 6 kategori, hatırlatma, bülten saati, sessiz saatler |
-| Etkinlik detay | `/etkinlik/[id]` | Hero, künye satırları, konuşmacı, kayıt CTA |
-| Kayıt formu | `/kayit/[id]` | Ad soyad, öğrenci no (9 hane), bölüm, sınıf, KVKK |
-| Kayıt başarılı | `/kayit-basarili` | Kayıt kodu ve dönüş aksiyonları |
+| Giriş | `/giris` | E-posta + parola |
+| Kayıt ol | `/kayit-ol` | Hesap oluşturma |
+| E-posta doğrulama | `/dogrula` | Altı haneli kod; çakışan alanı aynı ekranda düzeltiyor |
+| Parola sıfırlama | `/sifre-sifirla` | Kodla sıfırlama |
+| Bildirim ayarları | `/bildirim-ayarlari` | Ana anahtar, kategoriler, bülten saati, sessiz saatler |
+| Hesap silme | `/hesap-sil` | Ayrı ekran, parola ve onay ister |
 
-Öne çıkan bir karta ya da akıştaki bir satıra dokunulduğunda, tasarımdaki gibi kısa bir
-pixel "YUKLENIYOR" perdesi gösterilip detay açılır.
+Uygulama, `design-source/KOU Yazilim Kulubu App.dc.html` içindeki tasarım kanvasından
+birebir uyarlandı.
 
 ## Çalıştırma
 
@@ -455,10 +504,6 @@ gitignore'lu.
 Bucket yoksa ya da anahtarlar eksikse panel ne yapılması gerektiğini yazıyor —
 jenerik bir hata sayfası değil.
 
-## Kalan işler
-
-1. **Mağaza ekran görüntüleri** ve EAS build/submit.
-
 ## Mağazaya çıkarma
 
 ### Build'e hangi değerler giriyor
@@ -610,3 +655,30 @@ Play'e yüklenecek ekran görüntüleri repoda yok, yayın sırasında alınacak
 `npx expo run:ios` / `npx expo run:android` tam native derleme yapar. iOS için **Xcode**
 (sadece Command Line Tools yetmez) ve CocoaPods gerekir. EAS Build kullanıyorsanız bunlara
 gerek yok — derleme bulutta yapılır.
+
+## Katkı
+
+Kulüp üyesi olun ya da olmayın, PR açabilirsiniz. Tek şart, göndermeden önce şunun geçmesi:
+
+```bash
+npm ci
+npm run check:all
+```
+
+`check:all` altı saniye sürüyor ve 180'den fazla assertion taşıyor. Her biri bir kez
+gerçekten yanlış gitmiş bir şeyi koruyor — bu deponun en uzun dosyası olan [AGENTS.md](AGENTS.md)
+onların neden var olduğunu tek tek yazıyor. **Yeni bir kontrol eklerken koruduğu şeyi kırıp
+kırmızı verdiğini görün:** kırılamayan bir iddia, olmayan bir iddiadan kötüdür, çünkü yeşil
+rapor eder.
+
+Bir hata bildirmek için [issue açın](https://github.com/KOU-Software-Community/app_seng/issues).
+
+## Lisans
+
+[MIT](LICENSE) — Kocaeli Üniversitesi Yazılım Kulübü.
+
+Fork'layın, dersinizde kullanın, kendi kulübünüze uyarlayın. Tek beklentimiz telif satırının
+kalması.
+
+Kulübün adı, logosu ve maskotu (`assets/brand/`) lisansın kapsamı dışında; kodu alın,
+markayı bırakın.

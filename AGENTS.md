@@ -1645,6 +1645,43 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   (`react-native-worklets`, o gerçekten gerekli). Silmek native modül
   çıkardığı için yeniden derleme istiyor.
 
+### Herkese açık bir deponun kimliği — LICENSE, README ve About
+
+- **`LICENSE` iskeletten kalmıştı ve hiçbir şey hata vermiyordu.** Dosya
+  `create-expo-app`'in kendi lisansıydı: `Copyright (c) 2015-present 650
+  Industries, Inc. (aka Expo)`. Depo herkese açık, GitHub lisansı bu dosyadan
+  okuyor ve kenar çubuğunda doğru şekilde "MIT License" yazıyor — yani belirti
+  YOK. Kulübün kodu, telifi başka bir şirkete yazılmış hâlde aylarca yayında
+  durdu ve bunu kimse bildirmez, çünkü kimse `LICENSE` dosyasını açmaz.
+  `check:release` artık hem iskelet satırının geri gelmediğini hem de kulübün
+  adının durduğunu tutuyor; ikisi de tek tek kırılıp kırmızı verdiği görüldü.
+  Bu, `raffleLegal` testindeki `not.toContain('Abdülkadir')` ile aynı sınıf:
+  **geri gelmemesi gereken bir yasal dize, bir iddiayla tutulur.**
+  Aynı commit (`afa303c`, "lower iOS deployment target") bu defterde zaten
+  başka bir yanlışla anılıyor — bir commit'in bir hatası varsa ikincisine de
+  bakın.
+- **`package.json` dört kimlik alanını birden taşımıyordu:** `description`,
+  `license`, `author`, `repository`. `private: true` olduğu için npm'e
+  yayınlanmıyor, ama o alanları okuyan tek şey npm değil — lisans tarayıcıları
+  ve GitHub bağımlılık grafiği de oradan bakıyor. Eklemek `npm ci`'yi
+  etkilemiyor (ölçüldü: lockfile metadata değil bağımlılık eşliyor).
+- **README'nin ekran tablosu uygulamayı yanlış anlatıyordu.** `/(tabs)/bildirim`
+  diye bir sekme listeliyordu — o ekran aylar önce Hesabım'ın altına taşındı —
+  ve hesap, QR, sertifika, doğrulama, parola sıfırlama ekranlarının hiçbiri
+  yoktu. **Bir belgenin yanlış olması bir hata üretmiyor**, yalnızca depoya
+  bakan birini yanlış yere yolluyor; bu defterde aynı sınıfın iki kaydı zaten
+  var (`syncPending` yorumu, `ContentNotice`'i anlatan README satırı). Tablo
+  `app/` altındaki gerçek rota listesinden yeniden yazıldı.
+- **GitHub'ın About kenar çubuğu bir depo AYARI, dosya değil** — ve GitHub MCP
+  sunucusunda depo ayarlarını yazan bir araç yok (`create_repository` ve
+  `fork_repository` var, `update_repository` yok). Yani açıklama, konu
+  etiketleri ve web sitesi buradan doldurulamıyor; metni hazırlayıp operatöre
+  vermek gerekiyor. Bir sonraki tur "About'u da hallettim" diye yazmasın.
+- **`homepage` alanı BİLEREK boş bırakıldı.** `kouseng.com` bu depoda yalnızca
+  `api.` ve `mobil.` alt alanları ve bir e-posta test fikstürü olarak geçiyor;
+  apex'in canlı bir site olduğu **gözlemlenmedi**. Yanlış bir URL, boş bir
+  alandan kötü.
+
 ### QR erişimi, kayıt şartı ve bir kullanıcı turunun getirdikleri
 
 - **PDF üretimi ölçüldü ve tavan sanılan yerde değil.** Açılıştaki `4251 ms`
