@@ -30,6 +30,12 @@ const OPTIONAL: Set<string> = new Set([
   'SMTP_PORT',
   'MAIL_FROM',
   'MAIL_REPLY_TO',
+  // NORMALDE BOŞ. Tarayıcıyı `nixpacks.toml` derleme fazında kuruyor ve
+  // playwright-core onu `PLAYWRIGHT_BROWSERS_PATH`ten buluyor. Bu rapor onu
+  // "EKSİK" gösterseydi operatör doldurmaya çalışırdı — ve bu defterde
+  // raporun yanlış söylediği bir madde zaten var (`env:check` `scripts/`i
+  // panel sayıyordu, operatör "niye her şeyi iki kez giriyorum" diye sordu).
+  'CHROMIUM_PATH',
 ]);
 
 function sources(dirs: string[], pattern: RegExp): Set<string> {
