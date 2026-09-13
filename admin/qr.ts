@@ -9,14 +9,64 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import type { Firestore } from 'firebase-admin/firestore';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 
+import { toLocalIso } from '../src/eventSchema';
 import { defaultWindow, makeQrToken, type Pencere } from '../src/qrSchema';
 
 export const QR_COLLECTION = 'eventQr';
 export const ATTENDANCE_COLLECTION = 'attendance';
 
 export type QrTanimi = Pencere & { token: string; eventId: string };
+
+/*
+  PENCERE FIRESTORE'A `Timestamp` OLARAK YAZILIYOR, ISO DİZESİ OLARAK DEĞİL.
+
+  Kural şunu diyor:
+
+      request.time >= qrTanimi(eventId).opensAt
+
+  `request.time` bir `timestamp`. Alan bir DİZE olduğu sürece bu karşılaştırma
+  bir tip uyuşmazlığı ve kural dili hata veren bir ifadeyi REDDEDEREK bitiriyor
+  — yani pencere hiçbir zaman açılmıyordu. Ne varsayılan pencere ne de panelden
+  elle girilen pencere işe yarıyordu; belirti ikisinde de aynı: "Bu kod şu anda
+  geçerli değil". Operatör tarihi değiştirip tekrar deniyor, hiçbir şey
+  değişmiyor, ve sebebi hiçbir yerde yazmıyor.
+
+  Panelin geri kalanı DİZE görüyor: `qrView` ISO'yu regex ile parçalayıp
+  `datetime-local` kutularını dolduruyor, `defaultWindow` ISO üretiyor. Dönüşüm
+  bu yüzden tam burada, Firestore sınırında duruyor — tek yerde.
+*/
+
+/** Firestore'a yazılacak hâl. Okunamayan tarihte `null`. */
+function pencereyiYaz(p: Pencere): { opensAt: Timestamp; closesAt: Timestamp } | null {
+  const a = new Date(p.opensAt);
+  const k = new Date(p.closesAt);
+  if (!Number.isFinite(a.getTime()) || !Number.isFinite(k.getTime())) return null;
+  return { opensAt: Timestamp.fromDate(a), closesAt: Timestamp.fromDate(k) };
+}
+
+/**
+ * Dokümandan pencereyi ISO olarak okur.
+ *
+ * Eski kayıtlar dizeydi ve hâlâ öyle duruyor olabilir; okuma ikisini de
+ * kabul ediyor, yazma yalnızca `Timestamp` üretiyor. Tanınmayan değerde boş
+ * dize dönüyor — `qrView` onu `—` diye gösteriyor, uydurma bir tarih değil.
+ */
+function pencereAlani(v: unknown): string {
+  if (v instanceof Timestamp) return toLocalIso(v.toDate());
+  if (typeof v === 'string') return v;
+  return '';
+}
+
+function pencereyiOku(d: Record<string, unknown>): Pencere {
+  return { opensAt: pencereAlani(d.opensAt), closesAt: pencereAlani(d.closesAt) };
+}
+
+/** Kayıtlı pencere kuralın okuyabileceği tipte mi? */
+function tipiDogru(d: Record<string, unknown>): boolean {
+  return d.opensAt instanceof Timestamp && d.closesAt instanceof Timestamp;
+}
 
 function yeniJeton(): string {
   return makeQrToken((n) => Uint8Array.from(randomBytes(n)));
@@ -34,20 +84,34 @@ export async function ensureQr(db: Firestore, eventId: string, startsAt: string)
   const snap = await ref.get();
   if (snap.exists) {
     const d = snap.data() ?? {};
-    return {
-      eventId,
-      token: String(d.token ?? ''),
-      opensAt: String(d.opensAt ?? ''),
-      closesAt: String(d.closesAt ?? ''),
-    };
+    const tanim: QrTanimi = { eventId, token: String(d.token ?? ''), ...pencereyiOku(d) };
+    /*
+      DİZE OLARAK YAZILMIŞ ESKİ KAYITLAR BURADA ONARILIYOR.
+
+      Tip düzeltmesi tek başına yetmiyordu: `eventQr` dokümanı bir kez doğduktan
+      sonra hiçbir yazıcı ona dokunmuyor, yani üretimde duran her doküman dize
+      taşımaya devam ederdi ve yoklama o etkinliklerde çalışmamaya devam
+      ederdi — yeni kod dağıtılmış olmasına rağmen. Operatörün "QR" sayfasını
+      açması onarım için yeterli; ayrı bir göç adımı hatırlanması gereken bir
+      şey olurdu ve hatırlanmadığında belirtisi yine sessizlik.
+    */
+    if (!tipiDogru(d)) {
+      const yazilacak = pencereyiYaz(tanim);
+      if (yazilacak) await ref.set(yazilacak, { merge: true });
+    }
+    return tanim;
   }
 
   const pencere = defaultWindow(startsAt);
   if (!pencere) {
     throw new Error(`Etkinliğin başlangıç saati okunamadı, QR penceresi hesaplanamıyor: ${startsAt}`);
   }
+  const yazilacak = pencereyiYaz(pencere);
+  if (!yazilacak) {
+    throw new Error(`QR penceresi tarihe çevrilemedi: ${pencere.opensAt} – ${pencere.closesAt}`);
+  }
   const tanim: QrTanimi = { eventId, token: yeniJeton(), ...pencere };
-  await ref.set(tanim);
+  await ref.set({ eventId, token: tanim.token, ...yazilacak });
   return tanim;
 }
 
@@ -62,19 +126,19 @@ export async function regenerateQr(db: Firestore, eventId: string): Promise<QrTa
   const ref = db.collection(QR_COLLECTION).doc(eventId);
   const snap = await ref.get();
   const d = snap.data() ?? {};
-  const tanim: QrTanimi = {
-    eventId,
-    token: yeniJeton(),
-    opensAt: String(d.opensAt ?? ''),
-    closesAt: String(d.closesAt ?? ''),
-  };
-  await ref.set(tanim);
+  const tanim: QrTanimi = { eventId, token: yeniJeton(), ...pencereyiOku(d) };
+  // Pencere korunuyor ve yazarken TİPİ de düzeliyor: dize taşıyan eski bir
+  // doküman jeton yenilendikten sonra da kural tarafından okunamaz kalmasın.
+  const yazilacak = pencereyiYaz(tanim);
+  await ref.set({ eventId, token: tanim.token, ...(yazilacak ?? {}) }, { merge: !yazilacak });
   return tanim;
 }
 
 /** Pencereyi elle değiştirir. Jeton korunuyor — basılmış afiş geçerli kalsın. */
 export async function setQrWindow(db: Firestore, eventId: string, pencere: Pencere): Promise<void> {
-  await db.collection(QR_COLLECTION).doc(eventId).set(pencere, { merge: true });
+  const yazilacak = pencereyiYaz(pencere);
+  if (!yazilacak) throw new Error(`Pencere tarihe çevrilemedi: ${pencere.opensAt} – ${pencere.closesAt}`);
+  await db.collection(QR_COLLECTION).doc(eventId).set(yazilacak, { merge: true });
 }
 
 export type YoklamaSatiri = {

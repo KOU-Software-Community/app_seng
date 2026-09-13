@@ -1698,3 +1698,54 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   loglamıyor — `/api/hesap/kod` log satırının "kod YAZILMIYOR" notu aynı
   kuralın bir başka hâli. Kendi ürettiğimiz altı haneli kodlar da düz
   saklanmıyor: `hashCode` SHA-256 ve tuzu kaydın doküman kimliği.
+
+### QR penceresi hiç açılmadı — bir tip uyuşmazlığı, sıfır hata mesajı
+
+Operatör App Review provası için yarına bir etkinlik açtı, panelden QR
+oluşturdu, pencereyi elle 13 Eylül 00:00 – 14 Eylül 23:59 yaptı, ve 13 Eylül
+12:54'te okuttuğunda **"Bu kod şu anda geçerli değil"** aldı. Sorduğu soru
+doğruydu: *"Bu özellik başlamadan 1 saat önce kuralını override edemiyorsa
+neden var?"*
+
+- **Override çalışıyordu; kuralın pencereyi OKUYAMAMASI sorundu.** Kural
+  `request.time >= qrTanimi(eventId).opensAt` diyor ve `request.time` bir
+  `timestamp`. Panel `opensAt`/`closesAt`'i **ISO dizesi** olarak yazıyordu
+  (`Pencere = { opensAt: string; closesAt: string }`). Kural dili güçlü tipli:
+  timestamp ile dizeyi karşılaştırmak bir tip uyuşmazlığı ve hata veren bir
+  ifade **reddederek** bitiyor. Yani pencere ne varsayılan hâliyle ne de elle
+  girilmiş hâliyle açıldı — **özellik hiçbir zaman çalışmamıştı.**
+- **Belirtisi tam olarak yanlış yere bakmaya yolluyor.** Kural reddi istemcide
+  tek bir `permission-denied`; ekran onu "pencere kapalı" diye yazıyor (bilerek,
+  en olası sebep o olduğu için). Operatör pencereyi büyütüyor, aynı cevabı
+  alıyor, ve elindeki tek veri "tarihi değiştirdim, değişmedi" oluyor. **Bir
+  hata mesajı doğru olduğunda bile yanlış yönü gösterebilir.**
+- **Bu defter bunu ÖNGÖRMÜŞTÜ ve yine de kaçırıldı.** QR turunun kaydı şöyle
+  bitiyor: *"Bu depodan doğrulanamıyor (kural koşturacak ortam yok); ilk gerçek
+  etkinlikten önce sahte bir etkinlikle prova şart."* Prova yapıldı, kural
+  düştü. Bir satırın "doğrulanamıyor" demesi onu doğru yapmıyor — **yazılı bir
+  uyarı, alınmış bir önlem değil.**
+- **Düzeltme kural satırına DOKUNMUYOR, saklanan tipi düzeltiyor.** Alternatif
+  `opensAtMs` diye sayılar yazıp kuralda `request.time.toMillis()` demekti; o
+  yol kurala buradan çalıştıramadığım YENİ bir ifade sokardı, ve bu defterde
+  bunun bedeli yazılı (`matches()` RE2 maddesi: güvenlik düzeltmesinin kendisi
+  push'u sessizce öldürecekti). `Timestamp` yazınca kuralın iki satırı aynen
+  kalıyor; değişen tek şey karşılaştırmanın iki tarafının artık aynı tip
+  olması, ve risk TypeScript'e taşınıyor — ki o buradan sınanabiliyor.
+- **Tip düzeltmesi TEK BAŞINA üretimi onarmıyordu.** `eventQr` dokümanı bir kez
+  doğduktan sonra hiçbir yazıcı ona dokunmuyor: `ensureQr` var olan dokümanda
+  erken dönüyor. Yeni kod dağıtılsa bile mevcut etkinlikler dize taşımaya ve
+  yoklama onlarda çalışmamaya devam ederdi. `ensureQr` artık tip yanlışsa
+  onarıyor — QR sayfasını açmak yetiyor. **Ayrı bir göç adımı, hatırlanması
+  gereken ve hatırlanmadığında yine sessiz kalan bir şey olurdu.**
+- **Dönüşüm tek yerde, Firestore sınırında.** `qrView` ISO'yu regex ile parçalayıp
+  `datetime-local` kutularını dolduruyor, `defaultWindow` ISO üretiyor —
+  panelin geri kalanı dize görmeye devam ediyor. `toLocalIso` (`eventSchema.ts`)
+  ters yönü yapıyor ve **konteynerin saat dilimine bağlı değil**: değer +3 saat
+  kaydırılıp `getUTC*` ile okunuyor. `getHours()` kullanılsaydı Coolify'daki
+  UTC konteynerde pencere üç saat kaymış görünürdü — bu defterde `clubHour`
+  aynı sebeple var. Dört ayrı `TZ` ile koşturulup doğrulandı.
+- **`windowOpen` yazılmış ama hiçbir yerden çağrılmıyor** — tek göndergesi
+  kendi testi. Panele "pencere şu an açık mı" diye bir satır koymak cazip
+  geldi ve KONMADI: panel kendi saatine bakıp "açık" derdi, kural yine
+  reddederdi. Yanlış yerde güven veren bir gösterge, hiç gösterge olmamasından
+  kötü.
