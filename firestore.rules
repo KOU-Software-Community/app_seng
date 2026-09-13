@@ -422,6 +422,23 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // `passwordReset/{sha256(eposta)}` — parola sıfırlama kodunun hash'i ve
+    // sayaçları. `emailOtp` ile AYRI doküman olması bir tercih değil: aynı
+    // yerde dursalardı biri ötekinin kodunu ezer, `attempts` ve `sendCount`
+    // sayaçlarını paylaşır (beş yanlış sıfırlama denemesi doğrulamayı
+    // kilitlerdi) ve `/api/hesap/dogrula`'nın başarıdaki `ref.delete()`'i
+    // akıştaki sıfırlamayı sessizce öldürürdü.
+    //
+    // En tehlikelisi tuz: ikisi de `uid` ile hash'lenseydi bir amaç için
+    // üretilmiş kod öteki amaç için geçerli olurdu — doğrulama ekranına
+    // yazılan bir sıfırlama kodu e-postayı doğrulardı. Tuz doküman kimliği
+    // olduğu için iki kimlik hiçbir zaman eşit değil.
+    //
+    // Doküman kimliği ham e-posta DEĞİL, hash'i: kimlik kişisel veri olmasın.
+    match /passwordReset/{id} {
+      allow read, write: if false;
+    }
+
     // Bildirim otomasyonunun defterleri. Yalnızca panel (Admin SDK) yazıyor;
     // Admin SDK bu kuralları hiç görmüyor, dolayısıyla `false` onu engellemiyor.
     // Aşağıdaki catch-all zaten kapatırdı — açıkça yazılmalarının sebebi, bir

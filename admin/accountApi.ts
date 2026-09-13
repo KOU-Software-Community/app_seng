@@ -11,15 +11,29 @@
  * e-postanın doğrulanması ve telefon/öğrenci numarasının sahiplenilmesi.
  * Ayrılsalardı, doğrulanmış ama numarası çakışan bir hesap ortaya çıkardı ve
  * onu kimin düzelteceği belirsiz kalırdı.
+ *
+ * **Parola sıfırlamanın iki uç noktası kimliksiz** — parolasını unutan kişinin
+ * jetonu yok. Onları koruyan şey `kimlikCoz` değil, aşağıdaki dört katman:
+ * yalnızca var olan hesaba posta gitmesi, adres başına gönderim sınırı, IP
+ * başına istek sınırı ve günlük genel tavan. Hiçbiri tek başına yeterli değil;
+ * hangisinin neyi taşıdığı kendi satırında yazıyor.
  */
 import type { Express, Request, Response } from 'express';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type Auth } from 'firebase-admin/auth';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 
-import { STUDENT_NO_RE, normalizePhone } from '../src/accountSchema';
+import { createHash } from 'node:crypto';
+
+import {
+  EMAIL_RE,
+  MIN_PASSWORD,
+  STUDENT_NO_RE,
+  normalizeEmail,
+  normalizePhone,
+} from '../src/accountSchema';
 import { claimIdentity, type Kimlik } from './claims';
 import { sendMail, mailReady } from './mail';
-import { otpMail } from './mailTemplate';
+import { otpMail, sifreMail } from './mailTemplate';
 import {
   OTP_TTL_MS,
   decideSend,
@@ -30,9 +44,26 @@ import {
 import { clientIp, loginLimiter } from './session';
 
 const OTP_COLLECTION = 'emailOtp';
+const RESET_COLLECTION = 'passwordReset';
 
 /**
- * IP başına posta sınırı — 20 / saat.
+ * Günlük posta tavanları — **iki ayrı kova, ve ayrı olmaları şart.**
+ *
+ * IP sınırını dağıtık bir istek baypas ediyor; adres/hesap sınırı da başına
+ * olduğu için toplamı sınırlamıyor. Bu tavanlar Workspace kotasını koruyor ve
+ * o kota **ikisinin de sigortası**: yanarsa hem doğrulama hem sıfırlama ölür.
+ *
+ * Tek kova olsaydı sıfırlama trafiği doğrulamayı susturabilirdi — yeni
+ * kullanıcının kaydolamaması, parolasını unutan birinin bekleyebilmesinden
+ * daha ağır bir hata. Ayrı kovalar bu sırayı koruyor.
+ */
+const KOD_DAILY_CAP = 300;
+const KOD_STATE_DOC = 'pushState/emailOtpDaily';
+const RESET_DAILY_CAP = 200;
+const RESET_STATE_DOC = 'pushState/passwordReset';
+
+/**
+ * IP başına posta sınırı — 20 / saat, iki hat için ayrı sayaç.
  *
  * **Hesap başına sınır, hesap açmak bedavayken sınır değil.** `decideSend`
  * `emailOtp/{uid}` dokümanına bakıyor, yani yeni hesap = sıfır sayaç; Firebase
@@ -40,23 +71,35 @@ const OTP_COLLECTION = 'emailOtp';
  * alıyor. Elli hesap açan biri kulübün alan adından 250 posta gönderebiliyordu.
  *
  * Sonucu bir veri sızıntısı değil, daha sinsi bir şey: Workspace'in günlük
- * gönderim tavanı dolunca **hiçbir gerçek öğrenci doğrulama kodu alamıyor** ve
- * tek belirti "kod gelmiyor" — kimse sebebi göremiyor. Alan adının spam
- * itibarı da aynı kapıdan gidiyor.
+ * tavanı dolunca **hiçbir gerçek öğrenci kod alamıyor** ve tek belirti "kod
+ * gelmiyor" — kimse sebebi göremiyor. Alan adının spam itibarı da aynı kapıdan.
  *
  * Kalıcı cevap Firebase App Check (kimliksiz kayıt spam'iyle aynı kalem);
- * bu sayaç onun yerine geçmiyor, tavanı yaklaşılamaz hâle getiriyor.
+ * bu sayaçlar onun yerine geçmiyor, tavanı yaklaşılamaz hâle getiriyor.
  */
 const kodLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
+const sifreGonderLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
 
 /**
- * Günde gönderilebilecek toplam doğrulama postası.
+ * IP başına kod deneme sınırı — 120 / saat.
  *
- * IP sınırını dağıtık bir istek baypas ediyor ve hesap sınırı hesap başına
- * olduğu için toplamı sınırlamıyor. Bu tavan Workspace kotasını koruyor.
+ * Kodu tahmin etmenin tavanı zaten kayıttaki `attempts` (5); bu sınır Firestore
+ * okuma kotasını koruyor, kodu değil. Bu yüzden altı kat cömert.
  */
-const KOD_DAILY_CAP = 300;
-const KOD_STATE_DOC = 'pushState/emailOtpDaily';
+const sifreDegistirLimiti = loginLimiter(Date.now, 120, 60 * 60_000);
+
+/**
+ * Sıfırlama kaydının kimliği.
+ *
+ * Ham e-posta kimlik yapılmıyor: doküman adı kişisel veri olurdu ve koleksiyonu
+ * listeleyen herkes kimin parola sıfırladığını görürdü (`registrations`'taki
+ * `eventId__studentNo` maddesiyle aynı gerekçe). `uid` de kullanılamıyor —
+ * sıfırlama anında elde uid yok, ve olsa bile var olmayan adres için doküman
+ * yazılamaz, yani "kullanıcı var mı" sorusu kotada ve zamanlamada sızardı.
+ */
+function resetDocId(email: string): string {
+  return createHash('sha256').update(normalizeEmail(email)).digest('hex');
+}
 
 /** UTC gün anahtarı. Yerel güne bağlanırsa sayaç sunucunun penceresinden kayar. */
 function utcGun(now: number): string {
@@ -64,17 +107,23 @@ function utcGun(now: number): string {
 }
 
 /**
- * Günlük tavanı bir artırır; tavan aşılmışsa `false`.
+ * Bir günlük tavanı bir artırır; tavan aşılmışsa `false`.
  *
  * İşlem değil, oku + yaz: sınırda birkaç fazla posta göndermek kabul
- * edilebilir, kotayı yakmak değil.
+ * edilebilir, kotayı yakmak değil. Doküman ve tavan **parametre** — iki hat
+ * aynı fonksiyonu kullanıyor ama aynı kovayı kullanmıyor.
  */
-async function gunlukTavan(db: Firestore, now: number): Promise<boolean> {
-  const ref = db.doc(KOD_STATE_DOC);
+async function gunlukTavan(
+  db: Firestore,
+  now: number,
+  yol: string,
+  tavan: number,
+): Promise<boolean> {
+  const ref = db.doc(yol);
   const data = (await ref.get()).data() ?? {};
   const gun = utcGun(now);
   const sayi = data.gun === gun && typeof data.sayi === 'number' ? data.sayi : 0;
-  if (sayi >= KOD_DAILY_CAP) return false;
+  if (sayi >= tavan) return false;
   await ref.set({ gun, sayi: sayi + 1 });
   return true;
 }
@@ -88,14 +137,18 @@ function bearer(req: Request): string | null {
 
 type Kim = { uid: string; email: string; dogrulanmis: boolean };
 
-async function kimlikCoz(req: Request, res: Response): Promise<Kim | null> {
+async function kimlikCoz(
+  req: Request,
+  res: Response,
+  authOf: () => AuthLike,
+): Promise<Kim | null> {
   const token = bearer(req);
   if (!token) {
     res.status(401).json({ hata: 'oturum_yok' });
     return null;
   }
   try {
-    const decoded = await getAuth().verifyIdToken(token);
+    const decoded = await authOf().verifyIdToken(token);
     return {
       uid: decoded.uid,
       email: decoded.email ?? '',
@@ -114,7 +167,25 @@ async function otpOku(db: Firestore, uid: string): Promise<OtpRecord | null> {
   return snap.exists ? (snap.data() as OtpRecord) : null;
 }
 
-export function registerAccountApi(app: Express, db: Firestore): void {
+/**
+ * `registerAccountApi`'nin Auth'tan kullandığı her şey.
+ *
+ * Üçüncü parametre olmasının tek sebebi `check:panel`: bu uç noktaların
+ * korumaları (kayıtlı olmayan adresin birebir aynı cevabı vermesi, yanlış
+ * kodun parolayı değiştirmemesi, `revokeRefreshTokens`'ın gerçekten
+ * çağrılması) ancak sahte bir Auth ile sınanabiliyor — gerçek Firebase'e
+ * bağlanan bir kontrol CI'da hiç koşamaz, koşmayan kontrol de yeşil sayılır.
+ */
+export type AuthLike = Pick<
+  Auth,
+  'verifyIdToken' | 'updateUser' | 'getUserByEmail' | 'revokeRefreshTokens'
+>;
+
+export function registerAccountApi(
+  app: Express,
+  db: Firestore,
+  authOf: () => AuthLike = getAuth,
+): void {
   /**
    * Kod gönder.
    *
@@ -132,7 +203,7 @@ export function registerAccountApi(app: Express, db: Firestore): void {
     }
     kodLimiti.fail(ip);
 
-    const kim = await kimlikCoz(req, res);
+    const kim = await kimlikCoz(req, res, authOf);
     if (!kim) return;
     if (kim.dogrulanmis) return res.json({ durum: 'zaten_dogrulandi' });
     if (!kim.email) return res.status(400).json({ hata: 'eposta_yok' });
@@ -151,7 +222,7 @@ export function registerAccountApi(app: Express, db: Firestore): void {
 
     // Günlük tavan gönderimden ÖNCE: kaydı yazıp sonra göndermemek,
     // kullanıcıyı hiç gelmeyecek bir postayı beklemeye mahkûm ederdi.
-    if (!(await gunlukTavan(db, now))) {
+    if (!(await gunlukTavan(db, now, KOD_STATE_DOC, KOD_DAILY_CAP))) {
       console.error(
         `[posta] günlük doğrulama kodu tavanı (${KOD_DAILY_CAP}) doldu — kod gönderilmedi.`,
       );
@@ -200,7 +271,7 @@ export function registerAccountApi(app: Express, db: Firestore): void {
    * olmayan bir ekrana yönlendirmek hesabı kalıcı olarak doğrulanamaz bırakır.
    */
   app.post('/api/hesap/dogrula', async (req, res) => {
-    const kim = await kimlikCoz(req, res);
+    const kim = await kimlikCoz(req, res, authOf);
     if (!kim) return;
     if (kim.dogrulanmis) return res.json({ durum: 'zaten_dogrulandi' });
 
@@ -253,9 +324,160 @@ export function registerAccountApi(app: Express, db: Firestore): void {
     }
 
     await db.collection('users').doc(kim.uid).set(yeni, { merge: true });
-    await getAuth().updateUser(kim.uid, { emailVerified: true });
+    await authOf().updateUser(kim.uid, { emailVerified: true });
     await ref.delete().catch(() => {});
 
     res.json({ durum: 'dogrulandi' });
+  });
+
+  /**
+   * Parola sıfırlama kodu gönder. **Kimliksiz.**
+   *
+   * Cevap her durumda birebir aynı: aynı kod, aynı gövde, aynı alanlar. Adres
+   * kayıtlı olsa da olmasa da kayıt yazılıyor, dolayısıyla ikinci istek de aynı
+   * `bekle` cevabını veriyor — oracle sayaçta da yok.
+   *
+   * **Cevap postadan ÖNCE dönüyor ve bu bilinçli bir ihlal.** `/api/hesap/kod`
+   * gönderim patlarsa kaydı siliyor ve 502 dönüyor; orada çağıran zaten kimliği
+   * bilinen kişi. Burada gönderimin sonucunu söylemek, adresin kayıtlı olduğunu
+   * söylemek demek — üstelik `getUserByEmail` + SMTP el sıkışması "hiçbir şey
+   * yapma"dan yüzlerce ms uzun, yani zamanlama tek başına bir oracle olurdu.
+   * Karşılığı: gönderim hatası yalnızca panel logunda görünüyor.
+   */
+  app.post('/api/hesap/sifre-kod', async (req, res) => {
+    const ip = clientIp(req);
+    const kilit = sifreGonderLimiti.lockedFor(ip);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_fazla', saniye: Math.ceil(kilit / 1000) });
+    }
+    sifreGonderLimiti.fail(ip);
+
+    const email = normalizeEmail(String((req.body as Record<string, unknown>)?.email ?? ''));
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ hata: 'eposta_gecersiz' });
+
+    // Herkes için aynı cevap, dolayısıyla oracle değil.
+    if (!mailReady()) return res.status(503).json({ hata: 'posta_yapilandirilmamis' });
+
+    const now = Date.now();
+    const ref = db.collection(RESET_COLLECTION).doc(resetDocId(email));
+    const mevcut = (await ref.get()).data() as OtpRecord | undefined;
+
+    const karar = decideSend(mevcut ?? null, now);
+    if (!karar.ok) {
+      return res.status(429).json({ hata: karar.reason, saniye: karar.saniye });
+    }
+
+    // TUZ DOKÜMAN KİMLİĞİ, uid değil: doğrulama kodu ile sıfırlama kodunun
+    // birbirini doğrulamasını yapısal olarak imkânsız kılan şey bu (bkz. `otp.ts`).
+    await ref.set({
+      ...karar.record,
+      hash: hashCode(ref.id, karar.code),
+      // Yalnızca ileride Firestore TTL politikası için: terk edilmiş kayıtlar
+      // (var olmayan adreslere yazılanlar) hiç silinmiyor. Süpürücü yazılmadı,
+      // IP sınırı günde ~1000 doküman tavanı bırakıyor.
+      expiresAt: new Date(now + OTP_TTL_MS),
+    });
+
+    res.json({ durum: 'gonderildi', saniye: Math.round(OTP_TTL_MS / 1000) });
+
+    void (async () => {
+      if (!(await gunlukTavan(db, now, RESET_STATE_DOC, RESET_DAILY_CAP))) {
+        console.warn(
+          `[posta] sıfırlama kodu gönderilmedi: günlük tavan (${RESET_DAILY_CAP}) doldu.`,
+        );
+        return;
+      }
+      // Kurban kümesini "internetteki her adres"ten "zaten bizde hesabı olan
+      // kişiler"e indiren katman bu, ve maliyeti sıfır.
+      const kullanici = await authOf()
+        .getUserByEmail(email)
+        .catch(() => null);
+      if (!kullanici) {
+        console.log(`[posta] sıfırlama kodu istendi ama hesap yok: ${email}`);
+        return;
+      }
+      const sonuc = await sendMail({
+        to: email,
+        ...sifreMail(karar.code, Math.round(OTP_TTL_MS / 60_000)),
+      });
+      console.log(
+        `[posta] sıfırlama kodu → ${email} · kabul: ${sonuc.accepted.join(', ') || 'yok'}` +
+          (sonuc.rejected.length ? ` · RED: ${sonuc.rejected.join(', ')}` : '') +
+          ` · zarf göndereni: ${sonuc.envelopeFrom}`,
+      );
+    })().catch((err) => console.error('[posta] sıfırlama kodu gönderilemedi:', err));
+  });
+
+  /**
+   * Kodu doğrula ve parolayı değiştir — **tek istekte.** Kimliksiz.
+   *
+   * Araya tek kullanımlık bir jeton konmadı: o jeton bu sistemdeki en değerli
+   * sır olurdu (herhangi bir parolayı yazabilir), saklanması, kendi TTL'i,
+   * tüketildi bayrağı ve loglardan ayıklanması gerekirdi — hepsi bir
+   * gidiş-dönüş kazanmak için. Tek istekte "doğrulandı ama parola değişmedi"
+   * ara durumu hiç oluşmuyor. `/api/hesap/dogrula` da aynı şekilde çalışıyor.
+   *
+   * **`emailVerified`'a dokunulmuyor, ve bu bir unutma değil.** Bu dosyanın
+   * değişmezi "e-posta doğrulanmış ⇒ telefon ve öğrenci numarası sahiplenilmiş".
+   * Sıfırlamada `emailVerified: true` yazmak, hiç sahiplenme yapılmamış bir
+   * hesabı doğrulanmış gösterir ve o değişmezi sessizce kırar.
+   */
+  app.post('/api/hesap/sifre-degistir', async (req, res) => {
+    const ip = clientIp(req);
+    const kilit = sifreDegistirLimiti.lockedFor(ip);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_fazla', saniye: Math.ceil(kilit / 1000) });
+    }
+    sifreDegistirLimiti.fail(ip);
+
+    const govde = req.body as Record<string, unknown>;
+    const email = normalizeEmail(String(govde?.email ?? ''));
+    const code = String(govde?.code ?? '').trim();
+    const parola = String(govde?.parola ?? '');
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ hata: 'eposta_gecersiz' });
+
+    const ref = db.collection(RESET_COLLECTION).doc(resetDocId(email));
+    const kayit = ((await ref.get()).data() as OtpRecord | undefined) ?? null;
+
+    const karar = decideVerify(kayit, ref.id, code, Date.now());
+    if (!karar.ok) {
+      if (karar.reason === 'yanlis' && kayit) {
+        // `increment` çünkü aynı anda gelen iki yanlış deneme okunmuş değeri
+        // aynı görür ve sayaç bir artar — beş deneme sınırı orada delinir.
+        await ref.update({ attempts: FieldValue.increment(1) });
+      }
+      return res.status(400).json({ hata: karar.reason, kalan: karar.kalan });
+    }
+
+    // Kullanıcı bulunamadığında da `yanlis` dönüyor ve deneme sayılıyor:
+    // burada "hesap yok" demek, kod isteme adımındaki bütün tekdüzeliği son
+    // adımda geri açardı.
+    const kullanici = await authOf()
+      .getUserByEmail(email)
+      .catch(() => null);
+    if (!kullanici) {
+      if (kayit) await ref.update({ attempts: FieldValue.increment(1) });
+      return res.status(400).json({ hata: 'yanlis' });
+    }
+
+    // İstemcideki kontrol bir ipucu, sınır değil: ham istek onu atlıyor.
+    // Kod TÜKETİLMİYOR — kullanıcı parolayı düzeltip aynı kodla tekrar denemeli.
+    if (parola.length < MIN_PASSWORD) return res.status(400).json({ hata: 'parola_zayif' });
+
+    // Parola hiçbir log satırına girmiyor.
+    await authOf().updateUser(kullanici.uid, { password: parola });
+
+    // Parolasını ÇALINDIĞI İÇİN sıfırlayan kullanıcının asıl istediği bu:
+    // aksi hâlde saldırgan hesapta süresiz kalır ve kullanıcı sorunu
+    // çözdüğünü sanır. Yenileme jetonlarını geçersizleştiriyor; elde duran
+    // ID jetonları süreleri dolana kadar (bir saate kadar) geçerli kalıyor,
+    // ve Firestore kuralları iptali görmüyor. Hata yutuluyor: parola gerçekten
+    // değişti, "olmadı" demek kullanıcıya işlemi tekrarlatmak olurdu.
+    await authOf()
+      .revokeRefreshTokens(kullanici.uid)
+      .catch((err) => console.error('[hesap] revokeRefreshTokens:', err));
+
+    await ref.delete().catch(() => {});
+    res.json({ durum: 'degistirildi' });
   });
 }

@@ -48,6 +48,37 @@ function rulesBlock(collection) {
   return rules.slice(start, next < 0 ? rules.length : next);
 }
 
+/**
+ * TOML yorumlarını atar.
+ *
+ * `nixpacks.toml` baştan aşağı yorum ve aranan metinlerin hepsi gerekçesiyle
+ * birlikte orada yazıyor: ham metinde arayan bir kontrol, gerçek ayar silinse
+ * bile yeşil kalıyor — sınandı, tam olarak bu oldu. Aynı tuzağın JS tarafı için
+ * `strip()` var ama o yalnızca satır ve blok yorumlarını biliyor.
+ *
+ * Tırnak içindeki `#` yorum değil (bir komutun içinde geçebilir), o yüzden satır
+ * tırnak sayılarak taranıyor; orada kesmek doğru bir dosyayı kırmızı yapardı.
+ */
+function stripToml(src) {
+  return src
+    .split('\n')
+    .map((line) => {
+      let quote = null;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (quote) {
+          if (c === quote) quote = null;
+        } else if (c === '"' || c === "'") {
+          quote = c;
+        } else if (c === '#') {
+          return line.slice(0, i);
+        }
+      }
+      return line;
+    })
+    .join('\n');
+}
+
 const app = json('app.json').expo;
 const pkg = json('package.json');
 const store = read('src/store.tsx');
@@ -165,30 +196,6 @@ check(
     const dev = needed.filter((n) => pkg.devDependencies?.[n]);
     if (!dev.length) return null;
 
-    // TOML yorumu `#` ile başlıyor ve bu dosya baştan aşağı yorum: aradığımız
-    // iki metin de gerekçesiyle birlikte orada yazıyor. Ham metinde arayınca
-    // gerçek ayarlar silinse bile kontrol yeşil kalıyor — sınandı. Aynı tuzağın
-    // JS tarafı için `strip()` var ama o yalnızca `//` ve `/* */` biliyor.
-    // Tırnak içindeki `#` yorum değil, o yüzden satır tırnak sayılarak taranıyor.
-    const stripToml = (src) =>
-      src
-        .split('\n')
-        .map((line) => {
-          let quote = null;
-          for (let i = 0; i < line.length; i++) {
-            const c = line[i];
-            if (quote) {
-              if (c === quote) quote = null;
-            } else if (c === '"' || c === "'") {
-              quote = c;
-            } else if (c === '#') {
-              return line.slice(0, i);
-            }
-          }
-          return line;
-        })
-        .join('\n');
-
     const cfg = stripToml(read('nixpacks.toml'));
     if (!/npm ci[^\n]*--include=dev/.test(cfg)) {
       return `nixpacks.toml devDependencies kurmuyor ama panel onlara bağlı: ${dev.join(', ')}`;
@@ -199,6 +206,103 @@ check(
     // geliştirme sunucusu. Deploy başarılı görünür, panel hiç açılmaz.
     if (!/admin\/server\.ts/.test(cfg)) {
       return 'nixpacks.toml paneli başlatmıyor — Nixpacks `npm start`’a düşer, o da `expo start`';
+    }
+    return null;
+  },
+);
+
+check(
+  'sertifika PDF zinciri yerinde',
+  'PDF gerçek bir Chromium’da basılıyor ve bu deponun en sessiz kırılma sınıfı: ' +
+    'panel boot’ta ÖLMÜYOR — süreç açılır, sağlık kontrolü geçer, Coolify yeşil ' +
+    'görünür, ölüm ilk sertifika isteğinde gelir. Zincirin dört halkası da burada ' +
+    'tutuluyor.',
+  () => {
+    const cfg = stripToml(read('nixpacks.toml'));
+    const pkgRaw = read('package.json');
+
+    // 1) `puppeteer` ALT DİZESİ package.json’da geçmemeli. Nixpacks’in Node
+    //    sağlayıcısı onu görünce apt listesine `chromium` ekliyor; noble’da
+    //    gerçek chromium deb’i yok, snap saplamasına çözülüyor, konteynerde
+    //    snapd yok. Derleme yeşil, panel ilk sertifikada ölü. `puppeteer-core`
+    //    de tetikliyor, o yüzden aranan şey tam ad değil alt dize.
+    if (/puppeteer/.test(pkgRaw)) {
+      return 'package.json `puppeteer` alt dizesi taşıyor — nixpacks apt listesine snap chromium ekler';
+    }
+
+    // 2) playwright-core TAM pinli: tarayıcı derlemesi kütüphane sürümüne bağlı
+    //    ve `npm update` PDF üretemeyen bir konteyner dağıtır.
+    const sur = pkg.devDependencies?.['playwright-core'] ?? pkg.dependencies?.['playwright-core'];
+    if (!sur) return 'playwright-core bağımlılığı yok — PDF üretilemez';
+    if (!/^\d+\.\d+\.\d+$/.test(sur)) {
+      return `playwright-core tam pinli değil (${sur}) — tarayıcı sürümü kütüphaneye bağlı`;
+    }
+
+    // 3) Tarayıcı DERLEME fazında kuruluyor ve iki faz aynı yolu görüyor.
+    //    Çalışma fazına kaçarsa her restart ~104 MB indirir; yol ayrışırsa
+    //    derlemede kurulan tarayıcıyı çalışma anı bulamaz.
+    if (!/playwright-core install chromium/.test(cfg)) {
+      return 'nixpacks.toml tarayıcıyı derleme fazında kurmuyor';
+    }
+    if (!/PLAYWRIGHT_BROWSERS_PATH/.test(cfg)) {
+      return 'nixpacks.toml PLAYWRIGHT_BROWSERS_PATH tanımlamıyor';
+    }
+
+    // 4) Sistem fontları. Fontsuz konteynerde PDF ÜRETİLİYOR ama boş çıkıyor
+    //    (ölçüldü: ~1.1 KB) ve base64 @font-face bile kurtarmıyor — yani bu
+    //    satırın düşmesi "hata yok, belge boş" demek.
+    for (const f of ['fonts-liberation', 'fonts-dejavu-core', 'libgbm1', 'libnss3']) {
+      if (!cfg.includes(f)) return `nixpacks.toml aptPkgs listesinde ${f} yok`;
+    }
+
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const server = strip(read('admin/server.ts'));
+
+    // 5) Açılış duman testi: hatayı ilk sertifika isteğinden boot’a çeken şey.
+    if (!/pdfDumanTesti\(/.test(server)) {
+      return 'panel açılışta bir belge basmıyor — PDF hatası ilk sertifikaya kadar görünmez';
+    }
+
+    // 6) Doğrulama sayfası giriş duvarının ÖNÜNDE. Sonra kayıt edilseydi
+    //    belgenin üstüne basılı adres giriş ekranına yönlendirirdi.
+    const guard = server.indexOf('app.use(requireAuth)');
+    const rota = server.indexOf("'/sertifika/:no'");
+    if (rota < 0) return 'herkese açık /sertifika/:no rotası yok';
+    if (guard >= 0 && rota > guard) return '/sertifika/:no requireAuth’tan SONRA kayıtlı';
+
+    // 7) Panel fontları KENDİ klasöründen okuyor. `node_modules/@expo-google-fonts`
+    //    mobil tarafın bağımlılığı; oradan okumak, o paket mobilden kalktığı gün
+    //    deploy yeşil geçip sertifika üretiminin ölmesi demek.
+    const pdf = strip(read('admin/pdf.ts'));
+    if (/@expo-google-fonts/.test(pdf)) {
+      return 'admin/pdf.ts fontları mobil bağımlılığından okuyor';
+    }
+    for (const f of [
+      'PlusJakartaSans_400Regular.ttf',
+      'PlusJakartaSans_600SemiBold.ttf',
+      'PlusJakartaSans_800ExtraBold.ttf',
+      'PressStart2P_400Regular.ttf',
+    ]) {
+      if (!existsSync(join(root, 'admin/fonts', f))) return `admin/fonts/${f} yok`;
+    }
+    return null;
+  },
+);
+
+check(
+  'sertifikalarım ekranı bağlı',
+  'Ekranın var olması ona erişilebildiği anlamına gelmiyor: bu depoda giriş, kayıt ' +
+    've hesap silme ekranları çalışır hâldeyken uygulamada hiçbir şey oraya gitmiyordu ' +
+    've özellik kullanıcı açısından YOKTU.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (!existsSync(join(root, 'app/sertifikalarim.tsx'))) return 'app/sertifikalarim.tsx yok';
+    if (!/name="sertifikalarim"/.test(read('app/_layout.tsx'))) {
+      return 'sertifikalarim rotası kök yığına kayıtlı değil';
+    }
+    const hesap = strip(read('app/(tabs)/hesap.tsx'));
+    if (!/['"]\/sertifikalarim['"]/.test(hesap)) {
+      return 'hesap sekmesi sertifikalar ekranına bağlanmıyor';
     }
     return null;
   },
@@ -382,6 +486,70 @@ check(
     const auth = strip(read('src/auth.ts'));
     if (/sendEmailVerification/.test(auth)) {
       return 'src/auth.ts hâlâ Firebase doğrulama postası gönderiyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'parola sıfırlama OTP hattında',
+  'Firebase\'in kendi sıfırlama postası `noreply@<proje>.firebaseapp.com`\'dan ' +
+    'gidiyor; o alan adı kulübün değil, SPF/DKIM hizalanmıyor ve posta spam\'e ' +
+    'düşüyor — doğrulama postasında birebir bu yaşandı. Ekran ya da uç nokta ' +
+    'kopunca belirti sessiz: "parolamı unuttum" hiçbir şey yapmaz.',
+  () => {
+    // strip() İSTİSNASIZ: bu depoda bir kontrol dört kez kendi gerekçesini
+    // bulup yanlış cevap verdi. `sendPasswordResetEmail` adı aşağıdaki
+    // açıklamanın kendisinde de geçiyor.
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    if (!existsSync(join(root, 'app/sifre-sifirla.tsx'))) return 'app/sifre-sifirla.tsx yok';
+    if (!/name="sifre-sifirla"/.test(read('app/_layout.tsx'))) {
+      return 'sifre-sifirla rotası kök yığına kayıtlı değil';
+    }
+
+    // Aranan şey ROTA, fonksiyon adı değil: `sifremiUnuttum` bir yorumda da
+    // geçebilir ve kontrol ekran silinmişken yeşil kalırdı.
+    const giris = strip(read('app/giris.tsx'));
+    if (!/['"]\/sifre-sifirla['"]/.test(giris)) {
+      return 'giriş ekranındaki "parolamı unuttum" /sifre-sifirla\'ya gitmiyor';
+    }
+
+    const auth = strip(read('src/auth.ts'));
+    if (/sendPasswordResetEmail/.test(auth)) {
+      return 'src/auth.ts hâlâ Firebase sıfırlama postası gönderiyor';
+    }
+
+    const api = strip(read('admin/accountApi.ts'));
+    for (const yol of ['/api/hesap/sifre-kod', '/api/hesap/sifre-degistir']) {
+      if (!api.includes(yol)) return `panelde ${yol} uç noktası yok`;
+    }
+    // Parolasını ÇALINDIĞI İÇİN sıfırlayan kullanıcının asıl istediği bu.
+    // Çağrılmazsa saldırgan hesapta süresiz kalır ve kimse fark etmez.
+    if (!/revokeRefreshTokens\(/.test(api)) {
+      return 'sıfırlama diğer cihazlardaki oturumları düşürmüyor';
+    }
+    // İstemcideki uzunluk kontrolü bir ipucu, sınır değil: ham istek onu atlar.
+    if (!/MIN_PASSWORD/.test(api)) return 'panel parola uzunluğunu zorlamıyor';
+
+    // `emailVerified: true` sıfırlamaya SIZMAMALI: bu dosyanın değişmezi
+    // "doğrulanmış ⇒ telefon ve numara sahiplenilmiş", ve sıfırlama hiçbir
+    // sahiplenme yapmıyor.
+    const degistir = api.slice(api.indexOf("'/api/hesap/sifre-degistir'"));
+    if (/emailVerified/.test(degistir)) {
+      return 'sıfırlama uç noktası emailVerified yazıyor — sahiplenme değişmezini kırar';
+    }
+
+    // Tuz doküman kimliği olmazsa doğrulama kodu ile sıfırlama kodu birbirini
+    // doğrular; bu bir yetki geçişi.
+    if (!/hashCode\(ref\.id,/.test(api)) {
+      return 'sıfırlama kodu doküman kimliğiyle tuzlanmıyor';
+    }
+
+    const blok = rulesBlock('passwordReset');
+    if (!blok) return 'firestore.rules passwordReset bloğunu hiç tanımlamıyor';
+    if (!/allow read, write: if false/.test(blok)) {
+      return 'passwordReset istemciye açık — kullanıcı kendi deneme sayacını sıfırlayabilir';
     }
     return null;
   },

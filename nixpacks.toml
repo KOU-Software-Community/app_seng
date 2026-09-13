@@ -14,13 +14,63 @@
 # konteyner `Cannot find module 'express'` ile ölüyor. Hata derlemede değil,
 # ilk açılışta ve sunucuda görünüyor.
 
+# ---------------------------------------------------------------- Chromium
+#
+# Sertifika PDF'i gerçek bir tarayıcıda basılıyor (`admin/pdf.ts`), çünkü
+# belgenin tanımı tek bir HTML dizesi ve hem herkese açık doğrulama sayfası
+# hem PDF oradan çıkıyor. Aşağıdaki liste o tarayıcının paylaşılan
+# kütüphaneleri — Playwright'ın kendi `--with-deps` çıktısından, elle yazıldı.
+#
+# İKİ ŞEY BİLEREK BÖYLE:
+#
+# 1. Paket `playwright-core`, `puppeteer` DEĞİL. Nixpacks'in Node sağlayıcısı
+#    lockfile'da `puppeteer` alt dizesini görünce (yani `puppeteer-core` de
+#    tetikliyor) kendi apt listesine `chromium` ekliyor; Ubuntu noble'da gerçek
+#    bir chromium deb'i yok, snap saplamasına çözülüyor ve konteynerde snapd
+#    yok. Hiçbir apt satırı yazmamış olursunuz, derleme yeşil geçer, panel ilk
+#    sertifikada ölür. `playwright-core` o dizeyi taşımıyor: aşağıdaki liste
+#    sizin yazdığınız ve tamamı görünen liste.
+#
+# 2. `fonts-liberation` ve `fonts-dejavu-core` SÜS DEĞİL. Sistem fontu olmayan
+#    bir konteynerde PDF üretiliyor, `ToUnicode` yazılıyor, metin çıkarımı bile
+#    geçiyor — ve sayfa boş çıkıyor (ölçüldü: 1154 bayt). Base64 `@font-face`
+#    gömmek de kurtarmıyor. Açılıştaki duman testi bayt sayısına bu yüzden
+#    bakıyor.
+[phases.setup]
+aptPkgs = [
+  "libnss3",
+  "libnspr4",
+  "libatk1.0-0",
+  "libatk-bridge2.0-0",
+  "libcups2",
+  "libdrm2",
+  "libxkbcommon0",
+  "libxcomposite1",
+  "libxdamage1",
+  "libxfixes3",
+  "libxrandr2",
+  "libgbm1",
+  "libpango-1.0-0",
+  "libcairo2",
+  "libasound2t64",
+  "libatspi2.0-0",
+  "fonts-liberation",
+  "fonts-dejavu-core",
+]
+
 [phases.install]
 cmds = ["npm ci --include=dev"]
 
-# Derleme adımı yok: panel TypeScript'i tsx ile doğrudan çalıştırıyor, derlenmiş
-# bir çıktı üretmiyor. Boş bırakılmazsa Nixpacks `npm run build` arar ve bulamaz.
+# Tarayıcı DERLEME fazında kuruluyor, çalışma fazında değil: çalışma fazına
+# kaçarsa her yeniden başlatma ~104 MB indirir ve konteyner açılışı ağa bağlı
+# hâle gelir. `PLAYWRIGHT_BROWSERS_PATH` aşağıdaki [variables] bloğunda; iki
+# fazın da AYNI yolu görmesi gerekiyor, yoksa derlemede kurulan tarayıcıyı
+# çalışma anı bulamaz ve hata "npx playwright install" der.
 [phases.build]
-cmds = []
+cmds = ["npx playwright-core install chromium"]
+
+[variables]
+PLAYWRIGHT_BROWSERS_PATH = "/app/.pw-browsers"
 
 [start]
 cmd = "npx tsx admin/server.ts"

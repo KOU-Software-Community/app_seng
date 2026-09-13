@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { authErrorMessage, resetPassword, signIn } from '../src/auth';
+import { authErrorMessage, signIn } from '../src/auth';
 import { safeNext } from '../src/deepLink';
 import { ErrorBanner, Field, Input } from '../src/components/AuthForm';
 import { GlassButton, GradientHeader, PrimaryButton, Txt } from '../src/components/ui';
@@ -20,7 +20,6 @@ export default function LoginRoute() {
   const [parola, setParola] = useState('');
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  const [bilgi, setBilgi] = useState<string | null>(null);
 
   const submit = async () => {
     if (!email.trim() || !parola) {
@@ -29,7 +28,6 @@ export default function LoginRoute() {
     }
     setGonderiliyor(true);
     setHata(null);
-    setBilgi(null);
     try {
       await signIn(email, parola);
       router.replace(safeNext(next) ?? '/(tabs)/hesap');
@@ -40,19 +38,16 @@ export default function LoginRoute() {
     }
   };
 
-  const sifremiUnuttum = async () => {
-    if (!email.trim()) {
-      setHata('Önce e-posta adresinizi yazın.');
-      return;
-    }
+  // Sıfırlama kendi ekranında: bağlantı yerine altı haneli kod, ve postayı
+  // Firebase değil panel gönderiyor (bkz. `src/auth.ts`'teki not). `next`
+  // taşınıyor — kullanıcı "katıl" düğmesinden geldiyse parolayı sıfırlayıp
+  // girdikten sonra da oraya dönmeli, yoksa başladığı işi unutuyor.
+  const sifremiUnuttum = () => {
     setHata(null);
-    try {
-      await resetPassword(email);
-    } catch {
-      // Hata da başarı da aynı cümleyi veriyor: farklı cevap vermek, bir
-      // adresin kayıtlı olup olmadığını dışarıdan sorulabilir hâle getirir.
-    }
-    setBilgi('Adres kayıtlıysa parola sıfırlama bağlantısı gönderildi.');
+    router.push({
+      pathname: '/sifre-sifirla',
+      params: { email: email.trim(), ...(next ? { next: String(next) } : {}) },
+    });
   };
 
   return (
@@ -75,13 +70,6 @@ export default function LoginRoute() {
           keyboardShouldPersistTaps="handled"
         >
           <ErrorBanner message={hata} />
-          {bilgi ? (
-            <View style={styles.info}>
-              <Txt size={13} leading={1.45} color={colors.textBody}>
-                {bilgi}
-              </Txt>
-            </View>
-          ) : null}
 
           <Field label="E-posta">
             <Input
@@ -141,14 +129,6 @@ const styles = StyleSheet.create({
   form: { paddingHorizontal: 20, paddingTop: 22, gap: 18 },
   forgot: { paddingVertical: 4 },
   altLink: { paddingVertical: 12, alignItems: 'center' },
-  info: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
   submitBar: {
     position: 'absolute',
     left: 0,

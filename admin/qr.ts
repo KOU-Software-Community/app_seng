@@ -85,6 +85,9 @@ export type YoklamaSatiri = {
   kaynak: 'qr' | 'panel';
   checkedInAt: string;
   sertifikaNo?: string;
+  /** Teslim durumu. `sertifikaNo` varken ikisi de boşsa belge hiç gönderilmemiş. */
+  postaGitti?: boolean;
+  postaHatasi?: string;
 };
 
 /**
@@ -112,7 +115,9 @@ export async function attendanceRows(db: Firestore, eventId: string): Promise<Yo
     .map((d) => {
       const uid = String(d.get('uid') ?? '');
       const p = profiller.get(uid) ?? {};
-      const sertifika = d.get('certificate') as { no?: string } | undefined;
+      const sertifika = d.get('certificate') as
+        | { no?: string; mailedAt?: string; mailError?: string }
+        | undefined;
       return {
         uid,
         adSoyad: String(p.adSoyad ?? '(profil yok)'),
@@ -121,6 +126,8 @@ export async function attendanceRows(db: Firestore, eventId: string): Promise<Yo
         kaynak: (d.get('kaynak') === 'panel' ? 'panel' : 'qr') as 'qr' | 'panel',
         checkedInAt: zamanMetni(d.get('checkedInAt')),
         sertifikaNo: sertifika?.no,
+        postaGitti: Boolean(sertifika?.mailedAt),
+        postaHatasi: sertifika?.mailError || undefined,
       };
     })
     .sort((a, b) => a.adSoyad.localeCompare(b.adSoyad, 'tr'));

@@ -9,6 +9,7 @@
  * veriyi silmemesi** (gizlenen alan formdan da düşerse kaydetmek onu sessizce
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
+import { createHash } from 'node:crypto';
 import { parseServiceAccount } from '../admin/credentials';
 import { csvCell } from '../admin/csv';
 import {
@@ -48,6 +49,16 @@ import {
 import { readMailConfig } from '../admin/mail';
 import { otpMail } from '../admin/mailTemplate';
 import { claimIdentity, releaseIdentity } from '../admin/claims';
+import { registerAccountApi, type AuthLike } from '../admin/accountApi';
+import { adSinifi, certificateHtml } from '../admin/certificate';
+import {
+  BELGE_NO_UZUNLUK,
+  belgeTarihi,
+  makeBelgeNo,
+  publishCertificates,
+} from '../admin/certificates';
+import { sertifikaPage } from '../admin/certificateView';
+import { deliverCertificates, dogrulamaUrl } from '../admin/certificateDelivery';
 
 let failed = 0;
 function assert(name: string, condition: boolean, detail = '') {
@@ -771,6 +782,80 @@ void (async () => {
     assert('postada http bağlantısı yok', !/href="https?:/i.test(mail.html));
   }
 
+  // ----------------------------------------------- sertifika
+
+  {
+    const temel = {
+      tarih: '12 Mart 2026',
+      belgeNo: 'K7M2QX9R',
+      dogrulamaUrl: 'mobil.kouseng.com/sertifika/K7M2QX9R',
+      fontBase: './fonts',
+    };
+
+    // ASIL MESELE: ad ve etkinlik adı KULLANICIDAN geliyor. Kaçırılmazsa
+    // sertifika sayfasına kod sokulabilir — ve o sayfa herkese açık.
+    const kotu = certificateHtml({
+      ...temel,
+      adSoyad: '<script>alert(1)</script>',
+      etkinlik: '" onerror="alert(2)',
+    });
+    assert(
+      'sertifikada ad kaçırılıyor',
+      !/<script>alert\(1\)<\/script>/.test(kotu) && kotu.includes('&lt;script&gt;'),
+    );
+    assert('sertifikada etkinlik adı kaçırılıyor', !/onerror="alert\(2\)/.test(kotu));
+    assert(
+      'belge no ve doğrulama adresi kaçırılıyor',
+      !certificateHtml({ ...temel, adSoyad: 'A B', etkinlik: 'E', belgeNo: '<b>x' }).includes('<b>x'),
+    );
+
+    const normal = certificateHtml({ ...temel, adSoyad: 'Abdülkadir İvenç', etkinlik: 'Yapay Zekâ Atölyesi' });
+    assert('sertifika Türkçe karakterleri taşıyor', normal.includes('Abdülkadir İvenç'));
+    assert('sertifika A4 yatay', /@page\s*\{\s*size:\s*A4 landscape/.test(normal));
+    // Piksel font YALNIZCA etikette; gövdenin tamamı piksel fontla yazılırsa
+    // belge oyuncak gibi görünüyor ve deponun kendi kuralı da bunu yasaklıyor.
+    // `@font-face` tanımı hariç: piksel font YALNIZCA `.etiket` kuralında
+    // kullanılıyor olmalı. İlk yazılışında bu iddia `@font-face`'i de sayıyordu
+    // ve doğru kodda kırmızı veriyordu — ölçüldü.
+    const pikselKullanimi = normal
+      .split('@font-face')
+      .slice(1)
+      .map((blok) => blok.slice(blok.indexOf('}') + 1))
+      .join('')
+      .match(/font-family: 'Pixel'/g);
+    assert(
+      'piksel font yalnızca etikette',
+      (pikselKullanimi || []).length === 1,
+      `${(pikselKullanimi || []).length} yerde kullanılıyor`,
+    );
+
+    // Uzun ad çerçeveyi taşırırsa belge bozuk çıkar ve bunu ancak o adın sahibi
+    // görür — yani hiç görülmez. Punto kademesi uzunluğa göre iniyor.
+    //
+    // Sınırlar BASILARAK belirlendi, tahminle değil, ve punto büyütüldüğünde
+    // yeniden ölçüldü: 46pt'de 21 karakter sığıyordu, 52pt'de sığmıyor. Bu
+    // iddia bir kez daha kırmızı verdi ve yine yanlış olan kod değil beklentiydi
+    // — sayılar rendere göre düzeltildi, render sayılara göre değil.
+    //
+    // BU İDDİA SINIRIN DOĞRU YERDE OLDUĞUNU SÖYLEYEMEZ, yalnızca kaymadığını.
+    // Sınırın doğru yerde olduğunu yalnızca basıp bakmak söylüyor; punto her
+    // değiştiğinde o ölçüm tekrarlanmak zorunda.
+    assert('kısa ad tam punto', adSinifi('Ali Öz') === 'ad');
+    // Sınırın İKİ YANI da tutuluyor: yalnızca "20 tam punto" yazsaydım eşiği
+    // 40'a çekmek de yeşil kalırdı ve uzun ad sessizce çerçeveyi taşardı.
+    assert('20 karakter tam punto', adSinifi('Ayşegül Nur Şahinoğl') === 'ad');
+    assert('21 karakter bir kademe iniyor', adSinifi('Ayşegül Nur Şahinoğlu') === 'ad uzun');
+    assert(
+      '31 karakter hâlâ bir kademe inik',
+      adSinifi('Muhammed Emin Küçükçelebi Oğulu') === 'ad uzun',
+    );
+    assert(
+      '32 karakter iki kademe iniyor',
+      adSinifi('Muhammed Emin Küçükçelebi Oğullu') === 'ad cokUzun',
+    );
+    assert('boşluklar kırpılıyor', adSinifi('   Ali Öz   ') === 'ad');
+  }
+
   // ----------------------------------------------- teklik (claims)
 
   {
@@ -835,6 +920,357 @@ void (async () => {
     assert('kendi kaydını güncelleyebiliyor', duzeltme.ok);
     assert('eski telefon serbest bırakılıyor', db2._get('phoneClaims', TEL) === undefined);
     assert('yeni telefon sahiplenildi', db2._get('phoneClaims', '+905559998877') !== undefined);
+  }
+
+  // --- Parola sıfırlama uç noktaları --------------------------------------
+  //
+  // Bunlar KİMLİKSİZ, yani tek koruma buradaki dört katman. Aşağıdaki
+  // iddiaların her biri koruduğu şey kırılarak kırmızı verdiği görülerek
+  // yazıldı; en önemlisi birincisi — "kayıtlı olmayan adres birebir aynı
+  // cevabı veriyor" — çünkü o tek başına kullanıcı numaralandırmasının
+  // tamamını kapatıyor.
+  {
+    type Rota = (req: unknown, res: unknown) => unknown | Promise<unknown>;
+    const rotalar = new Map<string, Rota>();
+    const app = { post: (yol: string, h: Rota) => rotalar.set(yol, h) };
+
+    // Sahte Firestore: yalnızca bu uç noktaların kullandığı yüzey.
+    function resetDb() {
+      const store = new Map<string, Record<string, unknown>>();
+      const ref = (yol: string) => ({
+        id: yol.slice(yol.lastIndexOf('/') + 1),
+        async get() {
+          const d = store.get(yol);
+          return { exists: d !== undefined, data: () => d };
+        },
+        async set(data: Record<string, unknown>) {
+          store.set(yol, { ...data });
+        },
+        async update(patch: Record<string, unknown>) {
+          const d = store.get(yol);
+          if (!d) throw new Error('yok');
+          for (const [k, v] of Object.entries(patch)) {
+            // Sahte `FieldValue.increment(n)`: gerçek nesnede `operand` var.
+            const n = (v as { operand?: number })?.operand;
+            d[k] = typeof n === 'number' ? Number(d[k] ?? 0) + n : v;
+          }
+        },
+        async delete() {
+          store.delete(yol);
+        },
+      });
+      return {
+        collection: (n: string) => ({ doc: (id: string) => ref(`${n}/${id}`) }),
+        doc: (yol: string) => ref(yol),
+        _store: store,
+      };
+    }
+
+    function sahteAuth(varOlan: string | null) {
+      const cagrilar: string[] = [];
+      const auth = {
+        async verifyIdToken() {
+          throw new Error('kullanılmıyor');
+        },
+        async updateUser(uid: string, p: Record<string, unknown>) {
+          cagrilar.push(`updateUser:${uid}:${Object.keys(p).join(',')}`);
+          return {} as never;
+        },
+        async getUserByEmail(email: string) {
+          if (varOlan && email === varOlan) return { uid: 'u1', email } as never;
+          throw new Error('auth/user-not-found');
+        },
+        async revokeRefreshTokens(uid: string) {
+          cagrilar.push(`revoke:${uid}`);
+        },
+      };
+      return { auth: auth as unknown as AuthLike, cagrilar };
+    }
+
+    async function cagir(yol: string, govde: unknown, ip = '1.2.3.4') {
+      const h = rotalar.get(yol);
+      if (!h) throw new Error(`rota yok: ${yol}`);
+      let kod = 200;
+      let gonderildi: unknown;
+      let cozuldu: () => void = () => {};
+      const bitti = new Promise<void>((r) => (cozuldu = r));
+      const res = {
+        status(c: number) {
+          kod = c;
+          return res;
+        },
+        json(v: unknown) {
+          gonderildi = v;
+          cozuldu();
+          return res;
+        },
+      };
+      await h({ ip, body: govde, header: () => '' }, res);
+      await bitti;
+      // Arka plandaki gönderim mikro görevlerini boşalt.
+      await new Promise((r) => setImmediate(r));
+      return { kod, govde: gonderildi as Record<string, unknown> };
+    }
+
+    const VAR = 'elif@example.com';
+    const YOK = 'kimse@example.com';
+
+    // Posta gerçekten gönderilmemeli: `mailReady()` bu süreçte false, o yüzden
+    // uç nokta 503 döner. Sınamak için SMTP'yi yapılandırmıyoruz — onun yerine
+    // 503'ün de HER İKİ ADRES İÇİN aynı olduğunu doğruluyoruz, ki bu da bir
+    // oracle kapısı.
+    {
+      const db = resetDb();
+      const { auth } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+
+      const a = await cagir('/api/hesap/sifre-kod', { email: VAR }, '10.0.0.1');
+      const b = await cagir('/api/hesap/sifre-kod', { email: YOK }, '10.0.0.2');
+      assert(
+        'posta yapılandırılmamışken cevap iki adres için de aynı',
+        a.kod === b.kod && JSON.stringify(a.govde) === JSON.stringify(b.govde),
+        `${a.kod} ${JSON.stringify(a.govde)} ≠ ${b.kod} ${JSON.stringify(b.govde)}`,
+      );
+      assert('posta yapılandırılmamışken 503', a.kod === 503);
+      assert(
+        'e-posta biçimi bozuksa kayıt yazılmıyor',
+        (await cagir('/api/hesap/sifre-kod', { email: 'bu bir adres değil' })).kod === 400 &&
+          db._store.size === 0,
+      );
+    }
+
+    // Kodu elle yerleştirip doğrulama tarafını sınıyoruz: gönderim adımı
+    // SMTP istiyor, doğrulama adımı istemiyor.
+    const KOD = '123456';
+    function kayitYaz(db: ReturnType<typeof resetDb>, email: string, attempts = 0) {
+      const id = createHash('sha256').update(email).digest('hex');
+      db._store.set(`passwordReset/${id}`, {
+        hash: hashCode(id, KOD),
+        createdAt: Date.now(),
+        sendCount: 1,
+        windowStart: Date.now(),
+        attempts,
+      });
+      return `passwordReset/${id}`;
+    }
+
+    {
+      const db = resetDb();
+      const { auth, cagrilar } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+      const yol = kayitYaz(db, VAR);
+
+      const yanlis = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: '000000',
+        parola: 'yeterince-uzun-parola',
+      });
+      assert('yanlış kod parolayı değiştirmiyor', yanlis.kod === 400 && cagrilar.length === 0);
+      assert(
+        'yanlış kod deneme sayacını artırıyor',
+        (db._store.get(yol) as { attempts: number }).attempts === 1,
+      );
+
+      // Kod TÜKETİLMEMELİ: kullanıcı parolayı düzeltip aynı kodla tekrar
+      // denemeli, yoksa her zayıf parolada yeni posta beklemek gerekirdi.
+      const zayif = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: KOD,
+        parola: 'kisa',
+      });
+      assert('sunucu MIN_PASSWORD zorluyor', zayif.kod === 400 && zayif.govde.hata === 'parola_zayif');
+      assert('zayıf parola kodu tüketmiyor', db._store.has(yol));
+      assert('zayıf parolada updateUser çağrılmıyor', cagrilar.length === 0);
+
+      const ok = await cagir('/api/hesap/sifre-degistir', {
+        email: VAR,
+        code: KOD,
+        parola: 'yeterince-uzun-parola',
+      });
+      assert('doğru kod parolayı değiştiriyor', ok.kod === 200 && ok.govde.durum === 'degistirildi');
+      assert(
+        'parola değişince diğer oturumlar düşürülüyor',
+        cagrilar.includes('revoke:u1'),
+        cagrilar.join(' | '),
+      );
+      assert('başarıda kod siliniyor', !db._store.has(yol));
+    }
+
+    {
+      // KAYITLI OLMAYAN ADRES: hesap yoksa cevap "hesap yok" değil "yanlış".
+      // Aksi hâlde kod isteme adımındaki bütün tekdüzelik son adımda geri
+      // açılırdı — adresi yazıp rastgele bir kod denemek yeterli olurdu.
+      const db = resetDb();
+      const { auth, cagrilar } = sahteAuth(VAR);
+      rotalar.clear();
+      registerAccountApi(app as never, db as never, () => auth);
+      kayitYaz(db, YOK);
+      const r = await cagir('/api/hesap/sifre-degistir', {
+        email: YOK,
+        code: KOD,
+        parola: 'yeterince-uzun-parola',
+      });
+      assert(
+        'hesabı olmayan adreste doğru kod da "yanlış" diyor',
+        r.kod === 400 && r.govde.hata === 'yanlis' && cagrilar.length === 0,
+        JSON.stringify(r.govde),
+      );
+    }
+
+    {
+      // TUZ AYRIMI: doğrulama kaydı uid ile, sıfırlama kaydı doküman kimliği
+      // ile tuzlanıyor. Aynı altı hane iki hatta birden geçerli olsaydı
+      // doğrulama ekranına yazılan bir sıfırlama kodu e-postayı doğrulardı.
+      const uid = 'u1';
+      const resetId = createHash('sha256').update(VAR).digest('hex');
+      const kayit: OtpRecord = {
+        hash: hashCode(uid, KOD),
+        createdAt: Date.now(),
+        sendCount: 1,
+        windowStart: Date.now(),
+        attempts: 0,
+      };
+      assert('doğrulama kodu kendi hattında geçerli', decideVerify(kayit, uid, KOD, Date.now()).ok);
+      const capraz = decideVerify(kayit, resetId, KOD, Date.now());
+      assert(
+        'doğrulama kodu sıfırlama hattında geçersiz',
+        !capraz.ok && capraz.reason === 'yanlis',
+      );
+    }
+  }
+
+  // --- Sertifika yayınlama ------------------------------------------------
+  {
+    function sertDb() {
+      const store = new Map<string, Record<string, unknown>>();
+      const api = {
+        collection: (n: string) => ({
+          doc: (id: string) => ({
+            async get() {
+              const d = store.get(`${n}/${id}`);
+              return {
+                exists: d !== undefined,
+                get: (k: string) => d?.[k],
+              };
+            },
+            async set(data: Record<string, unknown>, opt?: { merge?: boolean }) {
+              const eski = opt?.merge ? (store.get(`${n}/${id}`) ?? {}) : {};
+              store.set(`${n}/${id}`, { ...eski, ...data });
+            },
+          }),
+        }),
+        _get: (yol: string) => store.get(yol),
+        _set: (yol: string, d: Record<string, unknown>) => store.set(yol, d),
+      };
+      return api;
+    }
+
+    const NOW = new Date('2026-03-13T10:00:00Z');
+    const db = sertDb();
+    db._set('attendance/e1__u1', { eventId: 'e1', uid: 'u1' });
+    db._set('attendance/e1__u2', { eventId: 'e1', uid: 'u2' });
+
+    const ilk = await publishCertificates(
+      db as never,
+      'e1',
+      [
+        { uid: 'u1', adSoyad: '  Ayşe   Gülşah  Öztürk ' },
+        { uid: 'u2', adSoyad: 'Ali Can Yıldız' },
+        // Yoklaması olmayana belge çıkmamalı: doğrulama sayfası neye bakacak?
+        { uid: 'u3', adSoyad: 'Hayalet Kişi' },
+        { uid: 'u4', adSoyad: 'X' },
+      ],
+      NOW,
+    );
+    assert('yoklaması olan yayınlanıyor', ilk.yayinlanan === 2, JSON.stringify(ilk));
+    assert(
+      'yoklaması olmayana belge çıkmıyor',
+      ilk.atlanan.some((a) => a.uid === 'u3' && a.sebep === 'yoklama kaydı yok'),
+    );
+    assert('çok kısa ad reddediliyor', ilk.atlanan.some((a) => a.uid === 'u4'));
+
+    const kayit = (db._get('attendance/e1__u1') as { certificate: Record<string, string> })
+      .certificate;
+    // Ad YAYIN ANINDA donuyor ve normalleşiyor: belge dışarıda ve adresi
+    // paylaşılmış olabilir, kişi profilini değiştirince belgenin sessizce
+    // değişmesi onu belge olmaktan çıkarır.
+    assert('ad normalleşerek donuyor', kayit.adSoyad === 'Ayşe Gülşah Öztürk', kayit.adSoyad);
+    assert('belge no doğru uzunlukta', kayit.no.length === BELGE_NO_UZUNLUK);
+    assert(
+      'belge no tahmin edilebilir bir şey DEĞİL',
+      kayit.no !== 'u1' && !kayit.no.includes('e1') && makeBelgeNo() !== kayit.no,
+    );
+
+    // İKİNCİ YAYIN YENİ NUMARA ÜRETMEMELİ: üretseydi eskisi geçersiz olurdu ve
+    // dışarıda paylaşılmış bir adres kırılırdı.
+    const ikinci = await publishCertificates(
+      db as never,
+      'e1',
+      [{ uid: 'u1', adSoyad: 'Başka Bir Ad' }],
+      NOW,
+    );
+    assert('zaten yayınlanmış olan atlanıyor', ikinci.yayinlanan === 0);
+    assert(
+      'ikinci yayın belgeyi değiştirmiyor',
+      (db._get('attendance/e1__u1') as { certificate: { no: string; adSoyad: string } })
+        .certificate.adSoyad === 'Ayşe Gülşah Öztürk',
+    );
+
+    assert('belge tarihi okunur hâle geliyor', belgeTarihi('2026-03-12T18:00:00+03:00') === '12 Mart 2026');
+    assert('okunamayan tarihte boş', belgeTarihi('bilinmiyor') === '');
+
+    // PDF üretimi bozukken sayfa bunu EN ÜSTTE söylüyor: söylemezse operatör
+    // "yayınla ve gönder"e basar, belgeler yayınlanır, hiçbir posta gitmez ve
+    // sebep yalnızca sunucu logunda kalır.
+    const bozuk = sertifikaPage({
+      eventId: 'e1',
+      baslik: 'Git Atölyesi',
+      tarih: '12 Mart 2026',
+      yoklama: [],
+      pdfHazir: false,
+      pdfHata: 'Chromium açılamadı',
+    });
+    assert('PDF bozukken sayfa uyarıyor', bozuk.includes('PDF üretimi çalışmıyor'));
+    assert('uyarı sebebi de yazıyor', bozuk.includes('Chromium açılamadı'));
+    const saglam = sertifikaPage({
+      eventId: 'e1',
+      baslik: 'Git Atölyesi',
+      tarih: '12 Mart 2026',
+      yoklama: [],
+      pdfHazir: true,
+    });
+    assert('PDF sağlamken uyarı çizilmiyor', !saglam.includes('PDF üretimi çalışmıyor'));
+
+    // TESLİM EDİLEMEYEN BELGE "gönderildi" İŞARETLENMEMELİ. Bu süreçte SMTP
+    // yapılandırılmamış, yani `deliverCertificates` en baştan hatayla dönüyor —
+    // ve o yolda kayda dokunulmadığı doğrulanıyor. Yanlışlıkla `mailedAt`
+    // yazılsaydı panel "gönderildi" gösterir, kimse tekrar göndermez ve belge
+    // hiç ulaşmaz; bu defterdeki "sessizce başarılı olma" sınıfı.
+    const teslim = await deliverCertificates(
+      db as never,
+      'e1',
+      'Git Atölyesi',
+      '2026-03-12T18:00:00+03:00',
+      'https://mobil.kouseng.com',
+      [{ uid: 'u1', email: 'elif@example.com' }],
+    );
+    assert('SMTP yokken teslim başarısız sayılıyor', teslim.gonderilen === 0);
+    assert(
+      'başarısız teslim mailedAt yazmıyor',
+      !(db._get('attendance/e1__u1') as { certificate: { mailedAt?: string } }).certificate
+        .mailedAt,
+    );
+
+    // Doğrulama adresi belgenin ÜSTÜNE basılıyor; biçimi değişirse basılı
+    // belgelerdeki adres bozulur ve bunu kimse fark etmez.
+    assert(
+      'doğrulama adresi /sertifika/<no> biçiminde',
+      dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90') ===
+        'https://mobil.kouseng.com/sertifika/K7M2QX90',
+      dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90'),
+    );
   }
 
   // --- Güvenlik sertleştirmesi ---------------------------------------------

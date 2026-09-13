@@ -138,6 +138,10 @@ export function qrPage(input: {
 
     <div class="card">
       <h2>Yoklama · ${yoklama.length} kişi</h2>
+      <p class="hint">
+        Sertifikalar ayrı sayfada:
+        <a href="/events/${esc(input.eventId)}/sertifika">Sertifikaları yayınla ve gönder</a>
+      </p>
       <table>
         <thead><tr><th>Ad Soyad</th><th>Öğrenci no</th><th>Nasıl</th><th>Ne zaman</th><th>Sertifika</th><th></th></tr></thead>
         <tbody>${yoklamaSatirlari}</tbody>

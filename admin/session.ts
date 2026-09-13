@@ -177,11 +177,11 @@ export const LOGIN_LOCK_MS = 15 * 60 * 1000;
  * `req.ip`, `trust proxy 1` ile proxy'nin yazdığı adres — istemcinin
  * uydurduğu başlık değil.
  *
- * Tavan ve pencere parametre: aynı mekanizmayı `/api/hesap/kod` ve
- * `/hesap-sil` başka bütçelerle kullanıyor. Kampüs NAT'ının arkasında yüzlerce
- * öğrenci tek IP'den geliyor, o yüzden oradaki sayılar buradakinden cömert —
- * dar tutulursa belirti "yurtta kimse kod alamıyor" olur ve kimse bunu NAT'a
- * bağlamaz.
+ * Tavan ve pencere parametre: aynı mekanizmayı `/api/hesap/kod`, `/hesap-sil`
+ * ve parola sıfırlamanın iki uç noktası başka bütçelerle kullanıyor. Kampüs
+ * NAT'ının arkasında yüzlerce öğrenci tek IP'den geliyor, o yüzden oradaki
+ * sayılar buradakinden cömert — dar tutulursa belirti "yurtta kimse kod
+ * alamıyor / parolasını sıfırlayamıyor" olur ve kimse bunu NAT'a bağlamaz.
  */
 export function loginLimiter(
   now: () => number = Date.now,

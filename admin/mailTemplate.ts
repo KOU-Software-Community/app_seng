@@ -1,5 +1,9 @@
 /**
- * Doğrulama kodu postasının gövdesi.
+ * Kod postalarının gövdesi — e-posta doğrulama ve parola sıfırlama.
+ *
+ * İkisi de aynı iskeleti kullanıyor (`kodMail`) çünkü aralarındaki fark yalnızca
+ * başlık ve iki cümle. Ayrı ayrı yazılsalardı biri düzeltilip öteki unutulurdu;
+ * bu defterde "aynı kararı iki yerde uygulamak" maddesi zaten var.
  *
  * Tasarım kısıtları, tercih değil: e-posta istemcileri 2000'lerin HTML'ini
  * çalıştırıyor. Flexbox, grid, `<style>` bloğunda sınıf, web fontu — hiçbiri
@@ -39,24 +43,38 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', mono
 
 export type OtpMail = { subject: string; html: string; text: string };
 
-export function otpMail(code: string, dakika: number): OtpMail {
-  const subject = `KOÜ Yazılım Kulübü doğrulama kodun: ${code}`;
+type KodMailGirdi = {
+  code: string;
+  dakika: number;
+  subject: string;
+  /** Lacivert şeritteki başlık ve onun altındaki tek cümle. */
+  baslik: string;
+  altBaslik: string;
+  /** Kod kutusunun üstündeki yönerge. */
+  yonerge: string;
+  /** "Bu isteği sen yapmadıysan…" — iki postada farklı, ve fark önemli. */
+  uyari: string;
+};
 
-  const text = [
+/** Düz metin karşılığı. Yalnızca HTML gönderen posta spam puanı alıyor. */
+function kodMetni(g: KodMailGirdi): string {
+  return [
     'KOÜ YAZILIM KULÜBÜ',
     '',
-    'Doğrulama kodun:',
-    code,
+    `${g.baslik}:`,
+    g.code,
     '',
-    `Kod ${dakika} dakika geçerli. Uygulamadaki doğrulama ekranına yaz.`,
+    `Kod ${g.dakika} dakika geçerli. ${g.yonerge}`,
     '',
-    'Bu kodu sen istemediysen hiçbir şey yapmana gerek yok — kod',
-    'kullanılmadan geçersiz olacak. Bir sorun olduğunu düşünüyorsan',
-    'info@kouseng.com adresine yazabilirsin.',
+    g.uyari,
+    '',
+    'Bir sorun olduğunu düşünüyorsan info@kouseng.com adresine yazabilirsin.',
     '',
     'Bu posta otomatik gönderildi, yanıtlanmıyor.',
   ].join('\n');
+}
 
+function kodMail(g: KodMailGirdi): OtpMail {
   const html = `<!doctype html>
 <html lang="tr">
 <head>
@@ -64,13 +82,13 @@ export function otpMail(code: string, dakika: number): OtpMail {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>${subject}</title>
+<title>${g.subject}</title>
 </head>
 <body style="margin:0; padding:0; background:${RENK.zemin}; font-family:${FONT}; -webkit-font-smoothing:antialiased;">
 
 <!-- Önizleme satırı: gelen kutusunda konunun yanında görünen metin. Gizli
      olmasının sebebi, gövdede ikinci kez tekrarlanmaması. -->
-<div style="display:none; max-height:0; overflow:hidden; opacity:0;">Kodun ${code} — ${dakika} dakika geçerli.</div>
+<div style="display:none; max-height:0; overflow:hidden; opacity:0;">Kodun ${g.code} — ${g.dakika} dakika geçerli.</div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${RENK.zemin};">
 <tr><td align="center" style="padding:32px 16px;">
@@ -86,29 +104,29 @@ export function otpMail(code: string, dakika: number): OtpMail {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
         <tr><td style="background:${RENK.lacivert}; padding:26px 32px;">
-          <div style="font-family:${FONT}; font-size:19px; font-weight:700; color:#ffffff; line-height:1.35;">E-postanı doğrula</div>
-          <div style="font-family:${FONT}; font-size:13px; color:${RENK.acikMavi}; line-height:1.5; padding-top:6px;">Etkinliklere katılabilmen için tek adım kaldı.</div>
+          <div style="font-family:${FONT}; font-size:19px; font-weight:700; color:#ffffff; line-height:1.35;">${g.baslik}</div>
+          <div style="font-family:${FONT}; font-size:13px; color:${RENK.acikMavi}; line-height:1.5; padding-top:6px;">${g.altBaslik}</div>
         </td></tr>
 
         <tr><td style="padding:30px 32px 8px 32px;">
-          <div style="font-family:${FONT}; font-size:14px; line-height:1.6; color:${RENK.govde};">Uygulamadaki doğrulama ekranına bu kodu yaz:</div>
+          <div style="font-family:${FONT}; font-size:14px; line-height:1.6; color:${RENK.govde};">${g.yonerge}</div>
         </td></tr>
 
         <tr><td style="padding:14px 32px 0 32px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr><td align="center" style="background:${RENK.acikMavi}; border-radius:12px; padding:22px 12px;">
-              <span style="font-family:${MONO}; font-size:34px; font-weight:700; letter-spacing:10px; color:${RENK.lacivert}; line-height:1;">${code}</span>
+              <span style="font-family:${MONO}; font-size:34px; font-weight:700; letter-spacing:10px; color:${RENK.lacivert}; line-height:1;">${g.code}</span>
             </td></tr>
           </table>
         </td></tr>
 
         <tr><td style="padding:16px 32px 30px 32px;">
-          <div style="font-family:${FONT}; font-size:13px; line-height:1.6; color:${RENK.soluk};">Kod <strong style="color:${RENK.metin};">${dakika} dakika</strong> geçerli. Süresi dolarsa uygulamadan yeni kod isteyebilirsin.</div>
+          <div style="font-family:${FONT}; font-size:13px; line-height:1.6; color:${RENK.soluk};">Kod <strong style="color:${RENK.metin};">${g.dakika} dakika</strong> geçerli. Süresi dolarsa uygulamadan yeni kod isteyebilirsin.</div>
         </td></tr>
 
         <tr><td style="padding:0 32px 30px 32px;">
           <div style="border-top:1px solid ${RENK.kenar}; padding-top:18px; font-family:${FONT}; font-size:12.5px; line-height:1.6; color:${RENK.soluk};">
-            Bu kodu sen istemediysen bir şey yapmana gerek yok; kod kullanılmadan geçersiz olacak. Bir sorun olduğunu düşünüyorsan <a href="mailto:info@kouseng.com" style="color:${RENK.mavi}; text-decoration:none; font-weight:600;">info@kouseng.com</a> adresine yazabilirsin.
+            ${g.uyari} Bir sorun olduğunu düşünüyorsan <a href="mailto:info@kouseng.com" style="color:${RENK.mavi}; text-decoration:none; font-weight:600;">info@kouseng.com</a> adresine yazabilirsin.
           </div>
         </td></tr>
 
@@ -127,5 +145,38 @@ export function otpMail(code: string, dakika: number): OtpMail {
 </body>
 </html>`;
 
-  return { subject, html, text };
+  return { subject: g.subject, html, text: kodMetni(g) };
+}
+
+export function otpMail(code: string, dakika: number): OtpMail {
+  return kodMail({
+    code,
+    dakika,
+    subject: `KOÜ Yazılım Kulübü doğrulama kodun: ${code}`,
+    baslik: 'E-postanı doğrula',
+    altBaslik: 'Etkinliklere katılabilmen için tek adım kaldı.',
+    yonerge: 'Uygulamadaki doğrulama ekranına bu kodu yaz.',
+    uyari: 'Bu kodu sen istemediysen bir şey yapmana gerek yok; kod kullanılmadan geçersiz olacak.',
+  });
+}
+
+/**
+ * Parola sıfırlama kodu.
+ *
+ * Uyarı cümlesi doğrulama postasındakinden **bilerek** farklı: bu posta hiç
+ * istemediği hâlde birine gidebiliyor (adresi bilen herkes isteyebilir), ve o
+ * kişinin öğrenmesi gereken tek şey parolasının değişmediği. "Kod kullanılmadan
+ * geçersiz olacak" burada yetmez — okuyan kişi hesabına bir şey olduğunu sanır.
+ */
+export function sifreMail(code: string, dakika: number): OtpMail {
+  return kodMail({
+    code,
+    dakika,
+    subject: `KOÜ Yazılım Kulübü parola sıfırlama kodun: ${code}`,
+    baslik: 'Parolanı sıfırla',
+    altBaslik: 'Yeni parolanı belirlemek için bu kodu kullan.',
+    yonerge: 'Uygulamadaki parola sıfırlama ekranına bu kodu yaz.',
+    uyari:
+      'Bu isteği sen yapmadıysan parolan değişmedi ve bir şey yapmana gerek yok; kod kullanılmadan geçersiz olacak.',
+  });
 }

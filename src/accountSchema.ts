@@ -88,7 +88,7 @@ export function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
  * Doğum tarihini gün cinsinden yaşa çevirir; okunamayan tarihte `null`.

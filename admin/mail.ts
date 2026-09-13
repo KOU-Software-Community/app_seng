@@ -111,7 +111,16 @@ export function initMail(env: MailEnv): { ok: true } | { ok: false; eksik: strin
   return { ok: true };
 }
 
-export type Mail = { to: string; subject: string; html: string; text: string };
+export type MailEki = { filename: string; content: Buffer; contentType: string };
+
+export type Mail = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  /** Sertifika PDF'i buradan gidiyor. Yoksa hiç eklenmiyor. */
+  attachments?: MailEki[];
+};
 
 /**
  * Gönderimin sonucu — panelin test formu bunu ekrana yazıyor.
@@ -143,6 +152,9 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
     // okuyucularda gövde tamamen boş görünüyor.
     text: mail.text,
     html: mail.html,
+    // Eksiz postada alan HİÇ verilmiyor: boş bir dizi nodemailer'a
+    // multipart/mixed kurdurup kod postasının şeklini değiştirirdi.
+    ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
   });
 
   return {
