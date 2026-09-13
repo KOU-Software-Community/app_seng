@@ -16,9 +16,11 @@ import {
   LOGIN_LOCK_MS,
   LOGIN_MAX_FAILURES,
   SESSION_SECONDS,
+  clientIp,
   cookieHeader,
   issueToken,
   loginLimiter,
+  revokeToken,
   sameOrigin,
   verifyToken,
 } from '../admin/session';
@@ -29,6 +31,7 @@ import {
   USER_DOC_COLLECTIONS,
   USER_QUERY_COLLECTIONS,
   processDeletion,
+  runDeletionSweep,
 } from '../admin/deletion';
 import { archiveList, eventForm } from '../admin/views';
 import {
@@ -521,8 +524,13 @@ void (async () => {
                   .filter(([, d]) => d[field] === value)
                   .map(([id, d]) => ({
                     id,
+                    data: () => d,
                     get: (k: string) => d[k],
-                    ref: { delete: async () => void c.delete(id) },
+                    ref: {
+                      delete: async () => void c.delete(id),
+                      set: async (patch: Record<string, unknown>, o?: { merge?: boolean }) =>
+                        void c.set(id, o?.merge ? { ...(c.get(id) ?? {}), ...patch } : patch),
+                    },
                   }));
                 return { docs };
               },
@@ -564,9 +572,13 @@ void (async () => {
 
   for (const name of [...USER_DOC_COLLECTIONS, ...USER_QUERY_COLLECTIONS]) {
     const kalan = silme._count(name);
-    // `registrations`ta başkasının iki kaydı kalıyor (uid'li + numarası
-    // tutmayan), `raffleEntries`te bir.
-    const beklenen = name === 'registrations' ? 2 : name === 'raffleEntries' ? 1 : 0;
+    // Sorgu koleksiyonlarının her birinde başkasına ait bir kayıt kalıyor;
+    // `registrations`ta ayrıca numarası tutmayan ikinci bir öğrencininki.
+    // Beklenti listeden TÜRETİLİYOR: elle yazılsaydı listeye eklenen her yeni
+    // koleksiyon bu iddiayı kırmızı yapardı ve düzeltme "sayıyı artır" olurdu,
+    // yani iddia listeyi korumak yerine listeye direnirdi.
+    const sorgulanan = (USER_QUERY_COLLECTIONS as readonly string[]).includes(name);
+    const beklenen = (sorgulanan ? 1 : 0) + (name === 'registrations' ? 1 : 0);
     assert(
       `silme ${name} koleksiyonuna dokunuyor`,
       kalan === beklenen,
@@ -583,6 +595,31 @@ void (async () => {
     'başka öğrencinin kaydına dokunulmuyor',
     silme._get('registrations', 'etkinlik__999999999') !== undefined,
   );
+
+  // TALEP DOKÜMANININ KENDİSİ DE GİDİYOR. İçinde uid ve e-posta var; süresiz
+  // kalması "hesabınız ve e-postanız kalıcı olarak silinir" cümlesini yanlış
+  // yapıyordu — silinen kişinin adresi, silindiğinin kaydı olarak duruyordu.
+  {
+    const t0 = Date.parse('2026-03-12T10:00:00Z');
+    const d = silmeDb();
+    d._seed('deletionRequests', 'u9', {
+      uid: 'u9',
+      email: 'silinen@example.com',
+      status: 'done',
+      completedAt: new Date(t0).toISOString(),
+      authSilindi: true,
+    });
+    // Erken silmek istemciyi sonsuza kadar bekletirdi: "bitti mi" sorusunun
+    // cevabı bu doküman.
+    await runDeletionSweep(d as never, t0 + 60_000);
+    assert('talep kaydı erken silinmiyor', d._get('deletionRequests', 'u9') !== undefined);
+    await runDeletionSweep(d as never, t0 + 40 * 60_000);
+    assert(
+      'süre dolunca talep kaydı da siliniyor',
+      d._get('deletionRequests', 'u9') === undefined,
+      'silinen kişinin e-postası veritabanında kalıyor',
+    );
+  }
 
   // ASIL MESELE: teklik kayıtlarının doküman kimliği `uid` değil, telefonun ve
   // öğrenci numarasının kendisi — yani iki listeye de giremiyorlar ve ayrıca
@@ -1265,6 +1302,38 @@ void (async () => {
     // Başlıksız istek GEÇİYOR: uygulamanın fetch'i Origin göndermiyor ve
     // çerez de taşımıyor — reddetmek CSRF'i değil, o istemcileri keserdi.
     assert('başlıksız istek geçiyor', sameOrigin(undefined, undefined, H));
+
+    // İSTEMCİ ADRESİ: `trust proxy 1` bir proxy sayıyor. Cloudflare + Coolify
+    // iki proxy demek ve o durumda `req.ip` kenar sunucusunun adresi oluyor —
+    // yani yukarıdaki bütün sayaçlar bir avuç adrese anahtarlanıyor ve
+    // "saatte 20 posta" dünyanın tamamı için 20 oluyor.
+    const baslikli = (h: Record<string, string>, ip?: string) => ({
+      ip,
+      get: (n: string) => h[n.toLowerCase()],
+    });
+    assert(
+      'Cloudflare arkasında gerçek istemci adresi okunuyor',
+      clientIp(baslikli({ 'cf-connecting-ip': '203.0.113.9' }, '172.16.0.1')) === '203.0.113.9',
+    );
+    assert(
+      'Cloudflare yokken req.ip kullanılıyor',
+      clientIp(baslikli({}, '198.51.100.4')) === '198.51.100.4',
+    );
+    // Virgüllü değer Cloudflare'in yazdığı şey değil: güvenilmiyor.
+    assert(
+      'beklenmedik biçimli başlığa güvenilmiyor',
+      clientIp(baslikli({ 'cf-connecting-ip': '1.2.3.4, 5.6.7.8' }, '198.51.100.4')) === '198.51.100.4',
+    );
+    assert('hiçbiri yoksa boş kalmıyor', clientIp(baslikli({})) === 'bilinmiyor');
+
+    // PANEL ÇIKIŞI: çerezi silmek çıkış değil — jeton 12 saat daha geçerli.
+    const gizli = Buffer.from('test-secret');
+    const jeton = issueToken(gizli, 1_000);
+    assert('jeton çıkıştan önce geçerli', verifyToken(gizli, jeton, 2_000));
+    revokeToken(jeton, 2_000);
+    assert('çıkıştan sonra jeton geçersiz', !verifyToken(gizli, jeton, 3_000));
+    const jeton2 = issueToken(gizli, 1_500);
+    assert('iptal yalnızca o jetonu kapsıyor', verifyToken(gizli, jeton2, 3_000));
   }
 
   // --- Teklik kaydı: başkasınınkini silmek ---------------------------------

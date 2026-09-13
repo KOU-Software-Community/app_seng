@@ -1485,6 +1485,53 @@ benziyor.
   indirildi; **davranışı anlatan bir yorum davranış değildir** maddesinin
   kaçıncı tekrarı olduğunu saymıyorum artık.
 
+**İkinci tur — ölmeyen ajanların göremediği yedi şey.** Oylanamayan 35
+bulgunun çoğu yukarıdakilerin kopyasıydı; kalanı elle okundu:
+
+- **`trust proxy 1` BİR proxy sayıyor, ve bu az önce eklenen bütün sayaçları
+  tehdit ediyordu.** Panelin önünde Coolify/Traefik var; alan adı Cloudflare'e
+  bağlıysa iki proxy oluyor ve Express "istemci" olarak Cloudflare **kenar
+  sunucusunun** adresini görüyor. O durumda IP başına saatte 20 posta sınırı
+  dünyanın tamamı için 20 olur — belirti yine "kod gelmiyor", ve sebebi bir
+  güvenlik önlemi. Hop sayısını elle ayarlamak da çözüm değil: yanlış bir sayı
+  sessizce yanlış cevap verir. `CF-Connecting-IP` sorunun kendi cevabı —
+  yalnızca Cloudflare arkasındayken var ve Cloudflare onu **istemciden gelen
+  değerin üzerine yazıyor**, yani uydurulamıyor. Yoksa `req.ip`. **Bir hız
+  sınırı eklemeden önce, anahtarının gerçekten kişi başına olduğunu ölçün.**
+- **Çerezi silmek çıkış değil.** `/logout` yalnızca çerezi siliyordu; jeton
+  imzalı ve 12 saat geçerli, yani kopyalanmış bir değer ya da geri düğmesi
+  oturumu açmaya devam ediyordu. Ortak bir bilgisayarda "çıkış yaptım" diyen
+  yönetici aslında yapmamış oluyordu. Sunucu hâlâ oturum saklamıyor, yalnızca
+  **iptal edilenleri** hatırlıyor — ve yeniden başlatma o listeyi siliyor, yani
+  hâlâ süresi dolmamış bir jeton geri gelebilir. Bedeli koda yazıldı.
+- **`esc()` HTML OLAY NİTELİĞİ İÇİNDE KORUMA SAĞLAMIYOR.** `onsubmit="…
+  confirm('${esc(title)}')"` güvenli görünüyor ama HTML ayrıştırıcısı niteliği
+  JS'e vermeden ÖNCE çözüyor: `&#39;` tekrar `'` oluyor ve dizeyi kapatıyor.
+  Ölçüldü — içinde tırnak geçen bir etkinlik başlığı panelde kod çalıştırıyor.
+  Kural: **kullanıcı verisi bir olay niteliğine hiç girmez.** `data-` niteliği
+  + `this.dataset` çözülmüş değeri düz metin olarak veriyor, ayrıştırılacak bir
+  şey kalmıyor.
+- **Silme listesi `attendance`ı kaçırıyordu**, ve unutulması sertifikayı da
+  kapsıyordu: yoklama satırı `uid` taşıyor ve üstünde belgenin **dondurulmuş
+  adı** duruyor. Liste QR turunda yazıldı, koleksiyon o turdan sonra doğdu.
+  Yeni bir koleksiyon eklerken bu listeye bakılmıyor — çünkü bakılması gereken
+  yer orası olduğu akla gelmiyor.
+- **Silme talebinin kendisi süresiz kalıyordu**, içinde uid ve e-posta ile. Yani
+  "kalıcı olarak silinir" cümlesi, silinen kişinin adresi *silindiğinin kaydı
+  olarak* dururken yazılıyordu. Auth silindikten sonra ikinci bir pencere
+  bekleniyor (istemci "bitti mi" diye o dokümanı okuyor), sonra doküman da
+  gidiyor.
+- **Silme sayfası tutamayacağı bir söz veriyordu:** "Bildirim kaydınız".
+  `devices` dokümanının kimliği push jetonu, kullanıcı değil, ve kural
+  `delete`'i tamamen kapatıyor — koleksiyon kimliksiz yazıldığı için silmeye
+  izin vermek herkesin herkesin bildirimini kapatabilmesi demek. Mekanizma
+  değil **söz** düzeltildi, ve neden verilmediği sayfada yazıyor.
+- **`kykapp://giris?next=…` açık yönlendirmeydi.** Derin bağlantı dışarıdan
+  geliyor; giriş sonrası varılan yeri saldırgan seçebiliyordu ve kimlik avı
+  için "kulübün uygulamasında giriş yaptım, sonra bu sayfaya geldim" en ikna
+  edici anlatı. `safeNext` ayrı bir modülde ve testli: `//evil.example` tek
+  eğik çizgi kontrolünden geçtiği için ayrıca eleniyor.
+
 **Taramanın kendi maliyeti ölçüldü:** 177 ajan, 75'i tamamlandı, **102'si
 oturum kotasına takılıp öldü** (`You've hit your session limit`). Yani çürütme
 turu YARIM: 22 bulgunun 18'i üç oyla doğrulandı, geri kalanı hiç oylanamadı.

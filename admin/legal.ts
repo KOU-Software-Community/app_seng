@@ -122,9 +122,16 @@ export function deleteAccountPage(opts: { error?: string; done?: boolean } = {})
      <ul>
        <li>Hesabınız ve giriş bilgileriniz</li>
        <li>Ad soyad, e-posta, doğum tarihi, telefon numarası</li>
-       <li>Etkinlik kayıtlarınız ve çekiliş katılımlarınız</li>
-       <li>Bildirim kaydınız</li>
+       <li>Etkinlik kayıtlarınız, yoklamalarınız ve katılım belgeleriniz</li>
+       <li>Çekiliş katılımlarınız</li>
      </ul>
+     <p class="hint">
+       Bildirim kaydı listede <strong>yok</strong>, ve bu bir eksik değil: o
+       kayıt telefonun bildirim jetonuna bağlı, hesabınıza değil — kimliğinizi
+       taşımıyor ve kim olduğunuzu söylemiyor. Uygulamayı silmek ya da
+       bildirimleri kapatmak onu bırakıyor. Tutmadığımız bir sözü buraya
+       yazmamak için ayrıca belirtiliyor.
+     </p>
 
      ${opts.error ? `<div class="banner">${esc(opts.error)}</div>` : ''}
 
