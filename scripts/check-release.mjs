@@ -747,6 +747,28 @@ check(
 );
 
 check(
+  'qs güvenli sürümde sabitli',
+  'Panel her form POST’unda qs.parse çalıştırıyor: express 5 `req.query` için ' +
+    'qs kullanmıyor ama body-parser `extended: false` iken bile qs’e gidiyor ' +
+    '(ölçüldü: body-parser/lib/types/urlencoded.js). 6.16.0 öncesi iki DoS ' +
+    'danışmasını taşıyor ve express `^6.14.0` istediği için npm kendiliğinden ' +
+    '6.15.x kuruyor. Düzeltme bir `overrides` satırı, ve o satır silindiğinde ' +
+    'hiçbir şey hata vermiyor — npm sessizce eski sürüme dönüyor.',
+  () => {
+    const istenen = pkg.overrides?.qs;
+    if (!istenen) {
+      return 'package.json içinde `overrides.qs` yok — qs eski sürüme döner';
+    }
+    const kurulu = json('node_modules/qs/package.json').version;
+    const [ana, orta] = kurulu.split('.').map(Number);
+    if (ana < 6 || (ana === 6 && orta < 16)) {
+      return `kurulu qs ${kurulu}; 6.16.0 ve üstü gerekiyor — \`npm ci\` çalıştırın`;
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

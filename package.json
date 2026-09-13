@@ -84,5 +84,14 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:all": "npm run typecheck && npm run check:release && npm run check:schema && npm run check:html && npm run check:raffle && npm run check:panel && npm run check:gundem && npm test"
   },
-  "private": true
+  "private": true,
+  "allowScripts": {
+    "@firebase/util": true,
+    "esbuild": true,
+    "fsevents": true,
+    "protobufjs": true
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  }
 }
