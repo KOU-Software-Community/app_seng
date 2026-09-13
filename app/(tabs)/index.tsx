@@ -67,6 +67,25 @@ export default function HomeRoute() {
             </Txt>
           </View>
 
+          {/*
+            QR yoklaması ana sayfadan da açılıyor.
+
+            Tek giriş etkinlik ekranıydı: öğrenci salonda telefonu açıyor,
+            önce doğru etkinliği bulması, sonra oradaki düğmeyi görmesi
+            gerekiyordu. Sekme çubuğuna altıncı bir sekme koymak yerine
+            buraya kondu — yoklama günde bir kez yapılan bir eylem, kalıcı bir
+            sekme değil. Etkinlik ekranındaki düğme DURUYOR: oradan gelen
+            okutma `eventId` taşıyor ve yanlış etkinliğin kodunu reddediyor.
+          */}
+          <Pressable
+            onPress={() => router.push('/qr')}
+            accessibilityRole="button"
+            accessibilityLabel="QR ile yoklama"
+            style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <PixelIcon name="qr" size={16} color={colors.onNavy} />
+          </Pressable>
+
           <Pressable
             onPress={() => router.push('/bildirim-ayarlari')}
             accessibilityRole="button"
@@ -264,7 +283,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   bell: {
     width: 38,

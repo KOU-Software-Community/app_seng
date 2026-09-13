@@ -1612,3 +1612,89 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   sonra **yeni** bir paketin install script'i eklemesinin görünür olması.
   **Bir aracın davranışını belgeden tahmin etmek yerine aracı indirip okumak,
   burada bir komut tarifi kadar ucuzdu.**
+
+### QR erişimi, kayıt şartı ve bir kullanıcı turunun getirdikleri
+
+- **PDF üretimi ölçüldü ve tavan sanılan yerde değil.** Açılıştaki `4251 ms`
+  bir SOĞUK tek belge: Chromium açılışı + ilk sayfa. Toplu çağrıda (tarayıcı
+  bir kez açılıyor, `sertifikaPdf` zaten toplu alıyor) marjinal maliyet
+  ölçüldü: 1 belge 1556 ms, 10 belge 2828 ms, 25 belge 6618 ms — yani açılış
+  ~1,3 sn sabit, belge başına **~210 ms**. 250 katılımcı ≈ **55 saniye**,
+  tek seferde, tek parti. Darboğaz PDF değil: her belge bir e-posta ve SMTP
+  el sıkışması ondan uzun. **Açılış maliyetini belge başına maliyet sanmak,
+  sistemi 20 kat yavaş göstermek demekti** — toplu işte o sayı bir kez
+  ödeniyor.
+- **QR yoklaması ana sayfaya da kondu, sekme çubuğuna DEĞİL.** Tek giriş
+  etkinlik ekranıydı: öğrenci salonda önce doğru etkinliği bulmak zorundaydı.
+  Altıncı bir sekme ise günde bir kez yapılan bir eyleme kalıcı yer ayırmak
+  olurdu — beş sekme zaten dar. Etkinlik ekranındaki düğme duruyor ve farkı
+  gerçek: oradan gelen okutma `eventId` taşıyor, yani yanlış etkinliğin kodu
+  reddediliyor; ana sayfadan gelen taşımıyor, çünkü hangi etkinlik olduğunu
+  kod söylüyor.
+- **Sertifikanın iki şartı var ve ikisi iki AYRI yerde zorlanıyor.** Yoklama
+  "salondaydı" diyor, kayıt "gelmeyi taahhüt etmişti" diyor; belge ikisini
+  birden iddia ediyor. Kapı uygulamada (`src/scanGate.ts`) öğrenciyi
+  **salondayken** uyarıyor — düzeltmesi elinde, aynı ekrandan kaydolup
+  dönüyor. Zorlayan taraf panel (`publishCertificates`), çünkü belgeyi üreten
+  tek yer orası. **Firestore kuralına konmadı ve bu bir eksiklik değil,
+  kayıt:** mağazadaki hesapsız sürümle yazılmış `registrations` dokümanlarında
+  `uid` alanı yok, yani kural o kaydı yazan kişiye bağlayamıyor — şartı bugün
+  kurala koymak, o kullanıcıları kapıda bırakırdı. `uid` zorunlu olduğu gün
+  kurala da eklenecek.
+- **Yalnızca yoklamaya bakan bir belge, kaydolmadan gelene "kayıtlı
+  katılımcı" demek olurdu.** Ve reddin NEREDE olduğu bir ürün kararı: kapıda
+  reddetmek öğrenciye çözümü olan bir ekran veriyor; sertifika aşamasında
+  reddetmek, haftalar sonra gelmeyen bir belge ve sebebini kimsenin
+  söyleyemediği bir şikâyet üretiyor.
+- **Bir ekran yığında kalıyorsa açılış efekti bir daha koşmuyor.** QR ekranı
+  "önce kaydol" derken kullanıcı kayıt ekranına gidiyor; geri döndüğünde bu
+  ekran YENİDEN MOUNT OLMUYOR, `denendi` bayrağı hâlâ true, bekleyen jetonu
+  gönderen efekt bir daha çalışmıyor — ve ekranda hâlâ "kaydın yok" kartı
+  duruyor. Yani karttaki "döndüğünde otomatik gönderilecek" cümlesi, o efekt
+  olmadan **tutulmayan bir söz**. Tetikleyici mount değil, kaydın kendisi:
+  `registrationFor` mağazadan geliyor ve kayıt yazıldığı an bileşen yeniden
+  çiziliyor.
+- **Taze okutma ile bekleyen okutma AYNI kapıdan geçmek zorunda.** Ayrı
+  geçselerdi kayıt şartı yalnızca taze okutmada uygulanırdı: kaydı olmayan
+  biri "önce kaydol" görür, kaydolmadan geri gelir, ve diskteki jeton kapıyı
+  atlayıp gönderilirdi. İkisi de `isle()`'den geçiyor.
+- **Kapıdaki sıra da bir iddia:** yanlış etkinlik, kayıt eksikliğinden ÖNCE
+  geliyor. Ters olsaydı, başka bir etkinliğin kodunu okutan kişiye "önce
+  kaydol" denir ve kaydolacağı etkinlik elindeki kodun etkinliği olurdu —
+  yanlış okutma, yanlış etkinliğe kayıtla sonuçlanırdı. Sırayı değiştirince
+  `scanGate.test.ts`'in yalnızca o testi kırmızı veriyor.
+- **Hesap sekmesindeki "Kayıtlarım" ve "Sertifikalarım" oturuma bağlandı.**
+  Kullanıcı bildirdi: giriş yapmamış birine "Sertifikalarım" göstermek,
+  dokununca boş çıkan bir kapı. Eskiden doğruydu — kayıt cihazda duruyordu ve
+  hesapsız kullanıcının da kaydı olabiliyordu; kayıt artık hesap istiyor
+  (`app/kayit/[id].tsx` giriş + doğrulanmış e-posta kapısı) ve sertifika
+  yoklamadan, yoklama da oturumdan geliyor. **Apple 5.1.1(v) ile
+  çelişmiyor:** o kural hesap tabanlı OLMAYAN içeriği duvarın arkasına
+  koymayı yasaklıyor. Bildirim ayarları (cihaza ait) ve yasal metinler
+  oturumsuz da duruyor, ve `check:release` bunların koşulun DIŞINDA kaldığını
+  ayrıca doğruluyor.
+- **BİR KONTROLÜN KENDİ GEREKÇESİNİ BULMASI YEDİNCİ KEZ.** Geri düğmesi
+  guard'ı önce `router.back()` arıyordu; `app/gundem/[id].tsx` hata durumunda
+  zaten "Geri dön" diye bir `PrimaryButton` taşıyor, dolayısıyla şeritteki
+  düğme silindiğinde kontrol yeşil kaldı — ölçüldü. Artık `label="‹"` arıyor:
+  ad değil, görünen davranışın izi.
+- **Geri düğmesinin eksikliği bir hata üretmiyor, sıkışmış bir kullanıcı
+  üretiyor** — ve o kimse tarafından raporlanmıyor. AI Gündem makalesinde
+  kapanacak bir şey yoktu; onu da kullanıcı söyledi. Guard artık `<GradientHeader`
+  taşıyan her yığın ekranını tarıyor, yani bir sonraki ekran unutulduğunda
+  kırmızı veriyor.
+- **`qr` glifi `grid` ile aynı olmaya bir piksel uzaktaydı.** İkisi de üç
+  köşede 3×3 kare taşıyor; farkı dördüncü köşenin kırık olması ve ortadaki iki
+  veri pikseli yapıyor. Ana sayfada `grid` (Arşiv) ile `qr` (yoklama) aynı
+  ekranda duruyor: ayrışmadıkları gün kullanıcı yanlış düğmeye basar ve bunu
+  kimse bir hata olarak bildirmez. Yine basılarak seçildi.
+- **Parolalar bu depoda hiçbir yerde saklanmıyor ve saklanamaz.** Firebase
+  Authentication parolayı kendi tarafında özetleyerek (scrypt türevi)
+  tutuyor; Admin SDK parolayı okuyamıyor — bu defterde zaten yazılı, web
+  silme sayfasının Identity Toolkit'ten geçmesinin sebebi bu. Panelin parolaya
+  dokunduğu iki yer var ve ikisi de geçiş: `webAuth.ts` doğrulamak için
+  Identity Toolkit'e yolluyor, `accountApi.ts` sıfırlamada
+  `updateUser(uid, { password })` çağırıyor. Hiçbiri diske yazmıyor, hiçbiri
+  loglamıyor — `/api/hesap/kod` log satırının "kod YAZILMIYOR" notu aynı
+  kuralın bir başka hâli. Kendi ürettiğimiz altı haneli kodlar da düz
+  saklanmıyor: `hashCode` SHA-256 ve tuzu kaydın doküman kimliği.

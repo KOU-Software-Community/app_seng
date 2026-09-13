@@ -1160,6 +1160,14 @@ void (async () => {
               store.set(`${n}/${id}`, { ...eski, ...data });
             },
           }),
+          where: (alan: string, _op: string, deger: unknown) => ({
+            async get() {
+              const docs = [...store.entries()]
+                .filter(([yol, d]) => yol.startsWith(`${n}/`) && d[alan] === deger)
+                .map(([, d]) => ({ get: (k: string) => d[k] }));
+              return { docs, empty: docs.length === 0 };
+            },
+          }),
         }),
         _get: (yol: string) => store.get(yol),
         _set: (yol: string, d: Record<string, unknown>) => store.set(yol, d),
@@ -1171,6 +1179,12 @@ void (async () => {
     const db = sertDb();
     db._set('attendance/e1__u1', { eventId: 'e1', uid: 'u1' });
     db._set('attendance/e1__u2', { eventId: 'e1', uid: 'u2' });
+    // Yoklaması olan ama KAYDI olmayan: kodu okutmuş, kaydolmamış.
+    db._set('attendance/e1__u5', { eventId: 'e1', uid: 'u5' });
+    db._set('registrations/e1__101', { eventId: 'e1', uid: 'u1', studentNo: '101' });
+    db._set('registrations/e1__102', { eventId: 'e1', uid: 'u2', studentNo: '102' });
+    // Başka etkinliğin kaydı bu etkinliğe geçerli olmamalı.
+    db._set('registrations/e2__105', { eventId: 'e2', uid: 'u5', studentNo: '105' });
 
     const ilk = await publishCertificates(
       db as never,
@@ -1181,6 +1195,8 @@ void (async () => {
         // Yoklaması olmayana belge çıkmamalı: doğrulama sayfası neye bakacak?
         { uid: 'u3', adSoyad: 'Hayalet Kişi' },
         { uid: 'u4', adSoyad: 'X' },
+        // Yoklaması VAR, kaydı yok.
+        { uid: 'u5', adSoyad: 'Kayıtsız Katılımcı' },
       ],
       NOW,
     );
@@ -1190,6 +1206,19 @@ void (async () => {
       ilk.atlanan.some((a) => a.uid === 'u3' && a.sebep === 'yoklama kaydı yok'),
     );
     assert('çok kısa ad reddediliyor', ilk.atlanan.some((a) => a.uid === 'u4'));
+    /*
+      Sertifikanın iki şartı var ve bu ikincisi.
+
+      Yalnızca yoklamaya bakmak, kaydolmadan gelip kodu okutan birine
+      "kayıtlı katılımcı" belgesi vermek olurdu. Başka bir etkinliğin kaydı da
+      geçmiyor: `u5`'in `e2` kaydı var ve `e1` için sayılmıyor — sorgu
+      `eventId` ile filtrelenmezse bu iddia kırmızı veriyor.
+    */
+    assert(
+      'kaydı olmayana belge çıkmıyor',
+      ilk.atlanan.some((a) => a.uid === 'u5' && a.sebep === 'etkinliğe kayıt bulunamadı'),
+      JSON.stringify(ilk.atlanan),
+    );
 
     const kayit = (db._get('attendance/e1__u1') as { certificate: Record<string, string> })
       .certificate;

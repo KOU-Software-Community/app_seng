@@ -776,6 +776,117 @@ check(
       // kural tarafından reddedilir ve kullanıcı sebebini anlamaz.
       return 'yoklama yazmadan önce mevcut kaydı okumuyor';
     }
+
+    // Ana sayfadaki giriş. Etkinlik ekranı tek kapıyken öğrenci salonda önce
+    // doğru etkinliği bulmak zorundaydı; bu satır düşerse belirti yine
+    // "okutamıyorum" olur, hata değil.
+    const ana = strip(read('app/(tabs)/index.tsx'));
+    if (!/push\(['"`]\/qr['"`]\)/.test(ana)) {
+      return 'ana sayfa QR yoklamaya bağlanmıyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'yoklama kayıt şartından geçiyor',
+  'Sertifika iki şeyi birden iddia ediyor: kişi kaydolmuştu ve salondaydı. ' +
+    'Yalnızca yoklamaya bakmak, kaydolmadan gelip kodu okutana kayıtlıymış gibi ' +
+    'bir belge vermek olurdu. İki tarafta iki ayrı iş yapıyorlar ve ikisi de ' +
+    'gerekli: uygulama öğrenciyi SALONDAYKEN uyarıyor (düzeltmesi elinde), panel ' +
+    'ise belgeyi üreten tek yer olduğu için şartı zorlayan taraf.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+
+    const qr = strip(read('app/qr.tsx'));
+    if (!/taramaKarari\(/.test(qr)) return 'app/qr.tsx kayıt kapısından geçmiyor';
+    // Kapının kararı kayıt ekranına GİDEBİLMELİ: sadece "kaydın yok" demek,
+    // öğrenciyi salonda çözümü olmayan bir ekranla baş başa bırakır.
+    if (!/['"`]\/kayit\/\$\{/.test(qr)) {
+      return 'kayıt kapısı kayıt ekranına yönlendirmiyor';
+    }
+
+    const sert = strip(read('admin/certificates.ts'));
+    if (!/collection\('registrations'\)\s*\.where\('eventId', '==', eventId\)/.test(sert)) {
+      return 'publishCertificates etkinliğin kayıtlarını okumuyor';
+    }
+    if (!/kayitliUidler\.has\(g\.uid\)/.test(sert)) {
+      return 'publishCertificates kayıt şartını uygulamıyor';
+    }
+    return null;
+  },
+);
+
+check(
+  'yığın ekranlarında geri düğmesi var',
+  'Sekme çubuğu olmayan bir ekranda geri çıkmanın tek yolu telefonun kendi ' +
+    'hareketi kalıyor ve iOS\u2019ta o hareket her ekranda çalışmıyor. Kullanıcı ' +
+    'bunu bildirdi: AI Gündem makalesinde kapanacak bir şey yoktu. Eksikliğin ' +
+    'belirtisi bir hata değil, sıkışmış bir kullanıcı — yani kimse raporlamıyor.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const eksik = [];
+    const walk = (d) => {
+      for (const e of readdirSync(join(root, d), { withFileTypes: true })) {
+        const rel = `${d}/${e.name}`;
+        // Sekmeler yığın değil: onlarda geri düğmesi nereye gideceği belli
+        // olmayan bir düğme olurdu.
+        if (e.isDirectory()) {
+          if (e.name !== '(tabs)') walk(rel);
+          continue;
+        }
+        if (!/\.tsx$/.test(e.name) || e.name === '_layout.tsx') continue;
+        const src = strip(readFileSync(join(root, rel), 'utf8'));
+        // Ölçüt GradientHeader: başlık şeridi olan her yığın ekranı bir sayfa.
+        // Şeridi olmayanlar (açılış, onboarding, kayıt başarılı) kendi tam
+        // ekran akışları ve geri değil ileri düğmeleri taşıyor.
+        if (!/<GradientHeader/.test(src)) continue;
+        /*
+          Aranan şey `router.back()` DEĞİL, görünen düğmenin kendisi.
+
+          İlk hâli `router.back()` arıyordu ve gevşekti: `app/gundem/[id].tsx`
+          hata durumunda zaten "Geri dön" diye bir `PrimaryButton` taşıyor,
+          yani şeritteki düğme silinse bile kontrol yeşil kalıyordu — ölçüldü.
+          Bu deponun defterinde aynı sınıf yedi kez yazılı: ad değil,
+          davranışın izi.
+        */
+        if (!/label="‹"/.test(src)) eksik.push(rel);
+      }
+    };
+    walk('app');
+    if (eksik.length) return `geri düğmesi olmayan ekranlar: ${eksik.join(', ')}`;
+    return null;
+  },
+);
+
+check(
+  'hesap sekmesi kayıt ve belgeleri oturuma bağlıyor',
+  'Oturumu olmayan kullanıcıya "Sertifikalarım" göstermek, dokununca boş çıkan ' +
+    'bir kapı: kayıt artık hesap istiyor, sertifika yoklamadan geliyor, yoklama da ' +
+    'oturumdan. Kullanıcı bunu bildirdi. Apple 5.1.1(v) ile çelişmiyor — o kural ' +
+    'hesap tabanlı OLMAYAN içeriği duvarın arkasına koymayı yasaklıyor; bildirim ' +
+    'ayarları ve yasal metinler oturumsuz da duruyor.',
+  () => {
+    const hesap = read('app/(tabs)/hesap.tsx');
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const temiz = strip(hesap);
+    // Aranan şey koşulun KENDİSİ: bölüm başlıkları dosyada her hâlükârda
+    // geçiyor, dolayısıyla onları aramak koşul silindiğinde de yeşil kalırdı.
+    if (!/\{user \? \(/.test(temiz)) {
+      return 'hesap sekmesi kayıt/belge bölümlerini oturuma bağlamıyor';
+    }
+    const kosul = temiz.indexOf('{user ? (');
+    const kayitlar = temiz.indexOf('KAYITLARIM');
+    const belgeler = temiz.indexOf('Sertifikalarım');
+    const ayarlar = temiz.indexOf('AYARLAR');
+    if (!(kosul < kayitlar && kayitlar < belgeler && belgeler < ayarlar)) {
+      return 'KAYITLARIM/Sertifikalarım koşulun içinde değil';
+    }
+    // Bildirim ayarları koşulun DIŞINDA kalmalı: cihaza ait bir tercih ve
+    // oturumsuz kullanıcının da ona erişmesi gerekiyor.
+    if (temiz.indexOf('bildirim-ayarlari') < ayarlar) {
+      return 'bildirim ayarları oturum koşulunun içine düşmüş';
+    }
     return null;
   },
 );

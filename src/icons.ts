@@ -12,6 +12,14 @@ export const ICON = {
   pin: 'M3 0h2v1h-2z M2 1h4v3h-4z M3 4h2v2h-2z M3 6h2v2h-2z',
   home: 'M3 0h2v1h-2z M1 1h6v1h-6z M0 2h8v1h-8z M1 3h6v5h-6z',
   grid: 'M0 0h3v3h-3z M5 0h3v3h-3z M0 5h3v3h-3z M5 5h3v3h-3z',
+  /*
+    QR — üç köşede bulucu kare, ortada dağınık veri, sağ altta KARE YOK.
+    Sağ alt köşenin dolu olmaması tesadüf değil: dolu olsaydı bu glif
+    `grid` ile birebir aynı olurdu ve ana sayfada ikisi yan yana duruyor.
+    Basılarak seçildi (defterdeki "sekiz piksellik bir glif yolu okunarak
+    değerlendirilemez" maddesi); ızgarası `icons.test.ts`'te.
+  */
+  qr: 'M0 0h3v3h-3z M5 0h3v3h-3z M0 5h3v3h-3z M5 5h2v2h-2z M7 7h1v1h-1z M4 3h1v1h-1z M3 4h1v1h-1z',
   bell: 'M3 0h2v1h-2z M2 1h4v4h-4z M1 5h6v1h-6z M3 6h2v1h-2z',
   chat: 'M0 0h8v5h-8z M1 5h2v2h-2z',
   lines: 'M0 0h8v2h-8z M0 3h6v2h-6z M0 6h4v2h-4z',
