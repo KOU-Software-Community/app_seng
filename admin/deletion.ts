@@ -42,6 +42,21 @@ const AUTH_GRACE_MS = 10 * 60_000;
 export const USER_DOC_COLLECTIONS = ['users', 'emailOtp'] as const;
 export const USER_QUERY_COLLECTIONS = ['registrations', 'raffleEntries'] as const;
 
+/**
+ * `uid` TAŞIMAYAN kayıtlar da silinmek zorunda, ve onlar yalnızca öğrenci
+ * numarasından bulunabiliyor.
+ *
+ * Mağazada hesapsız bir sürüm var ve o sürümün yazdığı `registrations`
+ * dokümanında `uid` alanı yok — `where('uid','==',uid)` onları hiç görmüyor.
+ * Yani hesabını silen bir kullanıcının adı, numarası, bölümü ve telefonu
+ * veritabanında kalıyordu, üstelik sayfa "bütün verileriniz silinir" diyerek.
+ * Bunu kimse bir hata olarak bildirmez: silinen bir şeyin geride kaldığını
+ * ancak veritabanına bakan biri görür.
+ *
+ * Numara `users/{uid}` okunduğu anda zaten elde; ayrıca bir yerden gelmiyor.
+ */
+const STUDENT_NO_COLLECTIONS = ['registrations'] as const;
+
 export type DeletionOutcome = { uid: string; silinen: number };
 
 /**
@@ -70,9 +85,14 @@ export async function processDeletion(
   // atlanırsa silinen hesabın numarası sonsuza kadar kilitli kalır ve aynı
   // kişi bir daha kayıt olamaz.
   const profil = (await db.collection('users').doc(uid).get()).data() ?? {};
-  await releaseIdentity(db, {
+  const ogrenciNo = typeof profil.ogrenciNo === 'string' ? profil.ogrenciNo : undefined;
+  // `uid` ARTIK VERİLİYOR ve silme ona bağlı: bu değerler istemcinin yazdığı
+  // profilden geliyor, dolayısıyla koşulsuz silen bir serbest bırakma,
+  // profiline kurbanın numarasını yazan birine BAŞKASININ teklik kaydını
+  // sildirirdi (bkz. `admin/claims.ts`).
+  await releaseIdentity(db, uid, {
     telefon: typeof profil.telefon === 'string' ? profil.telefon : undefined,
-    ogrenciNo: typeof profil.ogrenciNo === 'string' ? profil.ogrenciNo : undefined,
+    ogrenciNo,
   });
 
   for (const name of USER_DOC_COLLECTIONS) {
@@ -85,6 +105,21 @@ export async function processDeletion(
     for (const d of snap.docs) {
       await d.ref.delete();
       silinen += 1;
+    }
+  }
+
+  // Hesapsız sürümün yazdığı kayıtlarda `uid` alanı hiç yok; yukarıdaki sorgu
+  // onları görmüyor. Numara ile ikinci bir tur atılıyor — `d.ref.delete()`
+  // zaten silinmiş bir dokümanda da sorun çıkarmıyor, ama sayaç şişmesin diye
+  // `uid` taşıyanlar atlanıyor.
+  if (ogrenciNo) {
+    for (const name of STUDENT_NO_COLLECTIONS) {
+      const snap = await db.collection(name).where('studentNo', '==', ogrenciNo).get();
+      for (const d of snap.docs) {
+        if (d.get('uid')) continue;
+        await d.ref.delete();
+        silinen += 1;
+      }
     }
   }
 

@@ -71,6 +71,42 @@ export function verifyToken(secret: Buffer, token: string | null, now = Date.now
   return Number.isFinite(age) && age >= 0 && age < SESSION_SECONDS * 1000;
 }
 
+/**
+ * Bu POST isteği panelin kendi sayfasından mı geliyor?
+ *
+ * **`SameSite=Strict` tek başına yetmiyor, ve sebebi alan adı.** SameSite
+ * "site" diyor, "origin" demiyor: site eTLD+1, yani `kouseng.com`. Kulübün
+ * kendi sitesindeki bir XSS ya da ele geçmiş bir alt alan adı, panele
+ * çerezi TAŞIYAN bir POST yollayabiliyor — panel etkinlik siliyor, kayıt
+ * dışa aktarıyor, sertifika iptal ediyor.
+ *
+ * `Origin` başlığını **tarayıcı** yazıyor ve sayfa JavaScript'i onu
+ * değiştiremiyor; siteler arası bir formun POST'u kendi kaynağını taşıyor.
+ * Bu yüzden gizli bir jeton ve onu her forma eklemek gerekmiyor: karşılaştırma
+ * tek satır ve her form bedava korunuyor.
+ *
+ * `Origin` yoksa `Referer`e düşülüyor (eski tarayıcılar ve bazı proxy'ler onu
+ * kırpıyor); ikisi de yoksa **kabul ediliyor**. Reddetmek daha güvenli
+ * görünüyor ama değil: uygulamanın `fetch`i hiç `Origin` göndermiyor, ve
+ * "hiç başlık yok" durumunu reddetmek CSRF'i değil, başlık göndermeyen
+ * istemcileri kesiyor. Buradaki koruma çerezli tarayıcı isteklerine ait ve
+ * onların hepsi `Origin` taşıyor.
+ */
+export function sameOrigin(
+  origin: string | undefined,
+  referer: string | undefined,
+  host: string | undefined,
+): boolean {
+  if (!host) return true;
+  const kaynak = origin || referer;
+  if (!kaynak) return true;
+  // `https://mobil.kouseng.com/yol` → `mobil.kouseng.com`. Elle ayrıştırılıyor
+  // çünkü `URL` bozuk girdide fırlatıyor ve bir başlık her zaman bozuk olabilir.
+  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]+)/i.exec(kaynak.trim());
+  if (!m) return false;
+  return m[1].toLowerCase() === host.toLowerCase();
+}
+
 export const LOGIN_MAX_FAILURES = 10;
 export const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
@@ -82,8 +118,18 @@ export const LOGIN_LOCK_MS = 15 * 60 * 1000;
  * var. Pencere kayan: son hatadan itibaren 15 dakika içinde 10 hata kilitler.
  * `req.ip`, `trust proxy 1` ile proxy'nin yazdığı adres — istemcinin
  * uydurduğu başlık değil.
+ *
+ * Tavan ve pencere parametre: aynı mekanizmayı `/api/hesap/kod` ve
+ * `/hesap-sil` başka bütçelerle kullanıyor. Kampüs NAT'ının arkasında yüzlerce
+ * öğrenci tek IP'den geliyor, o yüzden oradaki sayılar buradakinden cömert —
+ * dar tutulursa belirti "yurtta kimse kod alamıyor" olur ve kimse bunu NAT'a
+ * bağlamaz.
  */
-export function loginLimiter(now: () => number = Date.now) {
+export function loginLimiter(
+  now: () => number = Date.now,
+  maxFailures: number = LOGIN_MAX_FAILURES,
+  lockMs: number = LOGIN_LOCK_MS,
+) {
   // ponytail: süreç içi Map, tek örnek; birden çok panel örneği olursa paylaşımlı depo.
   const failures = new Map<string, { count: number; until: number }>();
   return {
@@ -96,7 +142,7 @@ export function loginLimiter(now: () => number = Date.now) {
         failures.delete(ip);
         return 0;
       }
-      return f.count >= LOGIN_MAX_FAILURES ? left : 0;
+      return f.count >= maxFailures ? left : 0;
     },
     fail(ip: string): void {
       const t = now();
@@ -107,7 +153,7 @@ export function loginLimiter(now: () => number = Date.now) {
       }
       const f = failures.get(ip);
       const count = f && f.until > t ? f.count + 1 : 1;
-      failures.set(ip, { count, until: t + LOGIN_LOCK_MS });
+      failures.set(ip, { count, until: t + lockMs });
     },
     succeed(ip: string): void {
       failures.delete(ip);

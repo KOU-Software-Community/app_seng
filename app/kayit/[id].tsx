@@ -73,8 +73,17 @@ export default function RegistrationRoute() {
     );
   }
 
-  // Doğrulanmamış e-posta kuralda da reddediliyor; kullanıcıya sebebini
-  // burada söylemek, Firestore'dan dönen izin hatasını göstermekten iyi.
+  // KAPI YALNIZCA BURADA, kuralda değil — ve bu yorum bir kez tersini yazdı.
+  // `registrations` create dalında `email_verified` diye bir koşul yok;
+  // olamaz da, çünkü `uid` bugün isteğe bağlı (mağazada hesapsız bir sürüm
+  // var) ve doğrulama koşulu ancak kimliğe bağlanabilir. Yani bu ekran bir
+  // kolaylık değil, tek zorlayıcı. Doğrudan Firestore'a yazan biri kuralı
+  // geçer; ona karşı savunma kayıt akışında değil, `uid` zorunlu hâle
+  // geldiğinde kurala eklenecek `request.auth.token.email_verified == true`
+  // satırında olacak.
+  //
+  // Bu defterde "davranışı anlatan bir belge, davranış değildir" maddesi zaten
+  // var — bu, yorum hâli.
   if (user && !emailVerified) {
     return (
       <AuthGate

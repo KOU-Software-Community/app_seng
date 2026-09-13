@@ -50,8 +50,23 @@ service cloud.firestore {
       // İzin verilen tek fark `createdAt` — o da sunucu saati olduğu için her
       // yazmada değişiyor. İsim, numara, kod: hiçbiri değiştirilemiyor. Yani
       // başka bir cihazdan gelen *farklı* bir kayıt bu dala düşemiyor.
+      //
+      // KALAN VARLIK ORAKÜLÜ: dal kimlik istemediği için "bu öğrenci bu
+      // etkinliğe kayıtlı mı" sorusu dışarıdan sorulabiliyor — var olmayan
+      // dokümanda update reddediliyor, var olanda geçiyor. `uid` taşıyan
+      // kayıtlarda kapandı; taşımayanlar mağazadaki hesapsız sürümün yazdığı
+      // satırlar ve o sürüm emekli olunca kendiliğinden kapanacak. `uid`'i
+      // BUGÜN zorunlu kılmak, kural yayınlandığı saniyede o sürümü kullanan
+      // herkesin yeniden gönderimini reddeder.
       allow update: if
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt'])
+        && (
+          !('uid' in resource.data.keys())
+          || (request.auth != null && resource.data.uid == request.auth.uid)
+        )
+        // `createdAt` sunucu saati olmak zorunda: istemcinin seçtiği bir damga
+        // kaydı ileri tarihe atıp sıralamayı bozabilirdi.
+        && request.resource.data.createdAt == request.time;
 
       allow create: if
         // Beklenen alanlar dışında bir şey yazılamasın.
@@ -167,6 +182,13 @@ service cloud.firestore {
         )
         // Başka bir cihazın kaydının üzerine yazılamasın.
         && request.resource.data.token == token
+        // JETON BİÇİMİ: koleksiyon kimliksiz yazmaya açık (cihaz kaydı
+        // girişten önce oluyor), yani biçim denetimi olmadan buraya sınırsız
+        // sayıda uydurma doküman yazılabiliyordu. Panelin gönderimi bütün
+        // koleksiyonu okuyup Expo'ya yığın hâlinde veriyor: milyonlarca sahte
+        // satır push'u tamamen durdurur ve belirti yine "bildirim gelmiyor"
+        // olur. Expo'nun kendi biçimi tahmin edilebilir bir dize değil.
+        && token.matches('^Expo(nent)?PushToken[[]([A-Za-z0-9_-]{1,64})[]]$')
         && request.resource.data.platform in ['ios', 'android']
         && request.resource.data.master is bool
         && request.resource.data.categories is map
@@ -193,11 +215,29 @@ service cloud.firestore {
 
       // Kayıtlardaki ile aynı gerekçe: yeniden gönderim var olan dokümana denk
       // geliyor ve update sayılıyor. Birebir aynı katılım geçiyor, başkası yok.
+      //
+      // `uid` taşıyan bir katılıma yalnızca sahibi dokunabiliyor; taşımayan
+      // (hesapsız sürümün yazdığı) katılım eskisi gibi açık — o alan zorunlu
+      // olsaydı mağazadaki sürüm kural yayınlandığı saniyede kırılırdı.
       allow update: if
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt'])
+        && (
+          !('uid' in resource.data.keys())
+          || (request.auth != null && resource.data.uid == request.auth.uid)
+        );
 
       allow create: if
-        request.resource.data.keys().hasOnly(['entryId', 'eventId', 'values', 'createdAt'])
+        // `uid` LİSTEDE, ve sebebi silme: hesabını silen kullanıcının çekiliş
+        // katılımı adını, telefonunu ve öğrenci numarasını taşıyor, ama
+        // `admin/deletion.ts` onu `where('uid','==',uid)` ile arıyor. Alan
+        // yasaklıyken sorgu hiçbir şey bulamıyor ve o veri veritabanında
+        // kalıyordu — hesap silindi görünürken. `registrations`taki gibi
+        // isteğe bağlı: varsa yazana ait olmak zorunda.
+        request.resource.data.keys().hasOnly(['entryId', 'eventId', 'values', 'createdAt', 'uid'])
+        && (
+          !('uid' in request.resource.data.keys())
+          || (request.auth != null && request.resource.data.uid == request.auth.uid)
+        )
         && request.resource.data.entryId == entryId
         // Var olmayan bir çekilişe katılım yazılamasın.
         && request.resource.data.eventId is string
@@ -215,7 +255,46 @@ service cloud.firestore {
     // ihlali. Panel de yazıyor (doğrulama anında düzeltilen telefon/numara),
     // ama Admin SDK bu kuralları hiç görmüyor.
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // ALAN DENETİMİ BİR SÜS DEĞİL, ve sebebi bu dokümanın dışında.
+      //
+      // Panel `telefon` ve `ogrenciNo`yu buradan okuyup onlara dayanarak
+      // `phoneClaims`/`studentClaims` kaydı SİLİYOR (admin/claims.ts,
+      // admin/deletion.ts). Denetimsiz hâlde kullanıcı kendi profiline
+      // KURBANIN numarasını yazıp panele başkasının teklik kaydını
+      // sildirebiliyordu: numara boşa düşüyor, saldırgan onu alıyor, kurban
+      // bir daha kendi numarasıyla doğrulanamıyor. Panel tarafında sahiplik
+      // kontrolü eklendi; bu kural ikinci kapı — biçimi tutmayan bir değer
+      // buraya hiç giremiyor.
+      //
+      // Sahiplik tek başına yetmiyordu çünkü doküman kullanıcının KENDİ
+      // dokümanı: kural "bu senin mi" diye soruyor, "ne yazdın" diye
+      // sormuyordu.
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+          ['adSoyad', 'email', 'dogumTarihi', 'telefon', 'ogrenciNo',
+           'kvkkOnayAt', 'kosullarOnayAt', 'createdAt']
+        )
+        && request.resource.data.adSoyad is string
+        && request.resource.data.adSoyad.size() >= 3
+        && request.resource.data.adSoyad.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        // Telefon `normalizePhone`un ürettiği tek biçim: +90 + on hane.
+        && request.resource.data.telefon is string
+        && request.resource.data.telefon.matches('^[+]90[0-9]{10}$')
+        // Öğrenci numarası tam dokuz hane — `STUDENT_NO_RE` ile aynı.
+        && request.resource.data.ogrenciNo is string
+        && request.resource.data.ogrenciNo.matches('^[0-9]{9}$')
+        && request.resource.data.dogumTarihi is string
+        && request.resource.data.dogumTarihi.size() <= 10;
+
+      // Profil silme panelin işi (hesap silme akışı Admin SDK ile temizliyor).
+      // İstemciye açılsaydı kullanıcı profilini silip teklik kaydını boşta
+      // bırakabilirdi — panel neyi serbest bırakacağını yalnızca buradan okuyor.
+      allow delete: if false;
     }
 
     // Hesap silme talepleri.
@@ -229,8 +308,14 @@ service cloud.firestore {
     // buradan öğreniyor ve Apple "tamamlandı" onayı istiyor.
     match /deletionRequests/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
+      // `hasOnly` OLMADAN istemci panelin iç alanlarını önceden yazabiliyordu
+      // (`kaynak`, `doneAt` gibi): panel kendi defterini okurken istemcinin
+      // uydurduğu bir değeri kendi yazdığı sanar. Alanlar sabit ve az.
       allow create: if request.auth != null
                     && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(
+                         ['uid', 'email', 'status', 'requestedAt']
+                       )
                     && request.resource.data.uid == uid
                     && request.resource.data.status == 'pending';
       // Güncelleme paneldeki Admin SDK'nın işi; istemci kendi talebini

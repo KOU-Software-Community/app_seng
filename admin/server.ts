@@ -94,7 +94,14 @@ import { deleteAccountPage, privacyPage, termsPage } from './legal';
 import { resolvePort } from './port';
 import { verifyPassword } from './webAuth';
 import { csvCell } from './csv';
-import { SESSION_SECONDS, cookieHeader, issueToken, loginLimiter, verifyToken } from './session';
+import {
+  SESSION_SECONDS,
+  cookieHeader,
+  issueToken,
+  loginLimiter,
+  sameOrigin,
+  verifyToken,
+} from './session';
 import { archiveList, esc, eventForm, loginPage, page, raffleForm, winnersForm } from './views';
 
 const PORT = resolvePort(process.env);
@@ -143,6 +150,31 @@ app.use(express.urlencoded({ extended: false }));
 // Uygulamanın çağırdığı uç noktalar JSON konuşuyor. Sınır düşük: bu gövdeler
 // yalnızca bir kod ve iki numara taşıyor.
 app.use(express.json({ limit: '8kb' }));
+
+/**
+ * CSRF: durum değiştiren her istek panelin kendi sayfasından gelmek zorunda.
+ *
+ * `/api/` ATLANIYOR ve bu bir boşluk değil: o uç noktaları uygulamanın
+ * `fetch`i çağırıyor, hiç `Origin` göndermiyor ve **çerez de taşımıyor** —
+ * kimlikleri `Authorization: Bearer`, yani tarayıcının kendiliğinden
+ * eklediği bir yetki yok. CSRF'in tanımı ambiyans kimlik bilgisi; orada yok.
+ *
+ * Neden jeton değil: `Origin` başlığını tarayıcı yazıyor, sayfa JavaScript'i
+ * değiştiremiyor. Gizli bir alan her forma eklenecekti ve biri unutulduğunda
+ * korumanın kalktığı görünmezdi — bu tek satır her formu birden koruyor.
+ */
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.path.startsWith('/api/')) {
+    return next();
+  }
+  if (sameOrigin(req.get('origin') ?? undefined, req.get('referer') ?? undefined, req.get('host') ?? undefined)) {
+    return next();
+  }
+  console.warn(
+    `[csrf] reddedildi: ${req.method} ${req.path} · origin: ${req.get('origin') ?? '-'} · host: ${req.get('host') ?? '-'}`,
+  );
+  res.status(403).type('text').send('İstek panelin kendi sayfasından gelmiyor.');
+});
 
 /**
  * Görsel yükleme. Bellekte tutuluyor: dosyalar küçültülüp Storage'a gidiyor,
@@ -242,6 +274,22 @@ app.get('/login', (req, res) => {
 /** Parola denemesi sınırı — bkz. `loginLimiter`. Süreç içi; yeniden başlatınca sıfırlanır. */
 const attempts = loginLimiter();
 
+/**
+ * Herkese açık `/hesap-sil` POST'unun parola denemesi sınırı.
+ *
+ * O rota **kimliksiz ve geri alınamaz**: Identity Toolkit'e bir e-posta +
+ * parola gönderiyor ve doğru tahmin doğrudan silme talebi yazıyor. Önünde
+ * hiçbir sayaç yoktu, yani panel aynı anda iki şey sunuyordu — sınırsız bir
+ * parola orakülü ve onun ödülü olarak hesabın silinmesi.
+ *
+ * İki kova: IP ve **denenen e-posta**. Yalnızca IP olsaydı botnet tek kurbanı
+ * sınırsız deneyebilirdi; yalnızca e-posta olsaydı bir IP bütün adresleri
+ * tarayabilirdi. Sayılar `/login`'den cömert, çünkü burada kampüs NAT'ı ve
+ * gerçekten parolasını yanlış yazan kullanıcı var: 10 deneme / 15 dakika.
+ */
+const silmeIpLimiti = loginLimiter(Date.now, 10, 15 * 60_000);
+const silmeAdresLimiti = loginLimiter(Date.now, 5, 15 * 60_000);
+
 app.post('/login', (req, res) => {
   const ip = req.ip ?? '';
   const locked = attempts.lockedFor(ip);
@@ -289,12 +337,31 @@ app.post('/hesap-sil', async (req, res) => {
     );
   }
 
+  // Kilit `verifyPassword`'dan ÖNCE: kilitliyken Identity Toolkit'e hiç
+  // gidilmiyor, yoksa sayaç dolsa bile her istek bir doğrulama çağrısı
+  // harcardı ve oracle zamanlama üzerinden açık kalırdı.
+  const ip = req.ip ?? 'bilinmiyor';
+  const kilit = Math.max(silmeIpLimiti.lockedFor(ip), silmeAdresLimiti.lockedFor(email));
+  if (kilit > 0) {
+    return res.status(429).type('html').send(
+      deleteAccountPage({
+        error: `Çok fazla deneme yapıldı. ${Math.ceil(kilit / 60_000)} dakika sonra tekrar deneyin.`,
+      }),
+    );
+  }
+  silmeIpLimiti.fail(ip);
+  silmeAdresLimiti.fail(email);
+
   // Kimlik Firebase'in kendi REST uç noktasıyla doğrulanıyor: Admin SDK
   // parola doğrulayamıyor (tasarımı gereği — parolayı hiç görmüyor).
   // Doğrulamadan talep kabul etmek, bir e-postayı bilen herkese başkasının
   // hesabını sildirmek olurdu.
   try {
     const uid = await verifyPassword(email, password);
+    // Başarılı doğrulama sayaçları temizliyor: parolasını hatırlayan kullanıcı
+    // bir önceki yanlış denemesi yüzünden kilitli kalmasın.
+    silmeIpLimiti.succeed(ip);
+    silmeAdresLimiti.succeed(email);
     await db.collection('deletionRequests').doc(uid).set({
       uid,
       email,
