@@ -27,7 +27,7 @@ import {
   hashCode,
   type OtpRecord,
 } from './otp';
-import { loginLimiter } from './session';
+import { clientIp, loginLimiter } from './session';
 
 const OTP_COLLECTION = 'emailOtp';
 
@@ -125,7 +125,7 @@ export function registerAccountApi(app: Express, db: Firestore): void {
   app.post('/api/hesap/kod', async (req, res) => {
     // IP kilidi kimlik çözümünden ÖNCE: jeton doğrulama da bir Firebase
     // çağrısı, ve kilitli bir IP'nin onu harcamasına gerek yok.
-    const ip = req.ip ?? 'bilinmiyor';
+    const ip = clientIp(req);
     const kilit = kodLimiti.lockedFor(ip);
     if (kilit > 0) {
       return res.status(429).json({ hata: 'cok_fazla', saniye: Math.ceil(kilit / 1000) });

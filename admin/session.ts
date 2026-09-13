@@ -59,7 +59,32 @@ export function issueToken(secret: Buffer, now = Date.now()): string {
   return `${issued}.${sign(secret, issued)}`;
 }
 
+/**
+ * Çıkış yapılmış jetonlar — süreç içi, sınırlı.
+ *
+ * `/logout` yalnızca çerezi siliyordu; jeton 12 saat daha geçerli kalıyordu.
+ * Ortak bir bilgisayarda "çıkış yaptım" diyen yönetici, geri düğmesiyle ya da
+ * kopyalanmış bir çerezle geri dönülebilen bir oturum bırakıyordu.
+ *
+ * Sunucu hâlâ oturum SAKLAMIYOR — yalnızca iptal edilenleri hatırlıyor, ve
+ * onlar zaten 12 saatte kendiliğinden geçersiz oluyor. Yeniden başlatma
+ * listeyi siliyor: o an hâlâ geçerli olan bir iptal edilmiş jeton geri
+ * gelebilir. Bunu kapatmanın tek yolu kalıcı bir depo ve o, bu panelin
+ * taşımadığı bir şey — bedeli burada yazılı olsun.
+ */
+const iptalEdilen = new Map<string, number>();
+
+export function revokeToken(token: string | null, now = Date.now()): void {
+  if (!token) return;
+  // Süresi dolmuşları temizle: liste bir sekmeye basılan çıkış sayısı kadar
+  // büyüyor, yani küçük — ama sınırsız değil.
+  for (const [t, s] of iptalEdilen) if (s <= now) iptalEdilen.delete(t);
+  iptalEdilen.set(token, now + SESSION_SECONDS * 1000);
+}
+
 export function verifyToken(secret: Buffer, token: string | null, now = Date.now()): boolean {
+  const bitis = token ? iptalEdilen.get(token) : undefined;
+  if (bitis !== undefined && bitis > now) return false;
   if (!token) return false;
   const dot = token.indexOf('.');
   if (dot < 0) return false;
@@ -105,6 +130,39 @@ export function sameOrigin(
   const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]+)/i.exec(kaynak.trim());
   if (!m) return false;
   return m[1].toLowerCase() === host.toLowerCase();
+}
+
+/**
+ * İstek gerçekten kimden geliyor — hız sınırlarının ANAHTARI.
+ *
+ * **`trust proxy 1` bir proxy sayıyor.** Panelin önünde Coolify/Traefik var;
+ * alan adı Cloudflare'e bağlıysa **iki** proxy oluyor ve Express en yakın
+ * proxy'den bir öncekini, yani Cloudflare kenar sunucusunun adresini,
+ * "istemci" sanıyor. O adresi kaç kişinin paylaştığı belli değil ama az sayıda
+ * olduğu kesin: bu dosyadaki bütün sayaçlar bir avuç kenar adresine
+ * anahtarlanır ve **saatte 20 posta sınırı dünyanın tamamı için 20 olur.**
+ * Belirti yine "kod gelmiyor", ve sebebi bir güvenlik önlemi.
+ *
+ * `CF-Connecting-IP` bu sorunun kendi cevabı: yalnızca Cloudflare arkasındayken
+ * var ve Cloudflare onu **istemciden gelen değerin üzerine yazıyor**, yani
+ * uydurulamıyor. Yoksa `req.ip`'ye düşülüyor. Hop sayısını elle ayarlamaya
+ * gerek kalmıyor — yanlış ayarlanmış bir sayı da sessizce yanlış cevap
+ * verirdi.
+ *
+ * Cloudflare yoksa başlık da yok: doğrudan Coolify'a gelen isteğe hiçbir şey
+ * eklenmiyor ve `req.ip` zaten doğru.
+ */
+export function clientIp(req: {
+  ip?: string;
+  get?(name: string): string | undefined;
+  header?(name: string): string | undefined;
+}): string {
+  const oku = (ad: string) => req.get?.(ad) ?? req.header?.(ad) ?? undefined;
+  const cf = (oku('cf-connecting-ip') ?? '').trim();
+  // Cloudflare tek bir adres yazıyor; virgül görürsek başlık bizim
+  // beklediğimiz şey değil ve güvenilmiyor.
+  if (cf && !cf.includes(',')) return cf;
+  return (req.ip ?? '').trim() || 'bilinmiyor';
 }
 
 export const LOGIN_MAX_FAILURES = 10;

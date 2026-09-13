@@ -467,6 +467,38 @@ check(
     if (!/hasOnly\(\[[^\]]*'uid'[^\]]*\]\)/.test(entries)) {
       return 'raffleEntries create listesinde uid yok — hesap silinince katılım verisi kalıyor';
     }
+    // 9) Sayaçların anahtarı gerçek istemci adresi olmalı. `req.ip` doğrudan
+    //    okunursa Cloudflare arkasında bütün dünya bir avuç kenar adresine
+    //    düşer ve "saatte 20" herkes için 20 olur.
+    if (/req\.ip/.test(server) || /req\.ip/.test(api)) {
+      return 'sayaçlar req.ip\u2019yi doğrudan okuyor — Cloudflare arkasında hepsi aynı kovaya düşer';
+    }
+    if (!/clientIp\(req\)/.test(server)) return 'panel istemci adresini clientIp ile çözmüyor';
+
+    // 10) Çıkış gerçekten çıkış olmalı: çerezi silmek jetonu geçersizleştirmiyor.
+    if (!/revokeToken\(/.test(server)) {
+      return '/logout jetonu iptal etmiyor — çerez silinse de oturum 12 saat yaşıyor';
+    }
+
+    // 11) Olay niteliği içinde kullanıcı verisi. `esc()` tırnağı `&#39;`
+    //     yapıyor ama HTML ayrıştırıcısı JS'e vermeden önce çözüyor.
+    if (/onsubmit="return confirm\('\$\{/.test(read('admin/server.ts'))) {
+      return 'onsubmit içinde enterpolasyon var — esc() orada koruma sağlamıyor';
+    }
+
+    // 12) Silme listesi yoklamayı da kapsamalı: satır `uid` taşıyor ve üstünde
+    //     sertifikadaki donmuş ad duruyor.
+    if (!/'attendance'/.test(deletion)) {
+      return 'silme listesinde attendance yok — yoklama ve sertifika hesaptan sonra kalıyor';
+    }
+
+    // 13) Derin bağlantıdan gelen `next` denetlenmeli: giriş sonrası varılan
+    //     yeri saldırgan seçebiliyordu.
+    const giris = strip(read('app/giris.tsx'));
+    if (!/safeNext\(next\)/.test(giris)) {
+      return 'giriş ekranı next parametresini denetlemiyor — açık yönlendirme';
+    }
+
     const silmeTalebi = rulesBlock('deletionRequests');
     if (!/hasOnly/.test(silmeTalebi)) {
       return 'deletionRequests create alan kısıtı yok — istemci panelin iç bayrağını yazabiliyor';
