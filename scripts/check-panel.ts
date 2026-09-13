@@ -10,6 +10,10 @@
  * temizler), ve her enterpolasyonun kaçırılmış olması.
  */
 import { createHash } from 'node:crypto';
+
+import { Timestamp } from 'firebase-admin/firestore';
+
+import { ensureQr, regenerateQr, setQrWindow } from '../admin/qr';
 import { parseServiceAccount } from '../admin/credentials';
 import { csvCell } from '../admin/csv';
 import {
@@ -1459,6 +1463,108 @@ void (async () => {
     );
     await releaseIdentity(db3 as never, 'silinen', { telefon: '+905553334444' });
     assert('silme kendi kaydını serbest bırakıyor', db3._get('phoneClaims', '+905553334444') === undefined);
+  }
+
+  // --- QR penceresi: kuralın okuyabileceği tip ------------------------------
+  {
+    /*
+      Pencere Firestore'a `Timestamp` olarak yazılmak ZORUNDA.
+
+      Kural `request.time >= qrTanimi(eventId).opensAt` diyor ve `request.time`
+      bir `timestamp`. Alan dize olduğu sürece bu bir tip uyuşmazlığı; kural
+      dili hata veren ifadeyi reddederek bitiriyor, yani pencere hiç açılmıyor.
+      Belirti bir hata değil, cihazda "Bu kod şu anda geçerli değil" — ve
+      operatör tarihi değiştirip tekrar denediğinde de aynısı.
+    */
+    function qrDb() {
+      const store = new Map<string, Record<string, unknown>>();
+      return {
+        collection: (n: string) => ({
+          doc: (id: string) => ({
+            async get() {
+              const d = store.get(`${n}/${id}`);
+              return { exists: d !== undefined, data: () => d };
+            },
+            async set(data: Record<string, unknown>, opt?: { merge?: boolean }) {
+              const eski = opt?.merge ? (store.get(`${n}/${id}`) ?? {}) : {};
+              store.set(`${n}/${id}`, { ...eski, ...data });
+            },
+          }),
+        }),
+        _get: (yol: string) => store.get(yol),
+        _set: (yol: string, d: Record<string, unknown>) => store.set(yol, d),
+      };
+    }
+
+    const BASLANGIC = '2026-09-14T18:00:00+03:00';
+
+    const db = qrDb();
+    const tanim = await ensureQr(db as never, 'apple', BASLANGIC);
+    const yazilan = db._get('eventQr/apple') as Record<string, unknown>;
+    assert(
+      'yeni QR penceresi Timestamp olarak yazılıyor',
+      yazilan.opensAt instanceof Timestamp && yazilan.closesAt instanceof Timestamp,
+      `${typeof yazilan.opensAt} / ${typeof yazilan.closesAt}`,
+    );
+    assert(
+      'yazılan an ekrandaki duvar saatiyle aynı',
+      (yazilan.opensAt as Timestamp).toDate().toISOString() ===
+        new Date('2026-09-14T17:00:00+03:00').toISOString(),
+      (yazilan.opensAt as Timestamp).toDate().toISOString(),
+    );
+    assert('okunan pencere ISO dizesi', tanim.opensAt === '2026-09-14T17:00:00+03:00', tanim.opensAt);
+
+    // Elle pencere: operatörün girdiği +03:00 duvar saati.
+    await setQrWindow(db as never, 'apple', {
+      opensAt: '2026-09-13T00:00:00+03:00',
+      closesAt: '2026-09-14T23:59:00+03:00',
+    });
+    const elle = db._get('eventQr/apple') as Record<string, unknown>;
+    assert('elle pencere de Timestamp', elle.opensAt instanceof Timestamp);
+    assert(
+      'elle pencere jetonu korunuyor',
+      elle.token === yazilan.token,
+    );
+    const geri = await ensureQr(db as never, 'apple', BASLANGIC);
+    assert(
+      'elle pencere geri okunuyor',
+      geri.opensAt === '2026-09-13T00:00:00+03:00' && geri.closesAt === '2026-09-14T23:59:00+03:00',
+      `${geri.opensAt} – ${geri.closesAt}`,
+    );
+
+    /*
+      Üretimdeki dokümanlar dize taşıyor ve hiçbir yazıcı onlara dokunmuyordu:
+      tip düzeltmesi tek başına o etkinlikleri onarmazdı. `ensureQr` açılışta
+      onarıyor, yani operatörün QR sayfasını açması yetiyor.
+    */
+    const eski = qrDb();
+    eski._set('eventQr/eski', {
+      eventId: 'eski',
+      token: 'ABCDEFGHJKMN',
+      opensAt: '2026-09-13T00:00:00+03:00',
+      closesAt: '2026-09-14T23:59:00+03:00',
+    });
+    const onarilan = await ensureQr(eski as never, 'eski', BASLANGIC);
+    const sonra = eski._get('eventQr/eski') as Record<string, unknown>;
+    assert('dize taşıyan eski kayıt onarılıyor', sonra.opensAt instanceof Timestamp);
+    assert('onarım jetonu değiştirmiyor', sonra.token === 'ABCDEFGHJKMN');
+    assert(
+      'onarım pencereyi oynatmıyor',
+      onarilan.opensAt === '2026-09-13T00:00:00+03:00' &&
+        (sonra.opensAt as Timestamp).toDate().toISOString() ===
+          new Date('2026-09-13T00:00:00+03:00').toISOString(),
+    );
+
+    // Jeton yenileme pencereyi korurken tipi de düzeltiyor.
+    const yeniJetonlu = await regenerateQr(eski as never, 'eski');
+    const sonra2 = eski._get('eventQr/eski') as Record<string, unknown>;
+    assert('jeton yenilendi', yeniJetonlu.token !== 'ABCDEFGHJKMN');
+    assert('yenileme sonrası pencere hâlâ Timestamp', sonra2.opensAt instanceof Timestamp);
+    assert(
+      'yenileme pencereyi oynatmıyor',
+      yeniJetonlu.opensAt === '2026-09-13T00:00:00+03:00',
+      yeniJetonlu.opensAt,
+    );
   }
 
 })().then(() => {
