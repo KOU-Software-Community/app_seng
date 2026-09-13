@@ -188,7 +188,13 @@ service cloud.firestore {
         // koleksiyonu okuyup Expo'ya yığın hâlinde veriyor: milyonlarca sahte
         // satır push'u tamamen durdurur ve belirti yine "bildirim gelmiyor"
         // olur. Expo'nun kendi biçimi tahmin edilebilir bir dize değil.
-        && token.matches('^Expo(nent)?PushToken[[]([A-Za-z0-9_-]{1,64})[]]$')
+        // KÖŞELİ PARANTEZLER KAÇIRILMAK ZORUNDA. `matches()` RE2 kullanıyor ve
+        // RE2, POSIX'in "sınıfın ilk karakteri olan ] literaldir" kuralını
+        // UYGULAMIYOR: `[]]` boş bir sınıf + bir `]` olarak ayrıştırılıyor ve
+        // derlenmiyor. Kaçışlı hâl her lehçede aynı şeyi söylüyor; kural
+        // dizesindeki `\\` tek bir ters bölü üretiyor (Firebase'in kendi
+        // örneklerindeki `\\s` ile aynı).
+        && token.matches('^Expo(nent)?PushToken\\[[A-Za-z0-9_-]{1,64}\\]$')
         && request.resource.data.platform in ['ios', 'android']
         && request.resource.data.master is bool
         && request.resource.data.categories is map

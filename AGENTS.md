@@ -1349,6 +1349,19 @@ benziyor.
   (`raffleEntries`'te `'uid'` → `hasOnly` listesi aranıyor). Üçü de kırılıp
   kırmızı verdiği görülerek düzeltildi.
 
+- **`matches()` RE2 kullanıyor ve RE2, POSIX'in "sınıfın ilk karakteri olan `]`
+  literaldir" kuralını UYGULAMIYOR.** `devices` jeton biçimi ilk hâlinde
+  `'^Expo(nent)?PushToken[[]([A-Za-z0-9_-]{1,64})[]]$'` yazıldı; `[[]` doğru
+  (sınıf içinde `[` özel değil) ama `[]]` boş bir sınıf + bir `]` olarak
+  ayrıştırılıyor. Ölçüldü: o desen **gerçek bir Expo jetonunu eşlemiyor**, yani
+  deploy edilseydi her cihaz kaydı reddedilir ve push herkes için sessizce
+  ölürdü — belirti yine "bildirim gelmiyor", ve sebebi bir güvenlik
+  düzeltmesinin kendisi olurdu. Kaçışlı hâl (`\\[` / `\\]`) her lehçede aynı
+  şeyi söylüyor; kural dizesindeki `\\` tek bir ters bölü üretiyor, Firebase'in
+  kendi `\\s` örneğiyle aynı. **Bir kural regex'i yazıldığı gibi
+  değerlendirilemez, çalıştırılması gerekiyor** — ve `firestore.rules` hiçbir
+  yerel kontrolle çalıştırılamadığı için desen elle, bir motorda sınandı.
+
 **Kapatılmayan iki bulgu, ve sebepleri:**
 
 - **`registrations` numara işgali** ve **`eventSeats` sahte koltuk.** İkisi de
