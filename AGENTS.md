@@ -1613,6 +1613,38 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   **Bir aracın davranışını belgeden tahmin etmek yerine aracı indirip okumak,
   burada bir komut tarifi kadar ucuzdu.**
 
+- **`npm audit`'in göremediği sınıfa karşı tek ayar: `min-release-age`.** Audit
+  AÇIKLANMIŞ danışmaları raporluyor; npm'e yapılan gerçek saldırılar (bakımcı
+  oltalanması → zehirli sürüm, `postinstall`'da kimlik toplama) açıklanmadan
+  ÖNCE lockfile'lara giriyor. Bilinen vakaların hepsi saatler içinde tespit
+  edilip çekildi, yani birkaç günlük bir bekleme penceresi o sürümü hiç
+  kurmamak demek. `.npmrc`'de `min-release-age=3`. Üçü de sezgiye aykırı ve
+  üçü de ölçüldü:
+  **(a) Eski npm'de sessizce etkisiz, ama kırmıyor** — npm 10.9.7 anahtarı
+  okuyor (`npm config get min-release-age` → 3) ve yok sayıp exit 0 veriyor.
+  CI `actions/setup-node` ile npm 10 çalıştırdığı için bugün orada bir şey
+  değişmiyor; ayar npm 12'de devreye giriyor (kurulu npm: `npm --version`).
+  **(b) `npm ci` bunu hiç görmüyor** — lockfile'ı birebir kuruyor. Ayar
+  yalnızca ÇÖZÜMLEME anında (`npm install`, `npm run deps:sync`) ısırıyor, ki
+  yeni bir sürümün lockfile'a gireceği an zaten orası. "CI korunuyor" diye
+  okumayın; korunan şey lockfile'ı değiştiren geliştirici makinesi.
+  **(c) Hata vermiyor, eski sürüme düşüyor** — `min-release-age=400` ile
+  express 5.2.1 yerine 5.1.0 kuruldu. Yalnızca hiçbir sürüm uygun değilse
+  `ENOVERSIONS` veriyor, ve bir yamayı engellediğinde bunu söyleyip sıfır
+  olmayan kodla çıkıyor. Acil durumda `--min-release-age=0` ya da
+  `min-release-age-exclude`.
+  Guard `.npmrc`'yi **ayrıştırarak** okuyor, `grep`'leyerek değil: açıklama
+  bloğu anahtarın adını altı kez taşıyor, ham arama tam da bu defterde yedi
+  kez yazılı olan "kontrol kendi gerekçesini buluyor" tuzağına düşerdi.
+  Ölçüldü: satır silinip yorumlar bırakıldığında kontrol kırmızı verdi.
+- **Silinecek bir bağımlılık bulundu, bu turda dokunulmadı:**
+  `react-native-worklets-core` yaprak — hiçbir paket istemiyor, kaynakta sıfır
+  import, ama `podspec` + `android/` taşıdığı için autolinking her EAS
+  derlemesine sokuyor. VisionCamera'nın worklets paketi; bu depo
+  `expo-camera` kullanıyor. Reanimated'in istediği ayrı paket
+  (`react-native-worklets`, o gerçekten gerekli). Silmek native modül
+  çıkardığı için yeniden derleme istiyor.
+
 ### QR erişimi, kayıt şartı ve bir kullanıcı turunun getirdikleri
 
 - **PDF üretimi ölçüldü ve tavan sanılan yerde değil.** Açılıştaki `4251 ms`
