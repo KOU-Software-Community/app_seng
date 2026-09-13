@@ -1125,6 +1125,27 @@ check(
 );
 
 check(
+  'LICENSE telifi kulübe ait',
+  'Depo herkese açık ve GitHub lisansı LICENSE dosyasından okuyor. Dosya aylarca ' +
+    'create-expo-app iskeletinden kalan telif satırını taşıdı: kulübün kodu, ' +
+    'telifi başka bir şirkete yazılmış hâlde yayındaydı. Hiçbir şey hata ' +
+    'vermiyor — GitHub yine "MIT License" yazıyor, kimse dosyayı açmıyor. ' +
+    'Bir iskelet yeniden koşturulduğunda ya da bir şablon kopyalandığında aynı ' +
+    'satır sessizce geri gelir; bu deponun raffleLegal testindeki ' +
+    "not.toContain iddiası da aynı sınıf: geri gelmemesi gereken yasal dize.",
+  () => {
+    const lisans = read('LICENSE');
+    if (/650 Industries|Expo/i.test(lisans)) {
+      return 'LICENSE hâlâ iskeletin telif satırını taşıyor — telif kulübün olmalı';
+    }
+    if (!lisans.includes('Kocaeli Üniversitesi Yazılım Kulübü')) {
+      return 'LICENSE telif satırında kulübün adı yok';
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',
