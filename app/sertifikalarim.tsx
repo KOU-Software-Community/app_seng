@@ -57,8 +57,18 @@ export default function CertificatesRoute() {
     void yukle();
   }, [yukle]);
 
+  // `PANEL_BASE_URL` boşsa adres üretilemiyor ve düğme HİÇBİR ŞEY yapmıyordu:
+  // basılıyor, hiçbir şey olmuyor, hata da yok — bu defterde "en geç fark
+  // edilen sınıf" diye yazılı. Sebep ekrana yazılıyor; kullanıcının
+  // düzeltebileceği bir şey değil ama bildiği bir şey olmalı.
   const ac = (url: string) => {
-    if (url) void Linking.openURL(url).catch(() => {});
+    if (!url) {
+      setHata('Uygulama yapılandırması eksik; bu sürümde belge açılamıyor.');
+      return;
+    }
+    void Linking.openURL(url).catch(() =>
+      setHata('Belge açılamadı. İnternetini kontrol edip tekrar dene.'),
+    );
   };
 
   return (
