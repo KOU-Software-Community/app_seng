@@ -51,6 +51,13 @@ service cloud.firestore {
       // yazmada değişiyor. İsim, numara, kod: hiçbiri değiştirilemiyor. Yani
       // başka bir cihazdan gelen *farklı* bir kayıt bu dala düşemiyor.
       //
+      // BEDELİ: hesabıyla kaydolup sonra ÇIKIŞ YAPAN ve o sırada eşitlenmemiş
+      // bir kaydı olan kullanıcının yeniden gönderimi artık reddediliyor —
+      // `request.auth` yok, `resource.data.uid` var. Dar bir durum ve çıkışı
+      // var (tekrar giriş yap), ama sessiz değil: istemci `permission-denied`
+      // aldığında arka plan denemesini durdurup ekrana elle gönderme düğmesi
+      // koyuyor. Oracle'ı açık bırakmak yerine bu kabul edildi.
+      //
       // KALAN VARLIK ORAKÜLÜ: dal kimlik istemediği için "bu öğrenci bu
       // etkinliğe kayıtlı mı" sorusu dışarıdan sorulabiliyor — var olmayan
       // dokümanda update reddediliyor, var olanda geçiyor. `uid` taşıyan
