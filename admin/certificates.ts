@@ -83,6 +83,27 @@ export async function publishCertificates(
 ): Promise<YayinSonucu> {
   const sonuc: YayinSonucu = { yayinlanan: 0, atlanan: [] };
 
+  /*
+    Sertifikanın ŞARTI iki tane: kayıt ve yoklama.
+
+    Yoklama "salondaydı" diyor, kayıt "gelmeyi taahhüt etmişti" diyor, ve belge
+    ikisini birden iddia ediyor. Yalnızca yoklamaya bakmak, kaydolmadan gelip
+    kodu okutan birine kayıtlıymış gibi bir belge vermek olurdu.
+
+    **Zorlayan taraf BURASI, Firestore kuralı değil.** Kural yoklamayı kayıt
+    aramadan kabul ediyor ve bu bilerek: mağazadaki hesapsız sürümle yapılmış
+    kayıtlarda `uid` alanı yok, yani kural o kaydı yazan kişiye bağlayamıyor —
+    şartı kurala koymak o kullanıcıları kapıda bırakırdı. Uygulama da
+    okutmadan önce uyarıyor (`src/scanGate.ts`) ama o bir istemci kararı;
+    belgeyi üreten tek yer burası, o yüzden şart burada.
+
+    Tek sorgu, tek alan, dizin gerekmiyor — ve parti başına bir kez.
+  */
+  const kayitlar = await db.collection('registrations').where('eventId', '==', eventId).get();
+  const kayitliUidler = new Set(
+    kayitlar.docs.map((d) => String(d.get('uid') ?? '')).filter(Boolean),
+  );
+
   for (const g of girdiler) {
     const ad = g.adSoyad.trim().replace(/\s+/g, ' ');
     if (ad.length < 3) {
@@ -100,6 +121,13 @@ export async function publishCertificates(
     }
     if (snap.get('certificate')) {
       sonuc.atlanan.push({ uid: g.uid, sebep: 'zaten yayınlanmış' });
+      continue;
+    }
+    if (!kayitliUidler.has(g.uid)) {
+      // Sebep operatöre olduğu gibi gösteriliyor: "yayınlandı 3, atlandı 1"
+      // diye bir özet, atlananın neden atlandığını söylemezse operatör
+      // öğrenciye de söyleyemez.
+      sonuc.atlanan.push({ uid: g.uid, sebep: 'etkinliğe kayıt bulunamadı' });
       continue;
     }
 

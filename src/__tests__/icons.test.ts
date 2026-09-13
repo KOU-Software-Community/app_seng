@@ -94,4 +94,32 @@ describe('ICON yolları', () => {
     expect(w.slice(0, bosIndex).every((genislik) => genislik > 0)).toBe(true);
     expect(w.slice(bosIndex + 1).every((genislik) => genislik > 0)).toBe(true);
   });
+
+  /**
+   * `qr` ile `grid` AYNI GLIF OLMAMALI — ve olmaları çok kolay.
+   *
+   * İkisi de üç köşede 3x3 kare taşıyor; farkı yalnızca dördüncü köşe ve
+   * ortadaki veri pikselleri yapıyor. Ana sayfada `grid` (Arşiv sekmesi) ile
+   * `qr` (yoklama düğmesi) aynı ekranda duruyor, yani ayrışmadıkları gün
+   * kullanıcı iki ayrı şeyi aynı simgeyle görüyor — ve bunu kimse bir hata
+   * olarak bildirmez, sadece yanlış düğmeye basar.
+   *
+   * İki iddia da tek tek kırılabilir olsun diye ayrı: sağ alt köşe dolarsa
+   * birincisi, ortadaki veri silinirse ikincisi kırmızı veriyor.
+   */
+  it('qr glifi grid ile aynı değil', () => {
+    expect(ICON.qr).not.toEqual(ICON.grid);
+    const qr = rowWidths(ICON.qr);
+    const grid = rowWidths(ICON.grid);
+    // Son satır: `grid` sağ altta dolu bir 3x3 taşıyor (6 piksel), `qr` ise
+    // kırık bir köşe. Eşitlerse dördüncü kare geri gelmiş demektir.
+    expect(qr[7]).not.toEqual(grid[7]);
+  });
+
+  it('qr glifinde bulucu kareler arasında veri var', () => {
+    const w = rowWidths(ICON.qr);
+    // `grid`in orta satırları tamamen boş; `qr`ı QR yapan şey orada bir şey
+    // olması. Boş kalırsa glif dört köşeli bir ızgaraya iner.
+    expect(w[3] + w[4]).toBeGreaterThan(0);
+  });
 });

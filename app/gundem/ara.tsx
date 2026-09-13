@@ -6,6 +6,7 @@ import {
   ContentNotice,
   DottedRule,
   EmptyState,
+  GlassButton,
   GradientHeader,
   PixelTxt,
   Txt,
@@ -29,7 +30,8 @@ export default function GundemAraRoute() {
   return (
     <View style={styles.screen}>
       <GradientHeader gradient={gradients.form} style={{ paddingBottom: 14 }}>
-        <Txt weight="extrabold" size={22} color="#fff" tracking={-0.4}>
+        <GlassButton label="‹" accessibilityLabel="Geri" onPress={() => router.back()} size={36} />
+        <Txt weight="extrabold" size={22} color="#fff" tracking={-0.4} style={{ marginTop: 14 }}>
           Haber ara
         </Txt>
         <TextInput

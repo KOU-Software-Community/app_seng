@@ -95,8 +95,9 @@ export default function HesapRoute() {
               Giriş yap
             </Txt>
             <Txt size={13} leading={1.55} color={colors.muted} style={{ marginTop: 8 }}>
-              Hesabın olduğunda etkinlik kayıtların telefonun değişse de durur,
-              bilgilerini her kayıtta yeniden yazmazsın.
+              Etkinliklere kaydolmak, QR ile yoklama vermek ve katılım
+              sertifikanı almak için hesap gerekiyor. Kayıtların telefonun
+              değişse de durur, bilgilerini her kayıtta yeniden yazmazsın.
             </Txt>
             <View style={{ gap: 10, marginTop: 16 }}>
               <PrimaryButton label="Giriş yap" onPress={() => router.push('/giris')} />
@@ -109,8 +110,22 @@ export default function HesapRoute() {
           </View>
         )}
 
-        {/* Kayıtlar cihazda duruyor, yani girişten bağımsız gösteriliyor —
-            hesabı olmayan kullanıcının da kaydı var ve onu görebilmeli. */}
+        {/*
+          Kayıtlar ve belgeler YALNIZCA oturum açıkken çiziliyor.
+
+          Eskiden girişten bağımsızdı, çünkü kayıt cihazda duruyordu ve hesapsız
+          kullanıcının da kaydı olabiliyordu. Kayıt artık hesap istiyor
+          (`app/kayit/[id].tsx` giriş + doğrulanmış e-posta kapısı) ve sertifika
+          yoklamadan, yoklama da oturumdan geliyor — yani oturumu olmayan
+          birinin bu iki bölümde görebileceği hiçbir şey yok. Boş bir
+          "Sertifikalarım" satırı, dokununca hiçbir şey vaat etmeyen bir kapı.
+
+          Apple 5.1.1(v) ile çelişmiyor: kural hesap tabanlı OLMAYAN içeriği
+          duvarın arkasına koymayı yasaklıyor. Bunlar hesap tabanlı. Sekmenin
+          kendisi, bildirim ayarları ve yasal metinler oturumsuz da duruyor.
+        */}
+        {user ? (
+          <>
         <GroupLabel style={styles.groupLabel}>KAYITLARIM</GroupLabel>
         {registrations.length ? (
           <View style={styles.card}>
@@ -165,6 +180,18 @@ export default function HesapRoute() {
             onPress={() => router.push('/sertifikalarim')}
           />
         </View>
+
+        <GroupLabel style={styles.groupLabel}>YOKLAMA</GroupLabel>
+        <View style={styles.card}>
+          <SatirLink
+            icon="qr"
+            label="QR ile yoklama"
+            hint="Etkinlikteki kodu okut, katılımın sertifikaya dönüşsün"
+            onPress={() => router.push('/qr')}
+          />
+        </View>
+          </>
+        ) : null}
 
         <GroupLabel style={styles.groupLabel}>AYARLAR</GroupLabel>
         <View style={styles.card}>

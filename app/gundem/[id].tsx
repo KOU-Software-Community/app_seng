@@ -6,6 +6,7 @@ import {
   Card,
   ContentNotice,
   DottedRule,
+  GlassButton,
   GradientHeader,
   PixelTxt,
   PrimaryButton,
@@ -69,7 +70,8 @@ export default function GundemArticleRoute() {
     return (
       <View style={styles.screen}>
         <GradientHeader gradient={gradients.form} style={{ paddingBottom: 16 }}>
-          <Txt weight="extrabold" size={20} color="#fff">
+          <GlassButton label="‹" accessibilityLabel="Geri" onPress={() => router.back()} size={36} />
+          <Txt weight="extrabold" size={20} color="#fff" style={{ marginTop: 14 }}>
             Haber bulunamadı
           </Txt>
         </GradientHeader>
@@ -115,7 +117,8 @@ export default function GundemArticleRoute() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         <GradientHeader gradient={gradients.form} style={{ paddingBottom: 16 }}>
-          <Txt size={12} color={colors.blue200}>
+          <GlassButton label="‹" accessibilityLabel="Geri" onPress={() => router.back()} size={36} />
+          <Txt size={12} color={colors.blue200} style={{ marginTop: 14 }}>
             {article.sourceName} · {relativeTimeTr(article.publishedAt)}
           </Txt>
           <Txt weight="extrabold" size={21} color="#fff" tracking={-0.4} style={{ marginTop: 6 }}>

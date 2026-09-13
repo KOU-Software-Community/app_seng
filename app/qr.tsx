@@ -10,12 +10,15 @@ import { GlassButton, GradientHeader, PixelTxt, PrimaryButton, Txt } from '../sr
 import { useContent } from '../src/content';
 import { bekleyeniOku, bekleyeniSil, bekleyeniYaz } from '../src/pendingScan';
 import { parseQrPayload, type QrOkuma } from '../src/qrSchema';
+import { taramaKarari } from '../src/scanGate';
+import { useAppStore } from '../src/store';
 import { colors, gradients, radius } from '../src/theme';
 
 type Durum =
   | { tur: 'tarama' }
   | { tur: 'gonderiliyor' }
   | { tur: 'bitti'; sonuc: YoklamaSonucu; eventId: string }
+  | { tur: 'kayit-gerek'; okuma: QrOkuma }
   | { tur: 'hata'; mesaj: string; tekrar?: QrOkuma };
 
 /**
@@ -30,6 +33,7 @@ export default function QrRoute() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { events, archive } = useContent();
+  const { registrationFor } = useAppStore();
   const { eventId: hedefEtkinlik } = useLocalSearchParams<{ eventId?: string }>();
 
   const [izin, izinIste] = useCameraPermissions();
@@ -77,6 +81,40 @@ export default function QrRoute() {
     [router],
   );
 
+  /**
+   * Okunan bir jetonu karara bağlar ve kararı uygular.
+   *
+   * Taze okutma da, girişten/kayıttan dönünce diskten gelen bekleyen okutma da
+   * BURADAN geçiyor. Ayrı geçselerdi kayıt şartı yalnızca taze okutmada
+   * uygulanırdı: kaydı olmayan biri "önce kaydol" görür, kaydolmadan geri
+   * gelir, ve bekleyen jeton kapıyı atlayıp gönderilirdi.
+   */
+  const isle = useCallback(
+    (okuma: QrOkuma) => {
+      const karar = taramaKarari({
+        okunanEtkinlik: okuma.eventId,
+        hedefEtkinlik,
+        kayitliMi: Boolean(registrationFor(okuma.eventId)),
+      });
+      if (karar.tur === 'yanlis-etkinlik') {
+        setDurum({
+          tur: 'hata',
+          mesaj: `Bu kod "${adiniBul(okuma.eventId)}" etkinliğine ait. Doğru kodu okuttuğundan emin ol.`,
+        });
+        return;
+      }
+      if (karar.tur === 'kayit-gerek') {
+        // Jeton saklanıyor: kayıttan dönen kullanıcı QR'ı ikinci kez aramasın.
+        // Pencere gün sonuna kadar açık, yani saklanan jeton hâlâ geçerli.
+        void bekleyeniYaz(okuma);
+        setDurum({ tur: 'kayit-gerek', okuma });
+        return;
+      }
+      void gonder(okuma);
+    },
+    [gonder, hedefEtkinlik, adiniBul, registrationFor],
+  );
+
   // Ekran açılınca bekleyen bir okutma varsa kendiliğinden gönderiliyor:
   // girişten dönen ya da internetsiz kalıp geri gelen kullanıcı QR'ı tekrar
   // aramak zorunda kalmasın.
@@ -88,37 +126,47 @@ export default function QrRoute() {
       const bekleyen = await bekleyeniOku();
       if (bekleyen) {
         mesgul.current = true;
-        await gonder(bekleyen);
+        isle(bekleyen);
       }
     })();
-  }, [user, gonder]);
+  }, [user, isle]);
+
+
+  /*
+    Kayıt kapısında bekleyen ekran, kayıt gelir gelmez kendiliğinden gönderiyor.
+
+    Açılış efekti buna yetmiyor ve sebebi ince: kullanıcı "Etkinliğe kaydol"a
+    bastığında bu ekran YIĞINDA KALIYOR, geri dönüldüğünde yeniden mount
+    olmuyor — `denendi` hâlâ true, efekt bir daha koşmuyor ve ekranda "önce
+    kaydol" kartı durmaya devam ediyor. Yani ekrandaki "döndüğünde otomatik
+    gönderilecek" cümlesi, bu efekt olmadan tutulmayan bir söz olurdu.
+
+    Tetikleyen şey kaydın kendisi: `registrationFor` mağazadan geliyor ve kayıt
+    yazıldığı an bu bileşen yeniden çiziliyor.
+  */
+  const kapidaki = durum.tur === 'kayit-gerek' ? durum.okuma : null;
+  useEffect(() => {
+    if (!kapidaki) return;
+    if (!registrationFor(kapidaki.eventId)) return;
+    mesgul.current = true;
+    void gonder(kapidaki);
+  }, [kapidaki, registrationFor, gonder]);
 
   const okundu = useCallback(
     ({ data }: { data: string }) => {
       if (mesgul.current) return;
       const okuma = parseQrPayload(data);
+      mesgul.current = true;
       if (!okuma) {
-        mesgul.current = true;
         setDurum({
           tur: 'hata',
           mesaj: 'Bu QR kulübün yoklama kodu değil. Etkinlik ekranındaki kodu okut.',
         });
         return;
       }
-      if (hedefEtkinlik && okuma.eventId !== hedefEtkinlik) {
-        // Etkinlik ekranından gelindiyse başka bir etkinliğin kodunu sessizce
-        // kabul etmek yanlış yoklama üretir.
-        mesgul.current = true;
-        setDurum({
-          tur: 'hata',
-          mesaj: `Bu kod "${adiniBul(okuma.eventId)}" etkinliğine ait. Doğru kodu okuttuğundan emin ol.`,
-        });
-        return;
-      }
-      mesgul.current = true;
-      void gonder(okuma);
+      isle(okuma);
     },
-    [gonder, hedefEtkinlik, adiniBul],
+    [isle],
   );
 
   const tekrarTara = () => {
@@ -195,6 +243,40 @@ export default function QrRoute() {
             </Txt>
             <View style={{ marginTop: 16 }}>
               <PrimaryButton label="Tamam" onPress={() => router.back()} />
+            </View>
+          </View>
+        ) : durum.tur === 'kayit-gerek' ? (
+          /*
+            Kaydı olmayan kişi burada durduruluyor — sunucuya hiç gidilmiyor.
+
+            Alternatif, yoklamayı almak ve sertifika aşamasında reddetmekti:
+            öğrenci salonda "yoklaman alındı" görür, haftalar sonra belge
+            gelmez, ve sebebini kimse söyleyemez. Ret kapıda ve düzeltmesi
+            ELDE: aynı ekrandan kaydol, geri dön, jeton zaten saklı.
+          */
+          <View style={[styles.kart, { borderColor: colors.blue500 }]}>
+            <Txt weight="extrabold" size={17} color={colors.text}>
+              Önce etkinliğe kaydol
+            </Txt>
+            <Txt size={13.5} leading={1.55} color={colors.textBody} style={{ marginTop: 6 }}>
+              {adiniBul(durum.okuma.eventId)}
+            </Txt>
+            <Txt size={13} leading={1.55} color={colors.muted} style={{ marginTop: 10 }}>
+              Bu etkinlik için kaydın görünmüyor. Katılım sertifikası yalnızca
+              kayıtlı katılımcılara veriliyor. Kaydını tamamlayıp bu ekrana
+              döndüğünde yoklaman otomatik gönderilecek — kodu tekrar okutmana
+              gerek yok.
+            </Txt>
+            <View style={{ marginTop: 16, gap: 10 }}>
+              <PrimaryButton
+                label="Etkinliğe kaydol"
+                onPress={() => router.push(`/kayit/${encodeURIComponent(durum.okuma.eventId)}`)}
+              />
+              <Pressable onPress={tekrarTara} style={{ paddingVertical: 10, alignItems: 'center' }}>
+                <Txt weight="semibold" size={13} color={colors.blue500}>
+                  Başka kod okut
+                </Txt>
+              </Pressable>
             </View>
           </View>
         ) : (
