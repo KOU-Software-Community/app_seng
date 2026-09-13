@@ -818,6 +818,32 @@ check(
 );
 
 check(
+  'demo hesap önce sahipleniyor, sonra doğruluyor',
+  'Bu deponun değişmezi: **e-posta doğrulanmış ⇒ telefon ve öğrenci numarası ' +
+    'sahiplenilmiş**. Panel `/api/hesap/dogrula` bu sırayı koruyor; demo hesap ' +
+    'scripti aynı işi Admin SDK ile yapıyor ve ters sıra, hiç sahiplenme ' +
+    'yapılmamış bir hesabı doğrulanmış gösterir. Sahiplenme çakışırsa script ' +
+    'çıkıyor — ama `emailVerified` çoktan yazılmışsa geride, numarası başkasında ' +
+    'olan ve yine de doğrulanmış bir hesap kalır.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (!existsSync(join(root, 'scripts/demo-account.ts'))) return 'scripts/demo-account.ts yok';
+    const src = strip(read('scripts/demo-account.ts'));
+    const claim = src.indexOf('claimIdentity(');
+    const verified = src.indexOf('emailVerified: true');
+    if (claim < 0) return 'demo hesap scripti claimIdentity çağırmıyor';
+    if (verified < 0) return 'demo hesap scripti emailVerified yazmıyor';
+    if (claim > verified) return 'emailVerified sahiplenmeden ÖNCE yazılıyor';
+    // Silme panelin kendi yolundan geçmeli: Console'dan silmek teklik
+    // kayıtlarını geride bırakıyor ve o numara sonsuza kadar kilitli kalıyor.
+    if (!/processDeletion\(/.test(src)) {
+      return 'demo hesap silme yolu processDeletion kullanmıyor';
+    }
+    return null;
+  },
+);
+
+check(
   'yığın ekranlarında geri düğmesi var',
   'Sekme çubuğu olmayan bir ekranda geri çıkmanın tek yolu telefonun kendi ' +
     'hareketi kalıyor ve iOS\u2019ta o hareket her ekranda çalışmıyor. Kullanıcı ' +

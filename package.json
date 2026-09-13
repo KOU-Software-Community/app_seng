@@ -74,6 +74,7 @@
     "rules:deploy": "node scripts/deploy-rules.mjs",
     "push": "tsx scripts/send-push.ts",
     "export": "tsx scripts/export-registrations.ts",
+    "demo:hesap": "tsx scripts/demo-account.ts",
     "check:schema": "tsx scripts/check-event-schema.ts",
     "admin": "tsx admin/server.ts",
     "check:html": "tsx scripts/check-html.ts",
