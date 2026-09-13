@@ -96,9 +96,11 @@ import { verifyPassword } from './webAuth';
 import { csvCell } from './csv';
 import {
   SESSION_SECONDS,
+  clientIp,
   cookieHeader,
   issueToken,
   loginLimiter,
+  revokeToken,
   sameOrigin,
   verifyToken,
 } from './session';
@@ -291,7 +293,7 @@ const silmeIpLimiti = loginLimiter(Date.now, 10, 15 * 60_000);
 const silmeAdresLimiti = loginLimiter(Date.now, 5, 15 * 60_000);
 
 app.post('/login', (req, res) => {
-  const ip = req.ip ?? '';
+  const ip = clientIp(req);
   const locked = attempts.lockedFor(ip);
   if (locked > 0) {
     return res
@@ -313,6 +315,11 @@ app.post('/login', (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
+  // ÇEREZİ SİLMEK ÇIKIŞ DEĞİL. Jeton imzalı ve 12 saat geçerli: çerez
+  // silinse bile kopyalanmış ya da geri düğmesiyle geri gelen bir değer
+  // oturumu açmaya devam ediyordu. Ortak bir bilgisayarda "çıkış yaptım"
+  // diyen yönetici, aslında yapmamış oluyordu.
+  revokeToken(readCookie(req));
   res.setHeader('Set-Cookie', cookieHeader({ name: COOKIE, value: '', secure: req.secure, maxAge: 0 }));
   res.redirect('/login');
 });
@@ -340,7 +347,7 @@ app.post('/hesap-sil', async (req, res) => {
   // Kilit `verifyPassword`'dan ÖNCE: kilitliyken Identity Toolkit'e hiç
   // gidilmiyor, yoksa sayaç dolsa bile her istek bir doğrulama çağrısı
   // harcardı ve oracle zamanlama üzerinden açık kalırdı.
-  const ip = req.ip ?? 'bilinmiyor';
+  const ip = clientIp(req);
   const kilit = Math.max(silmeIpLimiti.lockedFor(ip), silmeAdresLimiti.lockedFor(email));
   if (kilit > 0) {
     return res.status(429).type('html').send(
@@ -481,8 +488,16 @@ app.get('/', async (_req, res) => {
         <td><code>${esc(e.id)}</code></td>
         <td style="white-space:nowrap">
           <a class="btn btn-ghost" style="padding:6px 12px;font-size:13px" href="/events/${encodeURIComponent(e.id)}">Düzenle</a>
+          <!-- Başlık JS DİZESİNE GİRMİYOR, data- niteliğinden okunuyor.
+               esc() tırnağı &#39; yapıyor ama HTML ayrıştırıcısı olay
+               niteliğini JS'e vermeden ÖNCE çözüyor: tırnak geri geliyor ve
+               dizeyi kapatıyor. Ölçüldü: içinde tırnak geçen bir başlık kod
+               çalıştırıyordu. dataset çözülmüş değeri düz metin olarak
+               veriyor, ayrıştırılacak bir şey kalmıyor.
+               NOT: bu şablonun içinde ters tırnak kullanılamaz. -->
           <form method="post" action="/events/${encodeURIComponent(e.id)}/delete" style="display:inline"
-                onsubmit="return confirm('${esc(e.title)} silinsin mi? Geri alınamaz.')">
+                data-baslik="${esc(e.title)}"
+                onsubmit="return confirm(this.dataset.baslik + ' silinsin mi? Geri alınamaz.')">
             <button class="btn-danger" style="padding:6px 12px;font-size:13px">Sil</button>
           </form>
         </td>

@@ -40,7 +40,18 @@ const AUTH_GRACE_MS = 10 * 60_000;
  * listeyi tek doğru kaynak yapmak o ihtimali ortadan kaldırıyor.
  */
 export const USER_DOC_COLLECTIONS = ['users', 'emailOtp'] as const;
-export const USER_QUERY_COLLECTIONS = ['registrations', 'raffleEntries'] as const;
+/**
+ * `attendance` BU LİSTEDE, ve unutulması sertifikayı da kapsıyordu.
+ *
+ * Yoklama satırı `uid` taşıyor ve üstüne sertifika yazılıyor — yani kişinin
+ * adı (yayın anında dondurulmuş hâliyle) orada duruyor. Liste QR turunda
+ * yazıldı, `attendance` ise o turdan sonra doğdu: silme sayfası "etkinlik
+ * kayıtlarınız" derken bu koleksiyona hiç dokunmuyordu.
+ *
+ * Sertifikanın kendisi de gidiyor: belge hesaba bağlı, hesap yoksa belgenin
+ * dayanağı da yok. Doğrulama adresi artık "böyle bir belge yok" diyor.
+ */
+export const USER_QUERY_COLLECTIONS = ['registrations', 'raffleEntries', 'attendance'] as const;
 
 /**
  * `uid` TAŞIMAYAN kayıtlar da silinmek zorunda, ve onlar yalnızca öğrenci
@@ -124,8 +135,11 @@ export async function processDeletion(
   }
 
   // Cihaz kaydının kimliği push jetonu, kullanıcı değil. Kullanıcıya bağlı
-  // olmadığı için burada silinemiyor — cihazdan çıkış yapmak onu zaten
-  // bırakıyor ve jeton kişiyi tanımlamıyor.
+  // olmadığı için burada silinemiyor — ve kural `delete`'i tamamen kapatıyor,
+  // çünkü koleksiyon kimliksiz yazılıyor: silmeye izin vermek, herkesin
+  // herkesin bildirimini kapatabilmesi demek olurdu. Silme sayfası bu yüzden
+  // "bildirim kaydınız" diye bir söz VERMİYOR artık; jeton kişiyi tanımlamıyor
+  // ve uygulamayı silmek onu zaten bırakıyor.
 
   await db.collection('deletionRequests').doc(uid).set(
     { status: 'done', completedAt: new Date(now).toISOString(), silinen },
@@ -175,6 +189,22 @@ export async function runDeletionSweep(db: Firestore, now = Date.now()): Promise
     if (!Number.isFinite(bittiAt) || now - bittiAt < AUTH_GRACE_MS) continue;
     await deleteAuthUser(doc.id);
     await doc.ref.set({ authSilindi: true }, { merge: true });
+  }
+
+  // TALEP DOKÜMANININ KENDİSİ DE SİLİNİYOR, ve bu bir temizlik değil bir söz.
+  // İçinde uid ve e-posta var; süresiz kalması "hesabınız ve e-postanız
+  // kalıcı olarak silinir" cümlesini yanlış yapıyordu — silinen kişinin
+  // adresi, silindiğinin kaydı olarak veritabanında duruyordu.
+  //
+  // Auth silindikten sonra bekleniyor çünkü istemci "bitti mi" diye bu
+  // dokümanı okuyor: erken silmek ekranı sonsuza kadar bekletirdi. Pencere
+  // Auth gecikmesinin iki katı, yani istemcinin okuması kesin bitmiş oluyor.
+  const temizlenecek = await db.collection('deletionRequests').where('authSilindi', '==', true).get();
+  for (const doc of temizlenecek.docs) {
+    const bittiAt = Date.parse(String((doc.data() as { completedAt?: string }).completedAt ?? ''));
+    if (!Number.isFinite(bittiAt) || now - bittiAt < AUTH_GRACE_MS * 2) continue;
+    await doc.ref.delete();
+    console.log(`[silme] ${doc.id} talep kaydı da silindi.`);
   }
 
   return sonuc;

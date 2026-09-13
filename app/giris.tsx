@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authErrorMessage, resetPassword, signIn } from '../src/auth';
+import { safeNext } from '../src/deepLink';
 import { ErrorBanner, Field, Input } from '../src/components/AuthForm';
 import { GlassButton, GradientHeader, PrimaryButton, Txt } from '../src/components/ui';
 import { colors, gradients } from '../src/theme';
@@ -31,7 +32,7 @@ export default function LoginRoute() {
     setBilgi(null);
     try {
       await signIn(email, parola);
-      router.replace(next ? (next as never) : '/(tabs)/hesap');
+      router.replace(safeNext(next) ?? '/(tabs)/hesap');
     } catch (err) {
       setHata(authErrorMessage(err));
     } finally {
