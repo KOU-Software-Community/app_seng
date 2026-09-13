@@ -1,3 +1,4 @@
+import { joinLocal, toLocalIso } from '../eventSchema';
 import {
   QR_ALPHABET,
   QR_TOKEN_LENGTH,
@@ -156,5 +157,35 @@ describe('windowOpen', () => {
 describe('attendanceId', () => {
   it('etkinlik ve kullanıcıyı birleştiriyor', () => {
     expect(attendanceId('git-atolyesi', 'uid123')).toBe('git-atolyesi__uid123');
+  });
+});
+
+/**
+ * `toLocalIso` — mutlak bir andan +03:00 duvar saatine.
+ *
+ * QR penceresi Firestore'a `Timestamp` olarak yazılıyor (kural `request.time`
+ * ile karşılaştırıyor ve dize bir tip uyuşmazlığı), panel ise ISO dizesi
+ * gösteriyor. Dönüşümün ters yönü bu fonksiyon, ve **konteynerin saat dilimine
+ * bağlı olmamak zorunda**: panel Coolify'da genellikle UTC'de koşuyor,
+ * `getHours()` kullanılsaydı pencere orada üç saat kaymış görünürdü.
+ */
+describe('toLocalIso', () => {
+  it('UTC değil, kulüp saatinin duvar saatini yazıyor', () => {
+    expect(toLocalIso(new Date('2026-09-14T17:00:00+03:00'))).toBe('2026-09-14T17:00:00+03:00');
+    expect(toLocalIso(new Date('2026-09-14T14:00:00Z'))).toBe('2026-09-14T17:00:00+03:00');
+  });
+
+  it('gün sınırını kulüp saatine göre çeviriyor', () => {
+    // 21:30 UTC = ertesi günün 00:30'u Kocaeli'de.
+    expect(toLocalIso(new Date('2026-09-13T21:30:00Z'))).toBe('2026-09-14T00:30:00+03:00');
+  });
+
+  it('joinLocal ile gidip gelmek değeri oynatmıyor', () => {
+    const iso = joinLocal('2026-09-13', '00:00');
+    expect(toLocalIso(new Date(iso))).toBe(iso);
+  });
+
+  it('okunamayan tarihte uydurmuyor', () => {
+    expect(toLocalIso(new Date('sallama'))).toBe('');
   });
 });

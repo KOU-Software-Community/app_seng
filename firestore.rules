@@ -388,6 +388,15 @@ service cloud.firestore {
         && request.resource.data.token == qrTanimi(request.resource.data.eventId).token
         // Pencere: etkinliğin bir saat öncesinden o günün sonuna. Bitişte
         // kapatmak, akşam bağlantıya kavuşan telefonu kalıcı olarak reddederdi.
+        //
+        // ALANLAR `timestamp` OLMAK ZORUNDA. `request.time` bir timestamp ve
+        // kural dili güçlü tipli: karşı taraf dize olduğunda bu bir tip
+        // uyuşmazlığı, hata veren ifade de REDDEDEREK bitiyor. Panel bir süre
+        // ISO dizesi yazdı ve sonucu pencerenin hiç açılmamasıydı — ne
+        // varsayılan ne elle girilen. Cihazda görünen tek şey "Bu kod şu anda
+        // geçerli değil"; operatör tarihi değiştiriyor, hiçbir şey değişmiyor.
+        // `admin/qr.ts` artık `Timestamp` yazıyor ve eski dize kayıtları
+        // açılışta onarıyor.
         && request.time >= qrTanimi(request.resource.data.eventId).opensAt
         && request.time <= qrTanimi(request.resource.data.eventId).closesAt;
     }
