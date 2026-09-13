@@ -14,7 +14,7 @@
  */
 import type { Express, Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 
 import { STUDENT_NO_RE, normalizePhone } from '../src/accountSchema';
 import { claimIdentity, type Kimlik } from './claims';
@@ -27,8 +27,57 @@ import {
   hashCode,
   type OtpRecord,
 } from './otp';
+import { loginLimiter } from './session';
 
 const OTP_COLLECTION = 'emailOtp';
+
+/**
+ * IP başına posta sınırı — 20 / saat.
+ *
+ * **Hesap başına sınır, hesap açmak bedavayken sınır değil.** `decideSend`
+ * `emailOtp/{uid}` dokümanına bakıyor, yani yeni hesap = sıfır sayaç; Firebase
+ * kaydı herkese açık ve doğrulanmamış hesap da geçerli bir kimlik jetonu
+ * alıyor. Elli hesap açan biri kulübün alan adından 250 posta gönderebiliyordu.
+ *
+ * Sonucu bir veri sızıntısı değil, daha sinsi bir şey: Workspace'in günlük
+ * gönderim tavanı dolunca **hiçbir gerçek öğrenci doğrulama kodu alamıyor** ve
+ * tek belirti "kod gelmiyor" — kimse sebebi göremiyor. Alan adının spam
+ * itibarı da aynı kapıdan gidiyor.
+ *
+ * Kalıcı cevap Firebase App Check (kimliksiz kayıt spam'iyle aynı kalem);
+ * bu sayaç onun yerine geçmiyor, tavanı yaklaşılamaz hâle getiriyor.
+ */
+const kodLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
+
+/**
+ * Günde gönderilebilecek toplam doğrulama postası.
+ *
+ * IP sınırını dağıtık bir istek baypas ediyor ve hesap sınırı hesap başına
+ * olduğu için toplamı sınırlamıyor. Bu tavan Workspace kotasını koruyor.
+ */
+const KOD_DAILY_CAP = 300;
+const KOD_STATE_DOC = 'pushState/emailOtpDaily';
+
+/** UTC gün anahtarı. Yerel güne bağlanırsa sayaç sunucunun penceresinden kayar. */
+function utcGun(now: number): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+/**
+ * Günlük tavanı bir artırır; tavan aşılmışsa `false`.
+ *
+ * İşlem değil, oku + yaz: sınırda birkaç fazla posta göndermek kabul
+ * edilebilir, kotayı yakmak değil.
+ */
+async function gunlukTavan(db: Firestore, now: number): Promise<boolean> {
+  const ref = db.doc(KOD_STATE_DOC);
+  const data = (await ref.get()).data() ?? {};
+  const gun = utcGun(now);
+  const sayi = data.gun === gun && typeof data.sayi === 'number' ? data.sayi : 0;
+  if (sayi >= KOD_DAILY_CAP) return false;
+  await ref.set({ gun, sayi: sayi + 1 });
+  return true;
+}
 
 /** `Authorization: Bearer …` başlığından jetonu çıkarır. */
 function bearer(req: Request): string | null {
@@ -74,6 +123,15 @@ export function registerAccountApi(app: Express, db: Firestore): void {
    * almadan bir dakika beklemek zorunda kalırdı.
    */
   app.post('/api/hesap/kod', async (req, res) => {
+    // IP kilidi kimlik çözümünden ÖNCE: jeton doğrulama da bir Firebase
+    // çağrısı, ve kilitli bir IP'nin onu harcamasına gerek yok.
+    const ip = req.ip ?? 'bilinmiyor';
+    const kilit = kodLimiti.lockedFor(ip);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_fazla', saniye: Math.ceil(kilit / 1000) });
+    }
+    kodLimiti.fail(ip);
+
     const kim = await kimlikCoz(req, res);
     if (!kim) return;
     if (kim.dogrulanmis) return res.json({ durum: 'zaten_dogrulandi' });
@@ -89,6 +147,15 @@ export function registerAccountApi(app: Express, db: Firestore): void {
     const karar = decideSend(await otpOku(db, kim.uid), now);
     if (!karar.ok) {
       return res.status(429).json({ hata: karar.reason, saniye: karar.saniye });
+    }
+
+    // Günlük tavan gönderimden ÖNCE: kaydı yazıp sonra göndermemek,
+    // kullanıcıyı hiç gelmeyecek bir postayı beklemeye mahkûm ederdi.
+    if (!(await gunlukTavan(db, now))) {
+      console.error(
+        `[posta] günlük doğrulama kodu tavanı (${KOD_DAILY_CAP}) doldu — kod gönderilmedi.`,
+      );
+      return res.status(503).json({ hata: 'posta_gonderilemedi' });
     }
 
     const ref = db.collection(OTP_COLLECTION).doc(kim.uid);
@@ -146,7 +213,13 @@ export function registerAccountApi(app: Express, db: Firestore): void {
       // Yanlış denemeler sayılıyor; süresi dolmuş ya da hiç olmayan kodda
       // sayacı artırmak anlamsız (artıracak bir kayıt da yok).
       if (karar.reason === 'yanlis' && kayit) {
-        await ref.update({ attempts: kayit.attempts + 1 });
+        // `attempts + 1` DEĞİL: eşzamanlı iki yanlış deneme aynı değeri okur,
+        // ikisi de aynı sayıyı yazar ve beş denemelik tavan paralelleştirilerek
+        // delinir — altı hane 10^6, yeterince paralel istekle tahmin edilebilir
+        // hâle geliyor. Bu, defterdeki "increment kullanma" maddesinin TERSİ
+        // durum: orada idempotent bir yeniden gönderim sayıyı şişiriyordu,
+        // burada her deneme ayrı ayrı sayılmak zorunda.
+        await ref.update({ attempts: FieldValue.increment(1) });
       }
       return res.status(400).json({ hata: karar.reason, kalan: karar.kalan });
     }

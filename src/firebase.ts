@@ -166,9 +166,24 @@ export async function pushRaffleEntry(entry: {
   values: Record<string, string>;
 }): Promise<void> {
   const db = getDb();
+
+  // `uid` YAZILIYOR, ve sebebi silme. Katılım formu ad, telefon ve öğrenci
+  // numarası topluyor; `admin/deletion.ts` bunları `where('uid','==',uid)` ile
+  // arıyor. Alan hiç yazılmadığı sürece o sorgu boş dönüyordu, yani hesabını
+  // silen kullanıcının çekiliş katılımı veritabanında kalıyordu — ekran
+  // "bütün verileriniz silinir" derken. Kimse bunu bildiremez: silinmiş bir
+  // şeyin kaldığını ancak veritabanına bakan biri görür.
+  //
+  // Kayıtlardaki gibi isteğe bağlı: hesabı olmayan sürüm de yazmaya devam
+  // edebilmeli. Auth dinamik içe aktarılıyor — hesapsız kullanıcı için Auth
+  // SDK'sını bu yola sokmanın anlamı yok.
+  const { currentUser } = await import('./auth');
+  const uid = currentUser()?.uid;
+
   await withTimeout(
     setDoc(doc(db, COLLECTIONS.raffleEntries, entry.entryId), {
       ...entry,
+      ...(uid ? { uid } : {}),
       createdAt: serverTimestamp(),
     }),
     'raffleEntry',

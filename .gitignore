@@ -113,3 +113,7 @@ service-account*.json
 serviceAccountKey*.json
 google-services.json
 GoogleService-Info.plist
+
+# Sertifika önizlemesi — `npm run sertifika:onizle` üretiyor, üretilen şey
+# depoya girmez.
+sertifika-onizleme/
