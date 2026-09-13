@@ -1098,6 +1098,33 @@ check(
 );
 
 check(
+  'yeni yayımlanmış sürümler için bekleme penceresi var',
+  'npm audit yalnızca AÇIKLANMIŞ danışmaları görüyor. npm’e yapılan gerçek ' +
+    'saldırılar — ele geçirilmiş bir bakımcı hesabından yayımlanan, ' +
+    'postinstall’da kimlik toplayan bir sürüm — açıklanmadan önce lockfile’a ' +
+    'giriyor. Bilinenlerin hepsi saatler içinde çekildi, yani birkaç günlük ' +
+    'pencere o sürümü hiç kurmamak demek. Satır silindiğinde hiçbir şey hata ' +
+    'vermiyor: npm eski davranışına döner ve kimse fark etmez. ' +
+    'Yorumlar ayrıştırılarak eleniyor — .npmrc’nin kendi açıklama bloğu bu ' +
+    'anahtarın adını altı kez taşıyor, ham arama kendi gerekçesini bulurdu.',
+  () => {
+    const satirlar = read('.npmrc')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#') && !l.startsWith(';'));
+    const satir = satirlar.find((l) => l.split('=')[0].trim() === 'min-release-age');
+    if (!satir) {
+      return '.npmrc içinde min-release-age yok — yeni yayımlanmış sürümler anında kurulur';
+    }
+    const gun = Number(satir.split('=').slice(1).join('=').trim());
+    if (!Number.isFinite(gun) || gun < 1) {
+      return 'min-release-age en az 1 gün olmalı, okunan: ' + satir;
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',
