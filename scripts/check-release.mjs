@@ -492,7 +492,13 @@ check(
       return 'silme listesinde attendance yok — yoklama ve sertifika hesaptan sonra kalıyor';
     }
 
-    // 13) Derin bağlantıdan gelen `next` denetlenmeli: giriş sonrası varılan
+    // 13) `req.body` tanımsız gelebiliyor (Express 5); yirmiye yakın okuma
+    //     var ve ikisi kimliksiz rotada.
+    if (!/req\.body === undefined/.test(server)) {
+      return 'req.body normalleştirilmiyor — Content-Type\u2019sız istek rotayı 500 yapar';
+    }
+
+    // 14) Derin bağlantıdan gelen `next` denetlenmeli: giriş sonrası varılan
     //     yeri saldırgan seçebiliyordu.
     const giris = strip(read('app/giris.tsx'));
     if (!/safeNext\(next\)/.test(giris)) {

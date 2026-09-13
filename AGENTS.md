@@ -1424,6 +1424,15 @@ bulgunun çoğu yukarıdakilerin kopyasıydı; kalanı elle okundu:
   edici anlatı. `safeNext` ayrı bir modülde ve testli: `//evil.example` tek
   eğik çizgi kontrolünden geçtiği için ayrıca eleniyor.
 
+- **Express 5'te `req.body` TANIMSIZ olabiliyor.** Hiçbir gövde ayrıştırıcısı
+  eşleşmediğinde (Content-Type yok ya da başka bir tür) alan hiç kurulmuyor;
+  Express 4'ün boş nesne davranışı yok. Panelde ve hesap uç noktalarında
+  yirmiye yakın yer `req.body.x` okuyor ve hepsi o istekte fırlıyor — ikisi
+  kimliksiz rotada (`/login`, `/hesap-sil`), yani dışarıdan tetiklenebilen bir
+  çökme yolu, ve hatanın metni sebebi hiç söylemiyor. Çağrı yerlerini tek tek
+  sarmak yerine tek bir ara yazılımda normalleştiriliyor: **yirmi yerde
+  hatırlanması gereken bir şey, on dokuzunda hatırlanır.**
+
 **Taramanın kendi maliyeti ölçüldü:** 177 ajan, 75'i tamamlandı, **102'si
 oturum kotasına takılıp öldü** (`You've hit your session limit`). Yani çürütme
 turu YARIM: 22 bulgunun 18'i üç oyla doğrulandı, geri kalanı hiç oylanamadı.

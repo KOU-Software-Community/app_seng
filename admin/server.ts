@@ -154,6 +154,24 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json({ limit: '8kb' }));
 
 /**
+ * `req.body` HİÇBİR ZAMAN TANIMSIZ OLMASIN.
+ *
+ * Express 5'te hiçbir gövde ayrıştırıcısı eşleşmediğinde (Content-Type yok ya
+ * da başka bir tür) alan **hiç kurulmuyor** — Express 4'teki boş nesne
+ * davranışı yok. Bu dosyada ve `accountApi.ts`'te yirmiye yakın yer
+ * `req.body.x` okuyor; hepsi o istekte fırlıyor ve rota 500 veriyor. İkisi
+ * kimliksiz (`/login`, `/hesap-sil`), yani dışarıdan tetiklenebilen bir çökme
+ * yolu — ve hatanın metni sebebi hiç söylemiyor.
+ *
+ * Çağrı yerlerini tek tek `?? {}` ile sarmak yerine burada normalleştiriliyor:
+ * yirmi yerde hatırlanması gereken bir şey, on dokuzunda hatırlanır.
+ */
+app.use((req, _res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
+
+/**
  * CSRF: durum değiştiren her istek panelin kendi sayfasından gelmek zorunda.
  *
  * `/api/` ATLANIYOR ve bu bir boşluk değil: o uç noktaları uygulamanın
