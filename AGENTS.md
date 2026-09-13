@@ -1749,3 +1749,35 @@ neden var?"*
   geldi ve KONMADI: panel kendi saatine bakıp "açık" derdi, kural yine
   reddederdi. Yanlış yerde güven veren bir gösterge, hiç gösterge olmamasından
   kötü.
+
+### App Review demo hesabı — `npm run demo:hesap`
+
+- **Doğrulanmamış bir demo hesap, inceleyiciyi gelmeyen bir kodu beklemeye
+  gönderir.** Etkinlik kaydı ekranı `emailVerified` istiyor; Apple'a verilen
+  hesap doğrulanmamışsa inceleyici doğrulama kapısını görüyor, kod operatörün
+  kutusuna düşüyor ve o hiç öğrenemiyor. Uygulamanın normal akışı da çalışır
+  ama panelin dağıtılmış, kuralların yayınlanmış olmasını ister; script Admin
+  SDK ile çalıştığı için ikisine de bağlı değil.
+- **Sıra bir ayrıntı değil: önce `claimIdentity`, sonra `emailVerified`.**
+  Bu deponun değişmezi "doğrulanmış ⇒ telefon ve öğrenci numarası
+  sahiplenilmiş" — parola sıfırlamanın `emailVerified`'a neden dokunmadığı da
+  aynı gerekçe. Ters sırada sahiplenme çakışırsa script çıkıyor ama
+  `emailVerified` çoktan yazılmış oluyor: numarası başkasında olan, yine de
+  doğrulanmış bir hesap kalıyor geride. `check:release` sırayı tutuyor ve
+  ters çevrilince kırmızı verdiği görüldü.
+- **Firebase Console'dan kullanıcı silmek teklik kayıtlarını GERİDE
+  BIRAKIYOR.** `phoneClaims/{telefon}` ve `studentClaims/{ogrenciNo}`
+  kimliklerini değerin kendisinden alıyor, `uid`'den değil — Console'un
+  sildiği tek şey Auth kaydı. O telefon ve o numara sonsuza kadar kilitli
+  kalıyor ve bunu kimse bir hata olarak bildirmez (defterde aynı madde silme
+  yoklayıcısı için zaten yazılı). `--sil` panelin kendi yolundan
+  (`processDeletion`) geçiyor, guard bunu da tutuyor.
+- **Argümanlar Firebase'e bağlanmadan ÖNCE doğrulanıyor.** Ters sıra,
+  telefondaki bir yazım hatasını "servis hesabı anahtarı okunamadı" diye
+  gösteriyordu. Yan faydası ölçülebilirlik: beş dalın beşi de anahtarsız bir
+  makinede koşturulup görüldü — **anahtarlı yol bu konteynerden
+  doğrulanamıyor** ve bu satır onu söylemek için burada.
+- **Parola argüman olarak alınmıyor, üretiliyor.** `--parola` kabuk geçmişine
+  ve `ps` çıktısına düşer. Gerekirse `DEMO_PAROLA=… npm run demo:hesap`.
+- Profil alanları `firestore.rules`'taki `hasOnly` listesiyle birebir yazılıyor:
+  fazladan bir alan, aynı profili uygulamadan güncellemeyi reddettirir.
