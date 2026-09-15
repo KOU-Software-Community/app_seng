@@ -5,7 +5,7 @@ import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { ContentNotice, EmptyState, PixelTxt } from '../../components/ui';
 import { colors } from '../../theme';
 import { ArticleCard } from '../components/ArticleCard';
-import { useFeed } from '../data-access/hooks';
+import { useSavedArticlesFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useReadArticles, useSavedArticles } from '../user-state/hooks';
 
@@ -26,18 +26,24 @@ export function SavedView() {
   const { saved } = useSavedArticles();
   const { isRead, markRead } = useReadArticles();
 
-  // Kayıtlı liste cihazda yalnızca kimlik tutuyor; gövdeler akış sorgusunda
-  // zaten var. Kimlik başına depoya sormak, tek ekran için N tur demekti.
-  const feed = useFeed();
-  const articles = useMemo(
-    () => feed.data?.pages.flatMap((page) => page.items) ?? [],
-    [feed.data],
-  );
+  const savedIds = useMemo(() => saved.map((entry) => entry.articleId), [saved]);
 
-  const items = orderBySaved(
-    articles,
-    saved.map((entry) => entry.articleId),
-  );
+  /**
+   * Gövdeler kimliklerden geliyor, akışın yüklenmiş sayfalarından DEĞİL.
+   *
+   * Eski hâl `useFeed()` çağırıp kayıtlı kimlikleri o sayfalarla kesiştiriyordu
+   * ve `orderBySaved` bulamadığını sessizce düşürüyordu: akış penceresinden
+   * düşmüş bir kayıt listeden yok oluyordu — hata yok, mesaj yok, ekranda
+   * "Kaydedilen haber yok" yazıyordu. Ne kadar çok kaydedilirse o kadar çoğu
+   * kayboluyordu.
+   *
+   * Yerine tek turluk toplu okuma (`articlesByIds`). Eski yorumun itirazı
+   * ("kimlik başına N tur") bu yüzden geçerli değil: tur sayısı bir.
+   */
+  const feed = useSavedArticlesFeed(savedIds);
+  const articles = useMemo(() => feed.data ?? [], [feed.data]);
+
+  const items = orderBySaved(articles, savedIds);
 
   return (
     <ScrollView
@@ -55,13 +61,13 @@ export function SavedView() {
         <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
       ) : null}
 
-      {feed.isPending ? (
+      {savedIds.length > 0 && feed.isPending ? (
         <PixelTxt size={9} style={styles.loading}>
           YUKLENIYOR
         </PixelTxt>
       ) : null}
 
-      {!feed.isPending && items.length === 0 ? (
+      {(savedIds.length === 0 || !feed.isPending) && items.length === 0 ? (
         <EmptyState
           title="Kaydedilen haber yok"
           body="Bir haberi açıp kaydettiğinde burada birikecek."

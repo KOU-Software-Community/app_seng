@@ -44,6 +44,20 @@ export interface FeedRepositoryV1 {
   readonly version: RepositoryContractVersion;
   listArticles(params?: ListArticlesParams): Promise<Result<Page<Article>>>;
   getArticle(id: ArticleId): Promise<Result<Article>>;
+  /**
+   * Verilen kimliklerin hepsi, TEK turda.
+   *
+   * Kayıtlılar ekranı için var. Eskiden o ekran kayıtlı kimlikleri akışın
+   * YÜKLENMİŞ SAYFALARIYLA kesiştiriyordu ve bulamadığını sessizce düşürüyordu
+   * — yani kullanıcının kaydettiği bir haber, akış penceresinden düştüğü an
+   * listeden yok oluyordu. Hata yok, mesaj yok.
+   *
+   * Ekrandaki eski yorum "kimlik başına depoya sormak N tur demekti" diyor ve
+   * haklı; bu yüzden cevap tek tek sormak değil, toplu sormak.
+   *
+   * Sıra GARANTİ EDİLMİYOR: çağıran kendi sırasını uyguluyor (kayıt sırası).
+   */
+  articlesByIds(ids: readonly ArticleId[]): Promise<Result<Article[]>>;
   /** Case-insensitive match over title + source name + category. */
   searchArticles(params: SearchArticlesParams): Promise<Result<Page<Article>>>;
 }

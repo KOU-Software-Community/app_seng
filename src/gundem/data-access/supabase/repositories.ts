@@ -138,6 +138,34 @@ export function createSupabaseFeedRepository(
      * `search_tsv`. The RPC returns at most `lim` rows in one shot and has no
      * cursor parameter, so a search result page is always the last page.
      */
+    async articlesByIds(ids: readonly string[]): Promise<Result<Article[]>> {
+      const temiz = [...new Set(ids.map((id) => id?.trim()).filter(Boolean))] as string[];
+      if (temiz.length === 0) return ok([]);
+      try {
+        // PostgREST `in` süzgecini SORGU DİZESİNE koyuyor. Kayıtlı liste
+        // tavansız (`setArticleSaved` kesmiyor), yani yıllar içinde yüzlerce
+        // kimliğe çıkabilir ve tek istekte URL sunucu sınırını aşar. Parça
+        // başına 100 kimlik ~4 KB'lık bir sorgu dizesi demek.
+        const parcalar: string[][] = [];
+        for (let i = 0; i < temiz.length; i += 100) parcalar.push(temiz.slice(i, i + 100));
+
+        const sonuclar = await Promise.all(
+          parcalar.map((parca) =>
+            client.from(FEED_VIEW).select(FEED_COLUMNS).in('article_id', parca),
+          ),
+        );
+        // Bir parça patlarsa HATA dönüyor, kısa liste değil: sessizce eksik
+        // dönmek, bu fonksiyonun düzeltmek için var olduğu hatanın aynısı olurdu.
+        for (const { error } of sonuclar) {
+          if (error) return { ok: false, error: toDataError(error, 'articlesByIds') };
+        }
+        const rows = sonuclar.flatMap((r) => (r.data ?? []) as unknown as FeedArticleRow[]);
+        return ok(rows.map(toArticle));
+      } catch (error) {
+        return toNetworkError(error, 'articlesByIds');
+      }
+    },
+
     async searchArticles(params: SearchArticlesParams): Promise<Result<Page<Article>>> {
       const query = params.query?.trim() ?? '';
       const limit = clampLimit(params.limit);
