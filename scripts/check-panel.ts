@@ -30,7 +30,7 @@ import {
 } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
 import { resolvePort } from '../admin/port';
-import { announce } from '../admin/push';
+import { announce, flushPending } from '../admin/push';
 import {
   USER_DOC_COLLECTIONS,
   USER_QUERY_COLLECTIONS,
@@ -1566,6 +1566,109 @@ void (async () => {
       yeniJetonlu.opensAt,
     );
   }
+
+  // ---- ADMIN_AUTO_PUSH=off sessiz saat kuyruğunu da durduruyor ----
+  //
+  // `off` yalnızca `announce()`'ta okunuyordu; `flushPending` kapısızdı ve
+  // `startPushFlusher` koşulsuz başlıyordu. Yani üretim servis hesabıyla
+  // yerelde panel açmak, kuyrukta bekleyen bildirimleri saniyeler içinde
+  // gerçek cihazlara gönderiyordu.
+  //
+  // İki iddia var ve İKİNCİSİ asıl olan: kapı doğru YERDE mi. `flushPending`
+  // kuyruk dokümanını gönderimden ÖNCE siliyor, dolayısıyla silmeden sonra
+  // konmuş bir kapı kuyruğu yine boşaltır — bildirim hem gitmez hem de
+  // sunucudaki panel onu doğru saatte bir daha gönderemez.
+  //
+  // ÖLÇÜLDÜ, üç kırma: (a) kapı tamamen kaldırıldığında ikisi de kırmızı;
+  // (b) kapı `pushTo` çağrısının önüne konduğunda yine ikisi de kırmızı — ama
+  // bu fikstür oraya hiç ULAŞMIYOR, jetonu boş olduğu için daha önce düşüyor,
+  // yani (b) yerleşimi sınamıyor; (c) kapı `doc.ref.delete()`in hemen ardına
+  // sayaç artırmadan konduğunda BİRİNCİ İDDİA YEŞİL KALIYOR, yalnızca ikincisi
+  // kırmızı veriyor. Yerleşimi sınayan tek ölçüm (c).
+  {
+    /** `where(alan, op, değer)`'i OPERATÖRÜYLE uygulayan küçük Firestore. */
+    function kuyrukDb(pending: Record<string, Record<string, unknown>>) {
+      const store = new Map<string, Map<string, Record<string, unknown>>>();
+      store.set('pendingPushes', new Map(Object.entries(pending)));
+      store.set('devices', new Map());
+      const col = (name: string) => {
+        if (!store.has(name)) store.set(name, new Map());
+        return store.get(name)!;
+      };
+      return {
+        collection(name: string) {
+          const c = col(name);
+          const belgeler = () =>
+            [...c.entries()].map(([id, d]) => ({
+              id,
+              data: () => d,
+              ref: { delete: async () => void c.delete(id) },
+            }));
+          return {
+            // Operatör BİLEREK uygulanıyor: bu depoda sahte Firestore'un
+            // operatörü yok sayması bir kontrolü yanlışlıkla yeşile boyamıştı.
+            where(field: string, op: string, value: unknown) {
+              return {
+                async get() {
+                  const docs = belgeler().filter(({ data }) => {
+                    const v = data()[field];
+                    if (op === '<=') return String(v) <= String(value);
+                    if (op === '==') return v === value;
+                    throw new Error(`sahte Firestore ${op} bilmiyor`);
+                  });
+                  return { docs, empty: docs.length === 0 };
+                },
+              };
+            },
+            async get() {
+              const docs = belgeler();
+              return { docs, empty: docs.length === 0, size: docs.length };
+            },
+          };
+        },
+        _kalan: () => col('pendingPushes').size,
+      };
+    }
+
+    const kuyruk = () => ({
+      bekleyen: {
+        notBefore: '2026-09-10T05:00:00.000Z',
+        tokens: [] as string[],
+        payload: { category: 'Atölye', title: 'Gece açılan atölye', body: '', data: {} },
+      },
+    });
+    const ONCE = new Date('2026-09-10T08:00:00+03:00');
+    const eskiDeger = process.env.ADMIN_AUTO_PUSH;
+
+    // off: hiçbir şey gönderilmiyor VE kuyruk dokümanı yerinde duruyor.
+    process.env.ADMIN_AUTO_PUSH = 'off';
+    const kapali = kuyrukDb(kuyruk());
+    const rKapali = await flushPending(kapali as never, { now: ONCE });
+    assert(
+      'ADMIN_AUTO_PUSH=off kuyruğu boşaltmıyor',
+      rKapali.flushed === 0 && rKapali.dropped === 0 && rKapali.sent === 0,
+      JSON.stringify(rKapali),
+    );
+    assert(
+      'off iken kuyruk dokümanı SİLİNMİYOR (kapı silmeden önce)',
+      kapali._kalan() === 1,
+      `kalan: ${kapali._kalan()}`,
+    );
+
+    // açık: aynı doküman tüketiliyor — yani yukarıdaki iddia boş değil.
+    delete process.env.ADMIN_AUTO_PUSH;
+    const acik = kuyrukDb(kuyruk());
+    const rAcik = await flushPending(acik as never, { now: ONCE });
+    assert(
+      'açıkken aynı kuyruk tüketiliyor (iddia boş değil)',
+      rAcik.dropped === 1 && acik._kalan() === 0,
+      `${JSON.stringify(rAcik)} kalan: ${acik._kalan()}`,
+    );
+
+    if (eskiDeger === undefined) delete process.env.ADMIN_AUTO_PUSH;
+    else process.env.ADMIN_AUTO_PUSH = eskiDeger;
+  }
+
 
 })().then(() => {
   // Çıkış burada: yukarıdaki blok asenkron, dosyanın sonunda çağrılsaydı

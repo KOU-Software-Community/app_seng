@@ -1645,6 +1645,42 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   (`react-native-worklets`, o gerçekten gerekli). Silmek native modül
   çıkardığı için yeniden derleme istiyor.
 
+### `ADMIN_AUTO_PUSH=off` bir kapatma anahtarı değildi
+
+- **Bir bayrak, yalnızca okunduğu yerde bayraktır.** `autoPushEnabled()` iki
+  yerde okunuyordu: `announce()` ve açılıştaki log satırı. `flushPending`
+  (sessiz saat kuyruğu) kapısızdı ve `startPushFlusher(db)` `server.ts`'te
+  **koşulsuz** başlıyor, üstelik `run()` interval'den önce bir kez hemen
+  koşuyor. Yani `ADMIN_AUTO_PUSH=off npm run admin` demek, üretim servis
+  hesabıyla yerelde panel açan birinin kuyrukta bekleyen bildirimleri saniyeler
+  içinde gerçek cihazlara göndermesi demekti. Bayrağın adı "auto push" ve
+  kuyruğu boşaltmak tanım gereği otomatik — kapsamı adından okunmuyor, kodundan
+  okunuyor.
+- **Kapının YERİ, kapının varlığı kadar önemli.** `flushPending` kuyruk
+  dokümanını gönderimden ÖNCE siliyor (yarıda kalan bir tur aynı bildirimi iki
+  kez göndermesin diye, ve o gerekçe doğru). Kapı o silmeden sonra konsaydı
+  bildirim gitmezdi **ama kuyruk yine boşalırdı** — yani sunucudaki panel onu
+  doğru saatte bir daha gönderemezdi. Kapı bu yüzden sorgudan da önce, en
+  başta.
+- **Yanlış fikstür, yerleşimi sınamıyor ve bunu fark etmek ölçüm istedi.**
+  İlk kırma testinde kapı `pushTo`nun önüne kondu ve iki iddia da kırmızı
+  verdi; "demek ki iddia yerleşimi yakalıyor" diye okunacaktı. Okunmamalıydı:
+  fikstürün jetonu boş olduğu için akış `pushTo`ya HİÇ ulaşmıyor, daha önce
+  `dropped`a düşüyor — yani o kırma, sınamak istediği satırı hiç çalıştırmadı.
+  Yerleşimi sınayan kırma, kapıyı `doc.ref.delete()`in hemen ardına sayaç
+  artırmadan koymak: o hâlde **birinci iddia yeşil kalıyor**, yalnızca "doküman
+  duruyor mu" kırmızı veriyor. **Bir kırma testinin kırmızı vermesi, doğru
+  sebeple kırmızı verdiği anlamına gelmiyor.**
+- **Test düğmesi bilerek kapsam dışı.** `/bildirimler` sayfasındaki
+  `sendTestPush` kapıdan geçmiyor: operatör eliyle basıyor, yani otomatik
+  değil, ve bu deponun defterinde zincirin sessizce koptuğunu görmenin tek yolu
+  olarak yazılı. Kapatılsaydı teşhis aracı da kapanırdı.
+- `autoPushEnabled`'ın kendi yorumu kapsamı hiç yazmıyordu; artık hangi üç yolu
+  kapattığını ve hangisini kapatmadığını sayıyor. Deponun **"bir yorumun
+  anlattığı davranış, davranış değildir"** maddesinin tersi yönü: burada
+  davranış doğruydu, eksik olan yorumdu, ve eksik yorum operatöre yanlış bir
+  güvence veriyordu.
+
 ### Herkese açık bir deponun kimliği — LICENSE, README ve About
 
 - **`LICENSE` iskeletten kalmıştı ve hiçbir şey hata vermiyordu.** Dosya

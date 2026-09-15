@@ -39,6 +39,11 @@ const DEVICES = 'devices';
  * Yerelde panel çalıştırırken gerçek kullanıcılara bildirim gitmesini
  * istemiyorsanız `ADMIN_AUTO_PUSH=off` verin — panel açılışta hangi modda
  * olduğunu yazıyor.
+ *
+ * **Kapsamı:** otomatik giden her şey — `announce()` (yeni etkinlik, iptal,
+ * çekiliş, duyuru) ve `flushPending()` (sessiz saat kuyruğu). Panelin
+ * `/bildirimler` sayfasındaki test düğmesi KAPSAM DIŞI: onu operatör eliyle
+ * basıyor, yani otomatik değil, ve zincirin çalıştığını görmenin tek yolu o.
  */
 export const autoPushEnabled = (): boolean =>
   (process.env.ADMIN_AUTO_PUSH ?? '').trim().toLowerCase() !== 'off';
@@ -253,6 +258,15 @@ export async function flushPending(
   db: Firestore,
   opts: { now?: Date; fetchImpl?: typeof fetch } = {},
 ): Promise<{ flushed: number; dropped: number; sent: number }> {
+  // Kapı sorgudan da ÖNCE, ve bu yerleşim bir karar.
+  //
+  // Aşağıda kuyruk dokümanı gönderimden ÖNCE siliniyor (yarıda kalan bir tur
+  // aynı bildirimi iki kez göndermesin diye — o gerekçe doğru). Kapı o silmeden
+  // sonra konsaydı `off` bildirimi göndermezdi ama kuyruğu yine boşaltırdı:
+  // bildirim hem gitmezdi hem de sunucudaki panel onu doğru saatte bir daha
+  // gönderemezdi. Yani yanlış yerde bir kapı, kapının çözdüğü sorundan kötü.
+  if (!autoPushEnabled()) return { flushed: 0, dropped: 0, sent: 0 };
+
   const now = opts.now ?? new Date();
   const fetchImpl = opts.fetchImpl ?? fetch;
 
