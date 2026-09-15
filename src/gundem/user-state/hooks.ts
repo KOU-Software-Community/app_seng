@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   DEFAULT_SETTINGS,
+  clearRecentSearches,
   getRead,
   getRecentSearches,
   getSaved,
@@ -161,5 +162,13 @@ export function useRecentSearches() {
     [setRecentState],
   );
 
-  return { recentSearches: recent, isReady, pushRecentSearch: push };
+  // İyimser durum ile disk AYNI anda sıfırlanıyor. Yalnızca diski silmek,
+  // ekranda duran listeyi uygulama yeniden açılana kadar bırakırdı — bu
+  // deponun "aynı kararı iki yerde uygulamak" maddesinin küçük hâli.
+  const clear = useCallback(() => {
+    setRecentState(() => []);
+    void clearRecentSearches();
+  }, [setRecentState]);
+
+  return { recentSearches: recent, isReady, pushRecentSearch: push, clearRecentSearches: clear };
 }

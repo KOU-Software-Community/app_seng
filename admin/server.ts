@@ -76,6 +76,7 @@ import {
 } from '../src/pushPolicy';
 import { startDeletionSweeper } from './deletion';
 import { registerAccountApi } from './accountApi';
+import { ceviriDurumSatiri, registerTranslateApi } from './translateApi';
 import { certificateHtml } from './certificate';
 import {
   belgeTarihi,
@@ -474,6 +475,10 @@ app.get('/sertifika/:no', async (req, res) => {
 // Uygulamanın hesap uç noktaları. Kimliği yönetici parolası değil, çağıranın
 // Firebase kimlik jetonu belirliyor — bu yüzden giriş duvarının önünde.
 registerAccountApi(app, db);
+// AI Gündem'in çeviri kapısı. Azure anahtarı uygulamaya konamıyor (yayımlanabilir
+// anahtar değil), o yüzden panelden geçiyor. Yapılandırılmamışsa uç nokta
+// "yapilandirilmamis" diyor ve uygulama sunucudan gelen AI çevirisine düşüyor.
+registerTranslateApi(app);
 
 app.use(requireAuth);
 
@@ -1605,6 +1610,7 @@ app.listen(PORT, () => {
   // tek belirtisi "kod gelmiyor" olurdu ve o, operatörün bakmadığı yerde kalır.
   const posta = initMail(process.env);
   mailEksik = posta.ok ? [] : posta.eksik;
+  console.log(ceviriDurumSatiri(process.env));
   console.log(
     posta.ok
       ? `[posta] SMTP hazır — gönderen: ${mailFrom()}`

@@ -1146,6 +1146,47 @@ check(
 );
 
 check(
+  "kayıtlılar ekranı gövdeleri kimliklerden okuyor",
+  "Eski hâl akışı çağırıp kayıtlı kimlikleri akışın YÜKLENMİŞ sayfalarıyla " +
+    "kesiştiriyordu; orderBySaved bulamadığını sessizce düşürüyor, yani akış " +
+    "penceresinden düşmüş bir kayıt listeden yok oluyordu. Hata yok, log yok, " +
+    "ekranda Kaydedilen haber yok yazıyordu; ne kadar çok kaydedilirse o kadar " +
+    "çoğu kayboluyordu. Hiçbir birim testi bir ekranın hangi hooku çağırdığını " +
+    "göremez, o yüzden kontrol burada. Yorumlar ATILIYOR: dosyanın kendi " +
+    "açıklaması eski çağrının adını taşıyor ve ham arama bu defterde sekizinci " +
+    "kez kendi gerekçesini bulurdu.",
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+    const saved = strip(read("src/gundem/screens/SavedView.tsx"));
+    if (!saved.includes("useSavedArticlesFeed(")) {
+      return "SavedView useSavedArticlesFeed cagirmiyor — kayitli haberler akis penceresine bagli kalir";
+    }
+    if (/\buseFeed\s*\(/.test(saved)) {
+      return "SavedView hala useFeed( cagiriyor — kesisim hatasi geri gelmis olabilir";
+    }
+    return null;
+  },
+);
+
+check(
+  "son aramalar temizlenebiliyor",
+  "clearRecentSearches aylarca yazılı durdu ve hiçbir ekran çağırmıyordu: " +
+    "fonksiyonun testi vardı, kullanıcının düğmesi yoktu. Bu deponun " +
+    "yazılmış ama bağlanmamış maddesinin küçük hâli, ve bir birim testi " +
+    "bunu asla göremez — ekranın hangi fonksiyonu çağırdığını yalnızca " +
+    "kaynak görüyor. Yorumlar atılıyor, çünkü düğmenin açıklaması da " +
+    "fonksiyonun adını taşıyor.",
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+    const ara = strip(read("app/gundem/ara.tsx"));
+    if (!ara.includes("clearRecentSearches")) {
+      return "app/gundem/ara.tsx clearRecentSearches cagirmiyor — kullanici aramalarini temizleyemez";
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

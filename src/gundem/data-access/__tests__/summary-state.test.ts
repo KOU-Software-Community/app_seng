@@ -301,4 +301,35 @@ describe('requestEnrichment — the body the deployed function actually sends', 
     if (!result.ok) throw new Error('expected ok');
     expect(result.data).toEqual({ status: 'unavailable', reason: 'no_content' });
   });
+
+  /**
+   * Çeviri METNİ boşken düğme AÇILMAMALI.
+   *
+   * Bu kural iki yerde yazılmıştı ve ayrıştı: akış yolu (`toSummary`) durumu
+   * metinden türetiyordu, zenginleştirme yolu `not_required` değilse koşulsuz
+   * `ready` yazıyordu. Sonucu ekranda: kullanıcı "Çeviri"ye basıyor ve
+   * `bodyFor` sessizce orijinali gösteriyor — düğme hiçbir şey yapmıyor.
+   *
+   * Defterde bu hata "düzeltildi" diye yazılıydı; düzeltme yalnızca akış
+   * yoluna girmişti ve bu yolu **hiçbir test tutmuyordu.**
+   */
+  it('marks translation pending when the ready body carries no translation text', async () => {
+    const result = await stub({
+      ...READY_BODY,
+      summary: { ...READY_BODY.summary, translation_tr: null, translation_state: 'ready' },
+    }).requestEnrichment('a1');
+    if (!result.ok || result.data.status !== 'ready') throw new Error('expected ready');
+    expect(result.data.summary.translationState).toBe('pending');
+    expect(result.data.summary.translationTr).toBeNull();
+  });
+
+  /** Yalnızca boşluktan ibaret bir çeviri de metin sayılmıyor. */
+  it('treats a whitespace-only translation as missing', async () => {
+    const result = await stub({
+      ...READY_BODY,
+      summary: { ...READY_BODY.summary, translation_tr: '   \n  ', translation_state: 'ready' },
+    }).requestEnrichment('a1');
+    if (!result.ok || result.data.status !== 'ready') throw new Error('expected ready');
+    expect(result.data.summary.translationState).toBe('pending');
+  });
 });

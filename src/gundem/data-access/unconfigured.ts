@@ -40,6 +40,9 @@ export function createUnconfiguredRepositories(problem: string): Repositories {
       async getArticle(): Promise<Result<Article>> {
         return fail();
       },
+      async articlesByIds(): Promise<Result<Article[]>> {
+        return fail();
+      },
       async searchArticles(): Promise<Result<Page<Article>>> {
         return fail();
       },

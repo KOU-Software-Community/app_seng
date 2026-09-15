@@ -97,6 +97,25 @@ export function useSearch(query: string) {
   });
 }
 
+/**
+ * Kayıtlı haberlerin gövdeleri — kimliklerden, tek turda.
+ *
+ * Anahtar kimlik listesinden türetiliyor: yeni bir kayıt anahtarı değiştirip
+ * yeniden çekiyor. Kaydetmek günde birkaç kez olan bir eylem, yani bu tek tur
+ * ucuz; alternatifi (akışın yüklenmiş sayfalarıyla kesişmek) kayıtlı haberi
+ * sessizce kaybediyordu.
+ */
+export function useSavedArticlesFeed(ids: readonly string[]) {
+  const repos = useRepositories();
+  const anahtar = [...ids].sort().join(',');
+  return useQuery({
+    queryKey: ['v1', 'saved-articles', anahtar],
+    enabled: ids.length > 0,
+    queryFn: () => repos.feed.articlesByIds(ids).then(unwrap),
+    retry: READ_RETRY,
+  });
+}
+
 export function useSources() {
   const repos = useRepositories();
   return useQuery({

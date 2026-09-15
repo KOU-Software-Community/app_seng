@@ -1645,6 +1645,64 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   (`react-native-worklets`, o gerçekten gerekli). Silmek native modül
   çıkardığı için yeniden derleme istiyor.
 
+### AI Gündem — kaybolan kayıtlar, çeviri kaynağı ve Azure
+
+- **Kaydedilen bir haber SESSİZCE kayboluyordu.** `SavedView` kayıtlı
+  kimlikleri akışın **yüklenmiş sayfalarıyla** kesiştiriyordu ve
+  `orderBySaved(...).filter(a => a !== undefined)` bulamadığını düşürüyordu.
+  Akış penceresinden düşmüş bir kayıt listeden yok oluyor; hata yok, log yok,
+  ekranda "Kaydedilen haber yok" yazıyordu. Ne kadar çok kaydedilirse o kadar
+  çoğu kayboluyor — ve kimse bunu bir hata olarak bildirmez, çünkü kaybolan
+  şeyin kaybolduğu görünmüyor.
+  Ekrandaki yorum *"gövdeler akış sorgusunda zaten var"* diyordu; **ölçüldü,
+  yalnızca varsayılan durumda ve yalnızca yüklü sayfalar için doğruydu.**
+  Sorgu anahtarları "Tümü" filtresinde birebir aynı çıkıyor
+  (`{"category":null,"sourceIds":null}`), kategori filtresi açıkken ayrışıyor.
+  Yani ilk teşhisim ("iki ayrı önbellek") yanlıştı ve ölçüm onu düzeltti;
+  asıl sorun paylaşım değil, **sayfalamanın hiç olmaması.**
+  Düzeltme `articlesByIds` — TEK turluk toplu okuma. Eski yorumun itirazı
+  ("kimlik başına N tur") bu yüzden geçersiz: tur sayısı bir. Kayıtlı listenin
+  **tavanı yok** (son aramaların var), o yüzden PostgREST'in `in` süzgeci URL'e
+  sığsın diye 100'lük parçalara bölünüyor; bir parça patlarsa KISA LİSTE değil
+  HATA dönüyor, çünkü sessizce eksik dönmek düzeltilen hatanın aynısı olurdu.
+- **Guard yorumları atmak zorunda — dokuzuncu kez.** `SavedView`'ın kendi
+  açıklaması eski çağrının adını (`useFeed()`) taşıyor. Ölçüldü: ham kaynakta
+  `/\buseFeed\s*\(/` **eşleşiyor**, `strip()` sonrası eşleşmiyor. Yani strip
+  olmasaydı kontrol doğru koda karşı yanlış alarm verirdi.
+- **`check-release.mjs`'e TEK TIRNAK ve TERS TIRNAK içeren proza yazmayın.**
+  Guard'ın açıklamasında `hook'u` geçti ve tek tırnaklı JS dizesini kapattı:
+  dosya `SyntaxError` ile hiç yüklenmedi, yani **bütün kontroller düştü**. Bu
+  defterde aynı sınıfın kaydı zaten var (CSS yorumundaki ters tırnak, JSDoc
+  içindeki `*/`). Çift tırnaklı dize kullanın ve prozadan tırnağı atın.
+- **Çeviri durumu iki yerde yazılmıştı ve AYRIŞMIŞTI.** Akış yolu (`toSummary`)
+  durumu metinden türetiyordu; zenginleştirme yolu (`repositories.ts`)
+  `not_required` değilse koşulsuz `ready` yazıyordu. Sonuç: çeviri metni boşken
+  düğme AÇIK geliyor, kullanıcı basıyor, `bodyFor` sessizce orijinali
+  gösteriyor. Bu defter o hatayı "düzeltildi" diye yazıyordu — düzeltme
+  yalnızca akış yoluna girmişti ve öbür yolu **hiçbir test tutmuyordu** (297
+  test yeşilken hata duruyordu). Karar artık tek fonksiyon (`ceviriDurumu`),
+  iki çağıran. **Bir defter kaydının "düzeltildi" demesi, her yolda
+  düzeltildiği anlamına gelmiyor.**
+- **Azure çevirisi panelde, uygulamada değil.** Abonelik anahtarı
+  yayımlanabilir değil ve `EXPO_PUBLIC_*` derleme anında pakete gömülüyor;
+  uygulamaya koymak onu yayımlamak olurdu. Uygulama `/api/gundem/ceviri`
+  ucuna soruyor — OTP'nin panele taşınma gerekçesinin aynısı.
+  Sözleşme belgeden okundu: gövde `[{Text}]`, cevap
+  `[{translations:[{text}]}]`, istek başına **50.000 karakter**, F0 katmanı
+  **saatte** (ayda değil) 2 milyon karakter, `403` kota / `429` hız.
+- **Azure'un çözdüğü şey KOTA DEĞİL, KAPSAMA.** "Çeviriyi ayırırsak AI
+  anahtarları yalnızca özete akar" diye yazdım ve **yanlıştı**: özet işini
+  kuyruğa koyan ve şemasında çeviriyi de zorunlu tutan taraf emekli Edge
+  fonksiyonu, değiştirilemiyor, yani model çeviriyi istemeye devam ediyor.
+  Kazanç şu: AI işi öldüğünde (ölçülen 22 ölü işin 13'ü hız limiti) kullanıcı
+  artık en azından çeviriyi görüyor. Eskiden hiçbir şey görmüyordu.
+- **Sıra "önce bedava olan".** Sunucunun çevirisi varsa Azure'a hiç
+  gidilmiyor. Uç nokta kimlik istemiyor (AI Gündem herkese açık; jeton şartı
+  Apple 5.1.1(v)'nin yasakladığı duvar olurdu) ve **cihaz kovası da yok**:
+  cihaz kimliği uydurmak bedava, yani bu deponun kendi kuralına göre sınır
+  sayılmaz. IP kovası + 20.000 karakter tavanı var; F0 sert tavanlı olduğu
+  için en kötü sonuç geçici özellik kaybı, fatura değil.
+
 ### Üç ölü parça, üç ayrı ölüm biçimi
 
 - **`react-native-worklets-core` ile `react-native-worklets` AYRI paketler ve
