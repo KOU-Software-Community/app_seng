@@ -1169,6 +1169,24 @@ check(
 );
 
 check(
+  "son aramalar temizlenebiliyor",
+  "clearRecentSearches aylarca yazılı durdu ve hiçbir ekran çağırmıyordu: " +
+    "fonksiyonun testi vardı, kullanıcının düğmesi yoktu. Bu deponun " +
+    "yazılmış ama bağlanmamış maddesinin küçük hâli, ve bir birim testi " +
+    "bunu asla göremez — ekranın hangi fonksiyonu çağırdığını yalnızca " +
+    "kaynak görüyor. Yorumlar atılıyor, çünkü düğmenin açıklaması da " +
+    "fonksiyonun adını taşıyor.",
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+    const ara = strip(read("app/gundem/ara.tsx"));
+    if (!ara.includes("clearRecentSearches")) {
+      return "app/gundem/ara.tsx clearRecentSearches cagirmiyor — kullanici aramalarini temizleyemez";
+    }
+    return null;
+  },
+);
+
+check(
   'sürüm iki dosyada aynı',
   'app.json 1.0.1, package.json 1.0.0 diye ayrışmıştı. runtimeVersion appVersion ' +
     'politikasında olduğu için sürüm dizgesi OTA eşleşmesini de belirliyor.',

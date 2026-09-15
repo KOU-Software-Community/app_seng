@@ -19,7 +19,7 @@ import { colors, gradients, radius } from '../../src/theme';
 export default function GundemAraRoute() {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const { recentSearches, pushRecentSearch } = useRecentSearches();
+  const { recentSearches, pushRecentSearch, clearRecentSearches } = useRecentSearches();
   const { isRead, markRead } = useReadArticles();
 
   const trimmed = query.trim();
@@ -56,9 +56,28 @@ export default function GundemAraRoute() {
         {trimmed.length === 0 ? (
           recentSearches.length > 0 ? (
             <View style={styles.recent}>
-              <PixelTxt size={8} style={{ color: colors.blue500 }}>
-                SON ARAMALAR
-              </PixelTxt>
+              <View style={styles.recentHead}>
+                <PixelTxt size={8} style={{ color: colors.blue500 }}>
+                  SON ARAMALAR
+                </PixelTxt>
+                {/*
+                  `clearRecentSearches` aylarca yazılı durdu ve hiçbir ekran
+                  çağırmıyordu: kullanıcı aramalarını temizleyemiyordu.
+                  Onay sorulmuyor — silinen şey sekiz arama dizesi, geri
+                  alınamaz bir veri değil; onay penceresi burada gürültü olurdu.
+                */}
+                <Pressable
+                  onPress={clearRecentSearches}
+                  accessibilityRole="button"
+                  accessibilityLabel="Son aramaları temizle"
+                  hitSlop={10}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <PixelTxt size={7} style={{ color: colors.faint }}>
+                    TEMIZLE
+                  </PixelTxt>
+                </Pressable>
+              </View>
               {recentSearches.slice(0, 8).map((item) => (
                 <Pressable
                   key={item}
@@ -128,6 +147,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   recent: { paddingHorizontal: 16, paddingTop: 18, gap: 10 },
+  recentHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   recentRow: { paddingVertical: 6 },
   loading: { textAlign: 'center', marginTop: 40, color: colors.faint },
   empty: { marginTop: 28 },
