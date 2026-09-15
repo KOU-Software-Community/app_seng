@@ -41,10 +41,6 @@ export const todayLineTr = (now: Date = new Date()): string => {
   return `${DAYS_TR[today.weekday]}, ${today.day} ${MONTHS_TR[today.month]}`;
 };
 
-/** "N yeni" — bu cihazın henüz açmadıkları. Sunucudan gelen bir sayı değil. */
-export const unseenCount = (articles: Article[], isRead: (id: string) => boolean): number =>
-  articles.filter((a) => !isRead(a.id)).length;
-
 export function FeedView() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('Tümü');
