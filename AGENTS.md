@@ -1645,6 +1645,37 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   (`react-native-worklets`, o gerçekten gerekli). Silmek native modül
   çıkardığı için yeniden derleme istiyor.
 
+### Üç ölü parça, üç ayrı ölüm biçimi
+
+- **`react-native-worklets-core` ile `react-native-worklets` AYRI paketler ve
+  adları bir karakter farklı.** Tekil olan (`worklets`) Reanimated'in,
+  `expo-modules-core`'un, `gesture-handler`'ın ve `@expo/ui`'nin istediği gerçek
+  bağımlılık. `-core` eki olan VisionCamera'nın; bu depo `expo-camera`
+  kullanıyor, dolayısıyla hiçbir şey onu istemiyordu. Lockfile'da tek "isteyen"
+  kök paketin kendisiydi (`''`), kaynakta sıfır import. **Ama `podspec` ve
+  `android/` taşıdığı için autolinking onu her EAS derlemesine C++/JSI kodu
+  olarak sokuyordu** — yani ölü bir bağımlılık değil, ölü bir *native modül*.
+  Bir gün geri eklenmek istenirse: istenen şey neredeyse kesinlikle tekil
+  olandır ve o zaten kurulu.
+- **Bir yorumun anlattığı arayüz, arayüz değildir.** `unseenCount` ölüydü ve
+  tek göndergesi kendi testiydi — bu deponun defterinde aynı sınıfın kaydı
+  zaten var (`capPersistedFeed`). Yenisi şu: fonksiyonun doc yorumu `"N yeni"`
+  diye bir rozeti anlatıyordu ve **o dize deponun tamamında başka hiçbir yerde
+  geçmiyordu.** Ucuz bir tespit yöntemi: bir yorum ekranda bir şey gördüğünü
+  söylüyorsa, o metni depoda arayın; yoksa fonksiyon da yoktur.
+- **Ölü olan okuyucuydu, alan değil.** `pollAfterSeconds` silindi ama
+  `EnrichmentResponse`'taki `poll_after_seconds` ALANI duruyor: o sunucunun
+  gerçek cevap şekli ve iki test fikstürü onu gönderiyor. Alanı da silmek,
+  kablonun sözleşmesini belgeleyen yeri silmek olurdu — ve bu defterde
+  "fikstür kablonun öbür ucundan kopyalanır" maddesi tam olarak bunun için var.
+  **Çağıranı olmayan bir fonksiyon ölüdür; onun okuduğu alan ölü değildir.**
+- Silme turunda `npm uninstall`'ın lockfile'a ne yaptığı ayrıca ölçüldü: yalnız
+  iki girdi çıktı (`react-native-worklets-core` ve kendi bağımlılığı
+  `string-hash-64`), ve kökteki `license: "MIT"` senkronlandı — o alan
+  `package.json`'a bir önceki turda eklenmişti, lockfile henüz görmemişti.
+  Bir bağımlılık silerken lockfile diff'ine bakın; `npm uninstall` tam
+  çözümleme yapıyor ve fazlasını oynatabilir.
+
 ### `ADMIN_AUTO_PUSH=off` bir kapatma anahtarı değildi
 
 - **Bir bayrak, yalnızca okunduğu yerde bayraktır.** `autoPushEnabled()` iki

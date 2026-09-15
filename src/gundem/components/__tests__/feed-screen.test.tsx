@@ -4,9 +4,8 @@ import React from 'react';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import GundemRoute from '../../../../app/(tabs)/gundem';
-import { todayLineTr, unseenCount } from '../../screens/FeedView';
+import { todayLineTr } from '../../screens/FeedView';
 import { ARTICLES } from '../../data/articles';
-import type { Article } from '../../domain/types';
 import { createQueryClient, QueryProvider } from '../../providers/QueryProvider';
 
 /**
@@ -78,16 +77,5 @@ describe('feed header helpers', () => {
   it('writes the day line in Turkish', () => {
     // 20 Ağustos 2026 bir Perşembe.
     expect(todayLineTr(new Date(2026, 7, 20))).toBe('Perşembe, 20 Ağustos');
-  });
-
-  /**
-   * "N yeni" bu cihazın açmadıklarını sayıyor, sunucudan gelen bir sayıyı değil.
-   * Yanlış sayarsa kimse fark etmez — sadece rakam biraz tuhaf durur.
-   */
-  it('counts only what this device has not opened', () => {
-    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }] as Article[];
-    expect(unseenCount(items, () => false)).toBe(3);
-    expect(unseenCount(items, (id) => id === 'a')).toBe(2);
-    expect(unseenCount(items, () => true)).toBe(0);
   });
 });

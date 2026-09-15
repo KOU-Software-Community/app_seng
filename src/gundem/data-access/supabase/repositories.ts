@@ -388,9 +388,3 @@ export function createSupabaseEnrichmentRepository(
     },
   };
 }
-
-/** Seconds the caller should wait before polling again, when the server says so. */
-export const pollAfterSeconds = (payload: unknown): number | null => {
-  const value = (payload as EnrichmentResponse | null)?.poll_after_seconds;
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
-};
