@@ -27,6 +27,7 @@ import { FEED_VIEW, SEARCH_RPC, requireSupabaseClient, toDataError, toNetworkErr
 import { callEdgeFunction, clientRequestId, type EdgeCallOptions } from './edge';
 import {
   FEED_COLUMNS,
+  ceviriDurumu,
   toArticle,
   toDigest,
   toSource,
@@ -355,13 +356,19 @@ export function createSupabaseEnrichmentRepository(
             `[supabase] request-enrichment returned ${all.length} bullets for ${trimmed}, expected 3; padding.`,
           );
         }
-        const state = summary?.translation_state === 'not_required' ? 'not_required' : 'ready';
+        // Durum METİNDEN türetiliyor, bayraktan değil — `ceviriDurumu` ile aynı
+        // kararı akış yolu da veriyor. Eskiden burada koşulsuz 'ready' yazılıyordu
+        // ve çevirisi boş bir cevapta düğme açılıp hiçbir şey yapmıyordu.
+        const karar = ceviriDurumu({
+          ham: summary?.translation_tr,
+          wireState: summary?.translation_state,
+        });
         return ok({
           status: 'ready',
           summary: {
             bullets: [all[0] ?? '', all[1] ?? '', all[2] ?? ''],
-            translationTr: state === 'not_required' ? null : (summary?.translation_tr ?? null),
-            translationState: state,
+            translationTr: karar.text,
+            translationState: karar.state,
           },
         });
       }

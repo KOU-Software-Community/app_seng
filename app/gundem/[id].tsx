@@ -15,6 +15,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { bodyFor, hasSummary, segmentState, type Segment } from '../../src/gundem/article/segment';
+import { useFallbackTranslation } from '../../src/gundem/article/useFallbackTranslation';
 import { ArticleBody } from '../../src/gundem/components/ArticleBody';
 import {
   enrichmentStalledMessage,
@@ -50,7 +51,10 @@ export default function GundemArticleRoute() {
   /* Elde gösterilecek üç madde var mı — uç nokta ne derse desin. */
   const summaryReady = hasSummary(summary);
 
-  const segment = segmentState(article, summary);
+  // AI çevirisi gelmediyse Azure'dan (panel üzerinden) iste. Zaten çeviri
+  // varsa hook hiç istek atmıyor — kota yalnızca gerçekten eksik olanlara.
+  const yedek = useFallbackTranslation(article, summary);
+  const segment = segmentState(article, summary, yedek.metin);
   const [chosen, setChosen] = useState<Segment>('tr');
   // Çeviri hazır değilken seçim "orijinal"e sabitleniyor: kullanıcı olmayan bir
   // metne geçemesin ama düğme de kaybolmasın — neden kapalı olduğu görünsün.
@@ -111,7 +115,7 @@ export default function GundemArticleRoute() {
   */
   const queuedReason = result?.status === 'queued' ? result.reason : null;
   const stalled = pending && Boolean(queuedReason);
-  const body = bodyFor(article, summary, active);
+  const body = bodyFor(article, summary, active, yedek.metin);
 
   return (
     <View style={styles.screen}>
@@ -234,7 +238,16 @@ export default function GundemArticleRoute() {
                 />
                 {segment.enabled ? null : (
                   <Txt size={11.5} color={colors.faint} style={{ marginTop: 6 }}>
-                    Çeviri hazırlanıyor.
+                    {/* Sebebi söylemek şart: bir sürüm derlemesinin konsolu yok
+                        ve "hazırlanıyor" sonsuza kadar dönen bir gösterge
+                        olduğunda kullanıcı neyi beklediğini bilmiyor. */}
+                    {yedek.yukleniyor
+                      ? 'Çeviri hazırlanıyor.'
+                      : yedek.sebep === 'kota'
+                        ? 'Çeviri servisi bugünlük doldu, sonra tekrar deneyin.'
+                        : yedek.sebep === 'cok-uzun'
+                          ? 'Bu haber çeviri için fazla uzun.'
+                          : 'Çeviri hazırlanıyor.'}
                   </Txt>
                 )}
               </>

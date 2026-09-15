@@ -30,6 +30,12 @@ const OPTIONAL: Set<string> = new Set([
   'SMTP_PORT',
   'MAIL_FROM',
   'MAIL_REPLY_TO',
+  // Üçü de isteğe bağlı: anahtar yoksa panel açılıyor, `/api/gundem/ceviri`
+  // "yapilandirilmamis" diyor ve uygulama sunucudan gelen AI çevirisine
+  // düşüyor. Yani eksik olması bir özelliği kapatıyor, paneli değil.
+  'AZURE_TRANSLATOR_KEY',
+  'AZURE_TRANSLATOR_REGION',
+  'AZURE_TRANSLATOR_ENDPOINT',
   // NORMALDE BOŞ. Tarayıcıyı `nixpacks.toml` derleme fazında kuruyor ve
   // playwright-core onu `PLAYWRIGHT_BROWSERS_PATH`ten buluyor. Bu rapor onu
   // "EKSİK" gösterseydi operatör doldurmaya çalışırdı — ve bu defterde
@@ -69,6 +75,14 @@ const panel = sources(['admin'], /process\.env\.([A-Z0-9_]+)/g);
 // SMTP ayarları `readMailConfig`'e parametre olarak geçiyor, yani
 // `process.env.SMTP_HOST` diye bir satır yok — tarama onları göremez.
 for (const ad of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM', 'MAIL_REPLY_TO']) {
+  panel.add(ad);
+}
+
+// Azure çeviri anahtarları da `azureConfig(env)`'e PARAMETRE olarak geçiyor,
+// yani `admin/` içinde `process.env.AZURE_...` diye bir satır yok ve tarama
+// onları göremiyor — SMTP ile aynı sebep. Listeye elle girmezlerse operatör
+// Coolify'a ne gireceğini rapordan öğrenemez.
+for (const ad of ['AZURE_TRANSLATOR_KEY', 'AZURE_TRANSLATOR_REGION', 'AZURE_TRANSLATOR_ENDPOINT']) {
   panel.add(ad);
 }
 
