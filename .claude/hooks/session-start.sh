@@ -38,17 +38,19 @@ else
   fi
 fi
 
-# Ponytail burada kurulmuyor — `.claude/settings.json` kuruyor.
+# Ponytail burada kurulmuyor. Yerelde `.claude/settings.json` kuruyor, bulutta
+# ortamın setup script'i — ikisi ayrı yollar, ayrıntısı AGENTS.md'de.
 #
-# Bir tur bu hook'tan npm ile kuruldu, sonra plugin olarak kurulunca blok
-# kaldırıldı: aynı altı skili iki kaynaktan almak, ikisi ayrışana kadar
-# çalışan bir kurulum demek. Hook npm'in en güncelini çekiyordu, plugin ise
-# bir commit SHA'sına sabitli — yani ayrışma kesindi, sadece zamanı belirsizdi.
+# Bu yorum eskiden "settings.json commit'li, konteyner sıfırlansa da duruyor"
+# diyordu ve bulut için yanlıştı: bulut oturumu bir deponun açtığı plugin'leri
+# kurmuyor, log her oturum `Skipping orphaned enabledPlugins entry
+# ponytail@ponytail: marketplace not registered` yazıyordu.
 #
-# settings.json'daki `extraKnownMarketplaces` + `enabledPlugins` ikilisi
-# commit'li, dolayısıyla konteyner sıfırlansa da duruyor: bu hook'un çözdüğü
-# problem (konteyner unutuyor) plugin tarafında zaten çözülmüş. Üstünde
-# skillerin getirmediği üç yaşam döngüsü hook'u var — asıl fark o, bkz. PR #44.
+# Buradan da kurulmamalı: SessionStart hook'u Claude Code açıldıktan SONRA
+# koşuyor, yani burada kurulan plugin'in kendi SessionStart'ı (kural setini
+# basan asıl parça) o an çoktan geçmiş oluyor. Setup script açılıştan önce
+# koşuyor. Bir de aynı altı skili iki kaynaktan almak (bir tur npm + plugin
+# denendi) ikisi ayrışana kadar çalışan bir kurulum demek.
 if command -v graphify >/dev/null 2>&1; then
   echo "graphify already present ($(graphify --version 2>&1 | head -1))"
 else

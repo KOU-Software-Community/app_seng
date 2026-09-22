@@ -30,7 +30,7 @@ import errors without needing Xcode.
 
 ## Agent setup
 
-Three layers, and only one of them lives in this repo:
+Four layers, and only one of them lives in this repo:
 
 - **MCP servers** — account level (claude.ai → Customize → Connectors). Nothing to copy;
   they are just there. On 21st.dev: `search` and all listing/metadata calls are free and
@@ -40,11 +40,16 @@ Three layers, and only one of them lives in this repo:
   palette source — the palette is `src/theme.ts`.
 - **Account skills** — `~/.claude/skills/synced/`. Downloaded per container. Do not copy
   them here.
+- **Environment setup script** — claude.ai → the cloud environment → *Setup script*. Runs
+  before Claude Code launches and is snapshotted with the environment. It installs the
+  **ponytail** plugin, because a plugin this repo turns on in `.claude/settings.json` is
+  installed in local sessions only. The script and the reasons are under "Ponytail bulutta
+  hiç yüklenmemişti" below.
 - **This repo** — `.claude/`, below. This is the part that is version controlled.
 
 ```
 .claude/
-├── settings.json              registers the SessionStart hook
+├── settings.json              SessionStart hook; ponytail plugin (local sessions only)
 ├── hooks/session-start.sh     restores graphify (must stay executable)
 └── skills/
     ├── NOTICE.md              provenance and licence boundary — read before citing it
@@ -2161,3 +2166,57 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   cevabı keser — bu defterde `output_truncated` olarak zaten kayıtlı, altı iş
   böyle ölmüştü. **Sınır kaç istek attığın değil, bir cevaba kaç karakter
   sığdığı.**
+
+### Ponytail bulutta hiç yüklenmemişti — depo plugin'i yalnızca yerelde kuruyor
+
+- **`enabledPlugins` + `extraKnownMarketplaces` bulut oturumunda hiçbir şey
+  kurmuyor.** Ponytail hook'tan çıkarılıp bu ikiliye taşınırken "commit'li,
+  konteyner sıfırlansa da duruyor" denmişti. Belge tersini söylüyor
+  (cloud-environments → "What carries over from your setup"), log da her
+  oturum aynısını yazıyordu: `Skipping orphaned enabledPlugins entry
+  ponytail@ponytail: marketplace not registered`; `claude plugin list` →
+  "No plugins installed". Plugin o günden beri bulutta bir kez bile
+  yüklenmedi ve hiçbir şey hata vermedi — kural seti gelmeyince model yalnızca
+  biraz daha az tembel davranıyor, bunu kimse bir hata olarak bildirmez.
+  `expo@claude-plugins-official` da aynı durumda.
+- **Bulutta kuran şey ortamın setup script'i** (claude.ai → ortam → *Setup
+  script*):
+
+  ```bash
+  #!/bin/bash
+  export PATH="/opt/claude-code/bin:$PATH"
+  claude plugin marketplace add "DietrichGebert/ponytail#v4.10.0" || true
+  claude plugin install ponytail@ponytail || true
+  mkdir -p ~/.claude && touch ~/.claude/.ponytail-statusline-nudged
+  ```
+
+  Ölçüldü (izole HOME, bu script + `CLAUDE_CODE_REMOTE=true claude -p`):
+  `Registered 3 hooks from 1 plugins`, `Total plugin skills loaded: 6`,
+  SessionStart çıktısında `PONYTAIL MODE ACTIVE — level: full`. `|| true`
+  belgenin şartı: setup script sıfırdan farklı çıkarsa oturum hiç açılmıyor.
+  `PATH` satırı `claude`'u `/usr/bin:/bin` gibi çıplak bir PATH'te de buluyor;
+  setup anındaki PATH buradan görülemiyor.
+- **SessionStart hook'u bunun yeri değil.** Hook Claude Code açıldıktan
+  sonra koşuyor: log'da plugin hook'ları `load_plugin_hooks` ile yüklendikten
+  sonra proje hook'u başlıyor. Orada kurulan plugin'in kendi SessionStart'ı,
+  yani kural setini basan asıl parça, o an çoktan geçmiş oluyor. Skillerin ve
+  öteki hook'ların, hook bittikten sonraki headless reconcile ile devreye
+  girip girmediği ölçülmedi. Oturumun ortasında `claude plugin install` ise
+  ölçüldü: dosyalar yerinde, çalışan süreç `0 plugin skills` demeye devam
+  ediyor. Hook'a otomatik indirme + kurulum eklemek auto mode'da da
+  reddedildi ("Untrusted Code Integration"); setup script'i operatör kendisi
+  yazıyor, karar onda kalıyor.
+- **Statusline işareti süs değil.** Ortam önbelleği setup script'ten sonra
+  alınan bir anlık görüntü; oturumda yazılan dosya bir sonrakine geçmiyor.
+  `.ponytail-statusline-nudged` önbellekte yoksa kural seti her oturum
+  "statusline kurmayı teklif et" talimatıyla geliyor — bulutta statusline
+  yokken. Ölçüldü: işaretsiz 1, işaretli 0.
+- **Sürüm iki yerde sabit ve ikisi aynı kalmalı:** script'teki `#v4.10.0`
+  (bulut) ve settings.json'daki `ref` (yerel). Önceki kayıt "plugin
+  974d940'a sabitli" diyordu; config'de hiçbir pin yoktu. Plugin her istemde
+  ve her alt ajanda node çalıştırıyor; v4.10.0'daki hook'lar okundu — ağ
+  yok, alt süreç yok, yalnızca `~/.claude` altına bayrak dosyası ve kural
+  metni. Yükseltirken ikisini birlikte değiştirin; script değişince ortam
+  önbelleği yeniden kuruluyor.
+- **Setup script depoya değil ortama ait.** Aynı ortamı kullanan her bulut
+  oturumu, başka depolar dahil, ponytail'le açılır.
