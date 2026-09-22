@@ -174,7 +174,11 @@ describe('key schema', () => {
       KV_KEYS.recentSearches,
       KV_KEYS.queryCache,
     ]) {
-      expect(key.startsWith('v1:')).toBe(true);
+      // Sürümün VARLIĞI aranıyor, belirli bir sürüm değil. `'v1:'` yazılıydı
+      // ve tam da desteklemek için var olduğu olayda kırmızı verdi: haber
+      // geçmişi silinince üç anahtar `v2:`ye taşındı. Bir sürüm guard'ı,
+      // sürüm artınca düşüyorsa sürümü değil sabiti koruyor demektir.
+      expect(key).toMatch(/^v\d+:/);
     }
   });
 });

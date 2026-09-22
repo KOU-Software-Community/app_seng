@@ -23,8 +23,18 @@ export const MAX_PERSISTED_FEED_ARTICLES = 200;
  * Bumping this throws away everything persisted. It includes the repository
  * contract version, so a DTO shape change invalidates the cache automatically
  * instead of hydrating the wrong type.
+ *
+ * **v2, ve sebebi bir şema değişikliği DEĞİL.** AI Gündem veritabanındaki bütün
+ * haber geçmişi silindi (2473 satır): şekil aynı, ama blob'un içindeki her
+ * makale kimliği artık hiçbir şeye karşılık gelmiyor. Bu sabit bugüne kadar
+ * yalnızca DTO değişince oynatıldı; burada oynatılma gerekçesi **içeriğin
+ * ölmesi**. Sürüm numarasına bakıp olmayan bir şema değişikliği aramayın.
+ *
+ * Buster oynatılmasaydı cihazdaki kalıcı akış, sunucuda artık var olmayan
+ * haberleri çevrimdışı açılışta gösterirdi — dokununca hiçbir şey bulamayan
+ * hayalet satırlar.
  */
-export const CACHE_BUSTER = `kyk-gundem-v1-repo${REPOSITORY_CONTRACT_VERSION}`;
+export const CACHE_BUSTER = `kyk-gundem-v2-repo${REPOSITORY_CONTRACT_VERSION}`;
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({

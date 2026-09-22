@@ -2017,3 +2017,147 @@ neden var?"*
   ve `ps` çıktısına düşer. Gerekirse `DEMO_PAROLA=… npm run demo:hesap`.
 - Profil alanları `firestore.rules`'taki `hasOnly` listesiyle birebir yazılıyor:
   fazladan bir alan, aynı profili uygulamadan güncellemeyi reddettirir.
+
+### İşi telefon yaratıyordu, sunucu değil — ve bu defterdeki bir satır yanlıştı
+
+**Ölçüm (2026-09-22, üretim veritabanı).** Kullanıcı "haber düşüyor ama özet
+hazır olmuyor" dedi; sebep hız limiti değil, **tetik yokluğu** çıktı:
+
+| | |
+|---|---|
+| aktif kaynaklardan toplam haber | 2473 |
+| özeti olan | **294 (%12)** |
+| şu ana kadar yaratılmış iş | 351 (%14) |
+| **o an kuyrukta bekleyen iş** | **0** |
+| worker kapasitesi | 3 iş / 2 dk = **2160/gün** |
+| günlük haber girişi | ~30 |
+
+Akışın tepesi, yani kullanıcının gerçekten gördüğü yer: ilk 20 haberin 11'i,
+ilk 50'nin 18'i, ilk 200'ün **30'u** özetliydi. Worker boş kuyruğun başında
+oturuyordu.
+
+- **`cron.job`'da dört iş vardı ve hiçbiri İŞ YARATMIYORDU.** Çekim (15 dk),
+  worker (2 dk), iki digest. Özet işini yaratan tek şey bir istemcinin
+  `request-enrichment` çağırmasıydı — yani haberi ilk açan kişi her zaman
+  bekliyordu. **Bir kuyruğun boş olması, sistemin yetiştiğini değil, kimsenin
+  iş koymadığını gösterebilir.** Kapasite ölçmeden "hız limiti" demeyin.
+- **BU DEFTERDEKİ BİR SATIR YANLIŞTI.** *"Backend deposu emekliye ayrıldı…
+  doğru düzeltme (`sync-feeds` özet işini de kuyruğa koysun) oraya
+  yazılamıyor"* diyordu. Edge fonksiyonu **deposu** için doğru — ama kuyruğa
+  koyma bir **veritabanı fonksiyonu** (`aigundem.internal_enqueue_ai_job`) ve
+  veritabanı canlı ve yazılabilir. Eksik olan bir Edge dağıtımı değil, bir
+  cron işiydi. **"Yazılamıyor" diyen bir kayıt, o kaydı yazanın o gün baktığı
+  yerin sınırını anlatıyor olabilir; kaldıracı yeniden arayın.**
+- **Beşinci dağıtım yüzeyi: AI Gündem veritabanı.** Yukarıdaki tablo dört
+  yüzey sayıyor ve bu beşincisi. `supabase/migrations/` altında kopyası
+  duruyor — `firestore.rules` ile aynı gerekçe: commit edilmeyen bir şema
+  değişikliği görünmez bir değişikliktir.
+- **`public.` sarmalayıcısı bilerek yazılmadı.** Bu şemadaki diğer
+  fonksiyonların `public.aigundem_internal_*` sarmalayıcıları var çünkü Edge
+  fonksiyonları PostgREST'ten çağırıyor. Süpürmeyi yalnızca pg_cron çağırıyor,
+  dolayısıyla sarmalayıcısı olmaması onu PostgREST'ten **erişilemez** kılıyor.
+  En az ayrıcalık, fazladan tek satır yazmadan.
+- **Model dizesi bir tahmin olamazdı, kaynaktan okundu.** Emekli backend'in
+  kendi yorumu (`_shared/ai-provider.ts`): *"THE ONE INVARIANT THAT MATTERS:
+  `request-enrichment` ve `process-enrichments` AYNI model dizesini çözmek
+  zorunda… `gemini-2.5-flash` kuyruğa konup `claude-opus-5` yazılsaydı her
+  arama sonsuza kadar ıskalardı."* Depo herkese açık, `git clone` ile okundu:
+  `PROMPT_VERSION = 'v1'`, `GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash'`.
+  Ölçüm de doğruladı (351 işin hepsi bu çift). **Ama kayması akışı bozmuyor**,
+  çünkü akış görünümü yalnızca `(article_id, content_hash)` join ediyor —
+  kayan tek şey istemci önbellek isabeti. Bu yüzden sabit değil parametre.
+- **Hız worker kapasitesinin ALTINDA seçildi (60/saat, kapasite 90).** Çünkü
+  **ölü iş geri gelmiyor**: hız limitinden 5 denemesini tüketen işin satırı
+  kalıyor ve süpürme onu bir daha kuyruğa koyamıyor (`on conflict do
+  nothing`). Sağlayıcının limitinin üstünde sürmek, kalıcı olarak özetsiz
+  kalacak haberler üretir.
+- **Gövdesi olmayan haber kuyruğa girmiyor.** Ölçüm anında 151 haberin metni
+  hiç yoktu; onların özeti hiçbir zaman üretilemiyor (`unavailable`) ve
+  kuyruğa koymak her turda kota yakmak olurdu.
+
+### Geçmişi silmek — ETag tuzağı ve telefondaki ölü kimlikler
+
+Operatör geçmişin tamamen silinmesini istedi. Silme tek satır (`aigundem.articles`
+→ özetler, digest ve işler CASCADE ile gidiyor), ama iki şey sessizce bozuyordu:
+
+- **Kaynakların `etag`/`last_modified` alanı AYNI İŞLEMDE sıfırlanmak
+  zorunda.** Yedi kaynağın dördünde ETag doluydu (o an mevcut 2473 haberin
+  2124'ü o dörtten). Bırakılsaydı `sync-feeds` koşullu istek atıp
+  **`304 Not Modified`** alır ve hiçbir şey eklemezdi: cron yeşil, uygulama
+  boş, ve sebep hiçbir yerde yazmaz. `next_fetch_at = now()` da eklendi ki
+  bir sonraki tur beklemesin. Ölçüldü: silme sonrası ilk tur **455 haber**
+  ekledi (tarihsel ilk kurulum 452 idi — tahmin değil, aynı sayı).
+- **Telefondaki makale kimlikleri de ölüyor**, ve deponun bunun için iki
+  kaldıracı zaten vardı: `CACHE_BUSTER` ve KV anahtarlarındaki `v1:` öneki.
+  İkisi de **şekil değişikliği** için yazılmıştı; burada şekil aynı, işaret
+  ettikleri şey öldü. Aynı kaldıraç, yeni bir sebep — yorumlara yazılmazsa
+  sonraki okuyan `v2:`yi görüp olmayan bir şema değişikliği arar.
+  `enabledSourceIds` taşınmadı: **kaynaklar silinmedi**, yalnızca haberler.
+- **Bir sürüm guard'ı, sürüm artınca kırmızı veriyorsa sürümü değil sabiti
+  koruyordur.** `user-state.test.ts` *"versions every key"* diyordu ama
+  `key.startsWith('v1:')` yazıyordu: tam da desteklemek için var olduğu
+  olayda düştü. `/^v\d+:/` oldu — kırılıp (bir anahtarın öneki silinerek)
+  hâlâ kırmızı verdiği görüldü.
+- **Testin fikstürü sabitten gelmiyorsa test kendini doğruluyordur.**
+  `useEnrichmentWarmup.test.tsx` temizlik anahtarını elle yazmıştı; sabit
+  `v2:`ye taşınınca temizlik yanlış anahtara gitti ve bütçe testler arasında
+  sızdı — dört test birden düştü. Artık `KV_KEYS.warmBudget` okuyor.
+- **`npm run check:all | tail -20` her zaman EXIT 0 verir.** Pipe'ın çıkış
+  kodu son komutunki, yani `tail`'inki. Beş test kırmızıyken "exited with
+  code 0" okundu ve bir an `check:all` bozuk sanıldı; bozuk olan çağrıydı.
+
+### "Bunlar uygulamaya düşmeyecek dememiş miydik?" — kapının tutmadığı yer
+
+Kullanıcı akışın en üstünde ne özeti ne çevirisi olan bir haber gördü ve haklı
+olarak bunu sordu. Kapı (`src/gundem/enrichment/gate.ts`) vardı ve çalışıyordu;
+**sadece söylediği şeyi yapmıyordu.**
+
+- **30 dakikalık tavan, kuralı neredeyse tamamen kapatıyor.** Kapı yalnızca
+  **taze** özetsiz haberi tutuyor, eskisini gösteriyor. Ölçüldü: 457 haberin
+  **447'si** kapıdan boş geçiyordu, kapıda bekleyen **0**. Tavanın gerekçesi
+  sağlamdı (gövdesi olmayan haber sonsuza kadar saklanmasın) ama pratikte
+  kural "özetsiz haber girmez" değil, "özetsiz haber 30 dakika gecikir"
+  anlamına geliyordu. **Bir kuralın istisnası, kuralın kendisinden büyük
+  olabilir — istisnanın kaç satırı kapsadığını sayın.**
+- **Tavan bir varsayıma dayanıyordu: "iş birazdan biter."** Normal akışta
+  doğru (günde ~30 haber, kapasite saatte ~90). Toplu dolumda ya da AI tarafı
+  tıkandığında yanlış — ve yanlış olduğunda sessizce boş haber gösteriyor.
+- **Düzeltme görünümde, uygulamada değil.** `public.aigundem_feed_articles_v1`
+  artık `summary_ready` **ve** (çeviri hazır **ya da** `not_required`) şartını
+  taşıyor. Veri kabloya hiç çıkmadığı için **mağazadaki eski sürüm dâhil her
+  istemci** düzeldi, EAS derlemesi beklemeden. Uygulamadaki kapı yerinde
+  kaldı: artık ikinci hat, tek hat değil.
+- **Takas açıkça tersine çevrildi ve bu bir karar.** Eski davranış "geç gelen
+  özet, hiç görünmeyen haberden iyidir" diyordu; bu defterde o gerekçe yazılı.
+  Operatör canlıda sonucu görüp öbür tarafı seçti: **boş haber göstermektense
+  az haber göstermek.** Uygulandığı an akış 457'den 10'a düştü.
+- **`not_required` şartı atlanamaz:** Türkçe kaynaklarda (Webrazzi) çeviri hiç
+  üretilmiyor. Yalnızca `translation_tr <> ''` aransaydı bütün Türkçe haberler
+  gizlenirdi.
+- **AÇIK KALAN DELİK:** arama bu filtreden geçmiyor.
+  `public.aigundem_search_articles_v1` görünümü değil
+  `aigundem.search_articles_v1(...)` fonksiyonunu çağırıyor, yani aramada hâlâ
+  özetsiz haber çıkabilir. Yazılmadı, bilerek burada duruyor.
+
+### Bir turda üç yanlış sayı — ölçmeden ayar değiştirmenin maliyeti
+
+Kullanıcı "1 saat ne aq" diye sorduğunda söylediğim sürelerin üçü de yanlıştı,
+ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
+
+- **`max_jobs: 3` → `10` yaptım; Edge fonksiyonu 1–3 dışını reddediyor.**
+  Her tur `400 bad_request: "max_jobs must be an integer between 1 and 3"`
+  döndü ve **~45 dakika boyunca tek bir haber işlenmedi.** Bu sürede
+  "bir saatte biter" dedim. `cron.job_run_details` işi **`succeeded`** diye
+  yazıyor — çünkü o yalnızca `net.http_post`'un gönderildiğini söylüyor.
+  **Cevabı görmek için `net._http_response` okunmalı**; cron'un "başarılı"sı
+  isteğin yollandığı anlamına geliyor, işin yapıldığı değil.
+- **Sonra dakikada 3'e çıkardım: 17 iş `rate_limited` oldu.** Gerçek tavan
+  cron ayarı değil, **ücretsiz API katmanının kendisi**. İki anahtar
+  (Gemini + NVIDIA yedek) tavanı ikiye katlıyor, kaldırmıyor. Orijinal
+  `3 iş / 2 dakika` ayarı muhtemelen tam bu yüzden öyle seçilmişti; geri
+  alındı.
+- **Toplu prompt da çözüm değil.** Her haber 3 madde özet + TAM çeviri
+  üretiyor; 10 haberi tek çağrıya koymak çıktıyı 10 katına çıkarır ve model
+  cevabı keser — bu defterde `output_truncated` olarak zaten kayıtlı, altı iş
+  böyle ölmüştü. **Sınır kaç istek attığın değil, bir cevaba kaç karakter
+  sığdığı.**
