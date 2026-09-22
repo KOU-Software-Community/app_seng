@@ -2105,3 +2105,59 @@ Operatör geçmişin tamamen silinmesini istedi. Silme tek satır (`aigundem.art
 - **`npm run check:all | tail -20` her zaman EXIT 0 verir.** Pipe'ın çıkış
   kodu son komutunki, yani `tail`'inki. Beş test kırmızıyken "exited with
   code 0" okundu ve bir an `check:all` bozuk sanıldı; bozuk olan çağrıydı.
+
+### "Bunlar uygulamaya düşmeyecek dememiş miydik?" — kapının tutmadığı yer
+
+Kullanıcı akışın en üstünde ne özeti ne çevirisi olan bir haber gördü ve haklı
+olarak bunu sordu. Kapı (`src/gundem/enrichment/gate.ts`) vardı ve çalışıyordu;
+**sadece söylediği şeyi yapmıyordu.**
+
+- **30 dakikalık tavan, kuralı neredeyse tamamen kapatıyor.** Kapı yalnızca
+  **taze** özetsiz haberi tutuyor, eskisini gösteriyor. Ölçüldü: 457 haberin
+  **447'si** kapıdan boş geçiyordu, kapıda bekleyen **0**. Tavanın gerekçesi
+  sağlamdı (gövdesi olmayan haber sonsuza kadar saklanmasın) ama pratikte
+  kural "özetsiz haber girmez" değil, "özetsiz haber 30 dakika gecikir"
+  anlamına geliyordu. **Bir kuralın istisnası, kuralın kendisinden büyük
+  olabilir — istisnanın kaç satırı kapsadığını sayın.**
+- **Tavan bir varsayıma dayanıyordu: "iş birazdan biter."** Normal akışta
+  doğru (günde ~30 haber, kapasite saatte ~90). Toplu dolumda ya da AI tarafı
+  tıkandığında yanlış — ve yanlış olduğunda sessizce boş haber gösteriyor.
+- **Düzeltme görünümde, uygulamada değil.** `public.aigundem_feed_articles_v1`
+  artık `summary_ready` **ve** (çeviri hazır **ya da** `not_required`) şartını
+  taşıyor. Veri kabloya hiç çıkmadığı için **mağazadaki eski sürüm dâhil her
+  istemci** düzeldi, EAS derlemesi beklemeden. Uygulamadaki kapı yerinde
+  kaldı: artık ikinci hat, tek hat değil.
+- **Takas açıkça tersine çevrildi ve bu bir karar.** Eski davranış "geç gelen
+  özet, hiç görünmeyen haberden iyidir" diyordu; bu defterde o gerekçe yazılı.
+  Operatör canlıda sonucu görüp öbür tarafı seçti: **boş haber göstermektense
+  az haber göstermek.** Uygulandığı an akış 457'den 10'a düştü.
+- **`not_required` şartı atlanamaz:** Türkçe kaynaklarda (Webrazzi) çeviri hiç
+  üretilmiyor. Yalnızca `translation_tr <> ''` aransaydı bütün Türkçe haberler
+  gizlenirdi.
+- **AÇIK KALAN DELİK:** arama bu filtreden geçmiyor.
+  `public.aigundem_search_articles_v1` görünümü değil
+  `aigundem.search_articles_v1(...)` fonksiyonunu çağırıyor, yani aramada hâlâ
+  özetsiz haber çıkabilir. Yazılmadı, bilerek burada duruyor.
+
+### Bir turda üç yanlış sayı — ölçmeden ayar değiştirmenin maliyeti
+
+Kullanıcı "1 saat ne aq" diye sorduğunda söylediğim sürelerin üçü de yanlıştı,
+ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
+
+- **`max_jobs: 3` → `10` yaptım; Edge fonksiyonu 1–3 dışını reddediyor.**
+  Her tur `400 bad_request: "max_jobs must be an integer between 1 and 3"`
+  döndü ve **~45 dakika boyunca tek bir haber işlenmedi.** Bu sürede
+  "bir saatte biter" dedim. `cron.job_run_details` işi **`succeeded`** diye
+  yazıyor — çünkü o yalnızca `net.http_post`'un gönderildiğini söylüyor.
+  **Cevabı görmek için `net._http_response` okunmalı**; cron'un "başarılı"sı
+  isteğin yollandığı anlamına geliyor, işin yapıldığı değil.
+- **Sonra dakikada 3'e çıkardım: 17 iş `rate_limited` oldu.** Gerçek tavan
+  cron ayarı değil, **ücretsiz API katmanının kendisi**. İki anahtar
+  (Gemini + NVIDIA yedek) tavanı ikiye katlıyor, kaldırmıyor. Orijinal
+  `3 iş / 2 dakika` ayarı muhtemelen tam bu yüzden öyle seçilmişti; geri
+  alındı.
+- **Toplu prompt da çözüm değil.** Her haber 3 madde özet + TAM çeviri
+  üretiyor; 10 haberi tek çağrıya koymak çıktıyı 10 katına çıkarır ve model
+  cevabı keser — bu defterde `output_truncated` olarak zaten kayıtlı, altı iş
+  böyle ölmüştü. **Sınır kaç istek attığın değil, bir cevaba kaç karakter
+  sığdığı.**
