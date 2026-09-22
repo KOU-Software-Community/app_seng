@@ -89,6 +89,15 @@ const sifreGonderLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
 const sifreDegistirLimiti = loginLimiter(Date.now, 120, 60 * 60_000);
 
 /**
+ * Hesap başına öğrenci numarası değişikliği — 5 / saat.
+ *
+ * Çakışma cevabı "bu numaranın uygulamada hesabı var mı" sorusunu
+ * cevaplıyor; sınırsız olsaydı doğrulanmış tek bir hesap numara uzayını
+ * tarayabilirdi. Anahtar uid, IP değil: kampüs NAT'ı.
+ */
+const numaraLimiti = loginLimiter(Date.now, 5, 60 * 60_000);
+
+/**
  * Sıfırlama kaydının kimliği.
  *
  * Ham e-posta kimlik yapılmıyor: doküman adı kişisel veri olurdu ve koleksiyonu
@@ -328,6 +337,47 @@ export function registerAccountApi(
     await ref.delete().catch(() => {});
 
     res.json({ durum: 'dogrulandi' });
+  });
+
+  /**
+   * Öğrenci numarasını değiştir; eskisi serbest kalıyor (`claimIdentity`).
+   *
+   * **Yalnızca doğrulanmış hesap.** Sahiplenme doğrulamayla birlikte oluyor.
+   * Doğrulanmamış hesaba açılsaydı bedava hesaplarla numara kapatılırdı —
+   * doğrulama yolundaki kod şartı atlanarak.
+   *
+   * Eski numarayla yapılmış etkinlik kayıtları taşınmıyor: kayıt, yazıldığı
+   * andaki numarayı taşıyor.
+   */
+  app.post('/api/hesap/ogrenci-no', async (req, res) => {
+    const kim = await kimlikCoz(req, res, authOf);
+    if (!kim) return;
+    if (!kim.dogrulanmis) return res.status(403).json({ hata: 'dogrulanmamis' });
+
+    const kilit = numaraLimiti.lockedFor(kim.uid);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_sik', saniye: Math.ceil(kilit / 1000) });
+    }
+    numaraLimiti.fail(kim.uid);
+
+    const ogrenciNo = String((req.body as Record<string, unknown>)?.ogrenciNo ?? '').trim();
+    if (!STUDENT_NO_RE.test(ogrenciNo)) return res.status(400).json({ hata: 'numara_gecersiz' });
+
+    const profil = db.collection('users').doc(kim.uid);
+    const kullanici = (await profil.get()).data() ?? {};
+    const telefon = normalizePhone(String(kullanici.telefon ?? ''));
+    if (!telefon) return res.status(400).json({ hata: 'telefon_gecersiz' });
+
+    const eski = typeof kullanici.ogrenciNo === 'string' ? kullanici.ogrenciNo : undefined;
+    const sonuc = await claimIdentity(db, kim.uid, { telefon, ogrenciNo }, { telefon, ogrenciNo: eski });
+    if (!sonuc.ok) {
+      return res.status(409).json({
+        hata: sonuc.alan === 'telefon' ? 'telefon_kullanimda' : 'numara_kullanimda',
+      });
+    }
+
+    await profil.set({ ogrenciNo }, { merge: true });
+    res.json({ durum: 'guncellendi' });
   });
 
   /**

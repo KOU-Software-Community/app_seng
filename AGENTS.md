@@ -2232,3 +2232,31 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   oturumu, başka depolar dahil, ponytail'le açılıyor. Varsayılan seviye
   `full`; ortam değişkeni `PONYTAIL_DEFAULT_MODE=ultra` onu değiştiriyor
   (sandbox'ta ölçüldü: `level: ultra`, bayrak `ultra`).
+
+### Öğrenci numarası — teklik hesapta vardı, kayıtta yoktu
+
+- **`studentClaims` hesabı koruyordu, etkinlik kaydını değil.** Kayıt
+  formunda numara ayrı ve serbest bir kutuydu: doğrulanmış bir hesap
+  başkasının numarasıyla kaydolabiliyordu, ve operatör bunu "unique öğrenci
+  no koyduk" diye kapalı sanıyordu. Form artık numarayı profilden alıyor,
+  kutu salt okunur. **Bir kuralın korunduğunu söyleyen şey, değerin aktığı
+  her yolda aynı kaynağı okuması** — teklik bir koleksiyonda duruyor diye
+  onu okumayan bir form ondan korunmuyor.
+- **Bu bir uygulama kapısı, kural değil.** `registrations` kuralında `uid`
+  hâlâ isteğe bağlı; Firestore'a doğrudan yazan biri istediği numarayla
+  kaydolabilir. Kural tarafı `uid` zorunlu olduğu gün:
+  `get(…/studentClaims/$(studentNo)).data.uid == request.auth.uid`.
+- **Numara değişikliği panelden geçiyor** (`/api/hesap/ogrenci-no`), profile
+  doğrudan yazılmıyor: eski numaranın teklik kaydı da serbest kalmalı.
+  `claimIdentity` bunu doğrulama ekranındaki çakışma düzeltmesi için zaten
+  yapıyordu, yeniden yazılmadı. Uç nokta yalnızca doğrulanmış hesaba açık,
+  çünkü sahiplenme doğrulamayla oluyor ve doğrulanmamış hesap bedava. Hesap
+  başına saatte beş değişiklik: çakışma cevabı, "bu numaranın hesabı var mı"
+  sorusunu cevaplayan bir oracle.
+- **YAZILMADI:** `users/{uid}` kuralı istemcinin profile doğrudan başka bir
+  numara yazmasına hâlâ izin veriyor, yani profil ile `studentClaims`
+  ayrışabilir — panelin yoklama ve sertifika listeleri profildeki numarayı
+  gösteriyor. Kapatması update dalında
+  `affectedKeys().hasAny(['telefon', 'ogrenciNo'])` reddi; hiçbir meşru
+  istemci yolu profili oluşturduktan sonra bu iki alanı yazmıyor (`signUp`
+  yalnızca oluşturuyor, düzeltmeler panelden geçiyor). Kural turuna bırakıldı.

@@ -41,7 +41,10 @@ export default function RegistrationRoute() {
   const { user, profile, loading: authLoading, emailVerified } = useAuth();
 
   const [name, setName] = useState('');
-  const [studentNo, setStudentNo] = useState('');
+  // Numara hesaptan geliyor ve burada yazılmıyor: hesapta tek (`studentClaims`),
+  // formda serbest olsaydı herkes istediği numarayla — başkasınınkiyle de —
+  // kaydolurdu. Yanlışsa Hesabım'dan değişiyor.
+  const studentNo = profile?.ogrenciNo ?? '';
   const [department, setDepartment] = useState('');
   const [year, setYear] = useState('');
   const [kvkk, setKvkk] = useState(false);
@@ -102,8 +105,6 @@ export default function RegistrationRoute() {
   const full = isFull(event, registeredCount(event.id)) && !registrationFor(event.id);
 
   const noValid = new RegExp(`^\\d{${STUDENT_NO_LENGTH}}$`).test(studentNo);
-  // Only complain once they have started typing.
-  const noError = studentNo.length > 0 && !noValid;
   const valid = !full && name.trim().length > 2 && noValid && !!department && !!year && kvkk;
 
   const submit = () => {
@@ -156,22 +157,14 @@ export default function RegistrationRoute() {
           <Field label="Öğrenci Numarası">
             <TextInput
               value={studentNo}
-              // Students paste from all sorts of places — strip anything non-numeric
-              // and cap the length rather than rejecting the whole entry.
-              onChangeText={(t) => setStudentNo(t.replace(/\D/g, '').slice(0, STUDENT_NO_LENGTH))}
-              placeholder="21xxxxxxx"
-              placeholderTextColor={colors.faint}
-              inputMode="numeric"
-              keyboardType="number-pad"
-              onFocus={() => setFocused('no')}
-              onBlur={() => setFocused(null)}
-              style={[inputStyle('no', noError), { letterSpacing: 0.5 }]}
+              editable={false}
+              style={[inputStyle('no'), { letterSpacing: 0.5, color: colors.muted }]}
             />
-            {noError ? (
-              <Txt weight="semibold" size={12} color={colors.danger} style={{ marginTop: 7 }}>
-                Öğrenci numarası {STUDENT_NO_LENGTH} haneli olmalı.
+            <Pressable onPress={() => router.push('/(tabs)/hesap')} hitSlop={8} style={{ marginTop: 7 }}>
+              <Txt weight="semibold" size={12} color={colors.blue500}>
+                Yanlışsa Hesabım sekmesinden değiştirebilirsin.
               </Txt>
-            ) : null}
+            </Pressable>
           </Field>
 
           <Field label="Bölüm">

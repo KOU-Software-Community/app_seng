@@ -872,7 +872,18 @@ void (async () => {
         if (!store.has(n)) store.set(n, new Map());
         return store.get(n)!;
       };
-      const ref = (n: string, id: string) => ({ _n: n, _id: id });
+      const ref = (n: string, id: string) => ({
+        _n: n,
+        _id: id,
+        // İşlem dışı okuma/yazma: `/api/hesap/ogrenci-no` profili böyle kullanıyor.
+        async get() {
+          const d = col(n).get(id);
+          return { exists: d !== undefined, data: () => d };
+        },
+        async set(data: Record<string, unknown>, o?: { merge?: boolean }) {
+          col(n).set(id, o?.merge ? { ...col(n).get(id), ...data } : data);
+        },
+      });
       const api = {
         collection: (n: string) => ({ doc: (id: string) => ref(n, id) }),
         async runTransaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
@@ -926,6 +937,65 @@ void (async () => {
     assert('kendi kaydını güncelleyebiliyor', duzeltme.ok);
     assert('eski telefon serbest bırakılıyor', db2._get('phoneClaims', TEL) === undefined);
     assert('yeni telefon sahiplenildi', db2._get('phoneClaims', '+905559998877') !== undefined);
+
+    // /api/hesap/ogrenci-no — sahiplenmeyi taşıyan tek istemci yolu.
+    // Doğrulanmamış hesaba açılsaydı bedava hesaplarla numara kapatılırdı.
+    type Rota = (req: unknown, res: unknown) => unknown | Promise<unknown>;
+    const rotalar = new Map<string, Rota>();
+    const db3 = claimDb();
+    const sahte = {
+      async verifyIdToken(t: string) {
+        return { uid: t, email: `${t}@example.com`, email_verified: t !== 'dogrulanmamis' };
+      },
+    };
+    registerAccountApi(
+      { post: (yol: string, h: Rota) => rotalar.set(yol, h) } as never,
+      db3 as never,
+      () => sahte as unknown as AuthLike,
+    );
+    async function numara(uid: string, ogrenciNo: string) {
+      let kod = 200;
+      let govde: Record<string, unknown> = {};
+      const res = {
+        status(c: number) {
+          kod = c;
+          return res;
+        },
+        json(v: Record<string, unknown>) {
+          govde = v;
+          return res;
+        },
+      };
+      await rotalar.get('/api/hesap/ogrenci-no')!(
+        { body: { ogrenciNo }, header: () => `Bearer ${uid}` },
+        res,
+      );
+      return { kod, hata: govde.hata };
+    }
+    await db3.collection('users').doc('a').set({ telefon: TEL, ogrenciNo: NO });
+    await claimIdentity(db3 as never, 'a', { telefon: TEL, ogrenciNo: NO });
+    await claimIdentity(db3 as never, 'b', { telefon: '+905550000001', ogrenciNo: '999999999' });
+
+    assert(
+      'doğrulanmamış hesap numara değiştiremiyor',
+      (await numara('dogrulanmamis', '111111111')).kod === 403 &&
+        db3._get('studentClaims', '111111111') === undefined,
+    );
+    assert(
+      'başkasının numarasına geçilmiyor',
+      (await numara('a', '999999999')).hata === 'numara_kullanimda' &&
+        db3._get('studentClaims', NO)?.uid === 'a',
+    );
+    assert('numara değişiyor', (await numara('a', '222222222')).kod === 200);
+    assert('yeni numara sahiplenildi', db3._get('studentClaims', '222222222')?.uid === 'a');
+    assert('eski numara serbest kaldı', db3._get('studentClaims', NO) === undefined);
+    assert('profil yeni numarayı taşıyor', db3._get('users', 'a')?.ogrenciNo === '222222222');
+    assert('telefon sahiplenmesi yerinde', db3._get('phoneClaims', TEL)?.uid === 'a');
+    for (let i = 0; i < 3; i++) await numara('a', '333333333');
+    assert(
+      'saatte beşten fazla numara değişikliği yok',
+      (await numara('a', '444444444')).hata === 'cok_sik',
+    );
   }
 
   // --- Parola sıfırlama uç noktaları --------------------------------------
