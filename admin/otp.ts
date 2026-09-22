@@ -78,7 +78,7 @@ function sameHash(a: string, b: string): boolean {
 
 export type SendDecision =
   | { ok: true; record: OtpRecord; code: string }
-  | { ok: false; reason: 'bekle' | 'cok_fazla'; saniye: number };
+  | { ok: false; reason: 'bekle' | 'cok_fazla' | 'kilitli'; saniye: number };
 
 /**
  * Yeni kod gönderilsin mi?
@@ -106,20 +106,35 @@ export function decideSend(record: OtpRecord | null, now: number): SendDecision 
     return { ok: false, reason: 'cok_fazla', saniye: Math.ceil(kalan / 1000) };
   }
 
+  // Yanlış denemeler kodla değil PENCEREYLE sayılıyor. Kod başına sayılınca her
+  // yeni kod sayacı sıfırlıyordu: saatte 5 kod × 5 deneme = kodu hiç görmeden
+  // bir hesaba saatte 25 tahmin. Kimliksiz parola sıfırlamada bu, sürekli
+  // denenen bir hesabın yılda ~%20 ihtimalle ele geçirilmesi demekti.
+  if (!pencereBitti && record.attempts >= OTP_MAX_ATTEMPTS) {
+    const kalan = OTP_SEND_WINDOW_MS - (now - record.windowStart);
+    return { ok: false, reason: 'kilitli', saniye: Math.ceil(kalan / 1000) };
+  }
+
   return {
     ok: true,
     code,
     record: pencereBitti
-      ? kayit(code, now, 1, now)
-      : kayit(code, now, record.sendCount + 1, record.windowStart),
+      ? kayit(code, now, 1, now, 0)
+      : kayit(code, now, record.sendCount + 1, record.windowStart, record.attempts),
   };
 }
 
-function kayit(code: string, now: number, sendCount: number, windowStart: number): OtpRecord {
+function kayit(
+  code: string,
+  now: number,
+  sendCount: number,
+  windowStart: number,
+  attempts = 0,
+): OtpRecord {
   // `hash` burada kodun kendisiyle dolduruluyor gibi görünüyor ama dolmuyor:
   // çağıran `hashCode(tuz, code)` ile değiştiriyor. Tuz bu modülde yok çünkü
   // saf fonksiyonların kimlik bilmesi gerekmiyor.
-  return { hash: code, createdAt: now, sendCount, windowStart, attempts: 0 };
+  return { hash: code, createdAt: now, sendCount, windowStart, attempts };
 }
 
 export type VerifyDecision =

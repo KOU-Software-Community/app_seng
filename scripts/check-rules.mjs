@@ -69,7 +69,9 @@ emu.stderr.on('data', (b) => (emuHata += b));
 /** Kuralları atlayan yazma (emülatörün `owner` jetonu): sahne kurmak için. */
 async function tohum(yol, alanlar) {
   const deger = (v) =>
-    Array.isArray(v)
+    v instanceof Date
+      ? { timestampValue: v.toISOString() }
+      : Array.isArray(v)
       ? { arrayValue: { values: v.map(deger) } }
       : typeof v === 'number'
         ? { integerValue: String(v) }
@@ -123,6 +125,16 @@ function kayit(no, uid, seatId) {
   };
 }
 
+/** `src/attendance.ts` → `yoklamaVer` ile aynı yazma. */
+function yoklama(db, eventId, uid, token) {
+  return setDoc(doc(db, 'attendance', `${eventId}__${uid}`), {
+    eventId,
+    uid,
+    token,
+    checkedInAt: serverTimestamp(),
+  });
+}
+
 /** Sonuç: 'izin' ya da hata kodu. */
 async function sonuc(fn) {
   try {
@@ -166,6 +178,20 @@ try {
   await tohum('users/u3', { ...PROFIL, telefon: '+905551112255', ogrenciNo: '210000003' });
   await tohum('studentClaims/210000001', { uid: 'u1' });
   await tohum('studentClaims/210000002', { uid: 'u2' });
+  // Pencere alanları TIMESTAMP: panel bir süre ISO dizesi yazdı ve kural
+  // timestamp ile dizeyi karşılaştıramadığı için pencere hiç açılmadı.
+  const saat = 3600_000;
+  await tohum('eventQr/e1', {
+    token: 'dogru-jeton-e1',
+    opensAt: new Date(Date.now() - saat),
+    closesAt: new Date(Date.now() + saat),
+  });
+  await tohum('events/e2', { title: 'Dünkü Atölye' });
+  await tohum('eventQr/e2', {
+    token: 'dogru-jeton-e2',
+    opensAt: new Date(Date.now() - 3 * saat),
+    closesAt: new Date(Date.now() - saat),
+  });
 
   const u1 = istemci('u1');
   const u2 = istemci('u2');
@@ -197,6 +223,13 @@ try {
   await red('kimliksiz sahte koltuk reddediliyor', () =>
     setDoc(doc(istemci(), 'eventSeats', 'e1'), { eventId: 'e1', seatIds: arrayUnion('sahte-koltuk-98') }, { merge: true }),
   );
+
+  // --- yoklama (QR)
+  await izin('pencere açıkken doğru jetonla yoklama geçiyor', () => yoklama(u1, 'e1', 'u1', 'dogru-jeton-e1'));
+  await red('yanlış jetonla yoklama reddediliyor', () => yoklama(u2, 'e1', 'u2', 'uydurma-jeton'));
+  await red('pencere kapalıyken yoklama reddediliyor', () => yoklama(u2, 'e2', 'u2', 'dogru-jeton-e2'));
+  await red('başkası adına yoklama reddediliyor', () => yoklama(u2, 'e1', 'u3', 'dogru-jeton-e1'));
+  await red('kimliksiz yoklama reddediliyor', () => yoklama(istemci(), 'e1', 'u9', 'dogru-jeton-e1'));
 
   // --- profil
   await red('profildeki öğrenci numarası istemciden değişmiyor', () =>

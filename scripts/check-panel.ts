@@ -56,6 +56,7 @@ import { readMailConfig } from '../admin/mail';
 import { otpMail } from '../admin/mailTemplate';
 import { claimIdentity, releaseIdentity } from '../admin/claims';
 import { registerAccountApi, type AuthLike } from '../admin/accountApi';
+import { PDF_SIRA_SINIRI, PdfMesgul, sertifikaPdf } from '../admin/pdf';
 import { adSinifi, certificateHtml } from '../admin/certificate';
 import {
   BELGE_NO_UZUNLUK,
@@ -697,6 +698,40 @@ void (async () => {
     );
     assert('pencere dolunca sayaç sıfırlanıyor',
       pencereSonrasi.ok && pencereSonrasi.record.sendCount === 1);
+
+    // ASIL MESELE: yeni kod deneme sayacını sıfırlamamalı. Sıfırlasaydı kodu
+    // hiç görmeyen biri kimliksiz sıfırlama ucunda saatte 25 tahmin yapardı.
+    const yeniKod = decideSend(kayitYap({ attempts: 3 }), T0 + OTP_RESEND_MS);
+    assert('yeni kod yanlış deneme sayacını sıfırlamıyor', yeniKod.ok && yeniKod.record.attempts === 3);
+    const bitmis = decideSend(kayitYap({ attempts: OTP_MAX_ATTEMPTS }), T0 + OTP_RESEND_MS);
+    assert('deneme hakkı bitmişken yeni kod verilmiyor',
+      !bitmis.ok && bitmis.reason === 'kilitli' && bitmis.saniye > 0);
+    const ertesiPencere = decideSend(
+      kayitYap({ attempts: OTP_MAX_ATTEMPTS, windowStart: T0 }),
+      T0 + OTP_SEND_WINDOW_MS + 1,
+    );
+    assert('pencere dolunca deneme hakkı da yenileniyor',
+      ertesiPencere.ok && ertesiPencere.record.attempts === 0);
+
+    // Saldırganın döngüsü: kod iste, yanlış dene, tekrar kod iste. Bir
+    // pencerede değerlendirilen tahmin sayısı deneme tavanını aşmamalı.
+    let kayit: ReturnType<typeof kayitYap> | null = null;
+    let tahmin = 0;
+    for (let i = 0; i < 20; i++) {
+      const t = T0 + i * OTP_RESEND_MS;
+      const s = decideSend(kayit, t);
+      if (s.ok) kayit = { ...s.record, hash: hashCode('sifirla', s.code) };
+      for (let j = 0; j < 10 && kayit; j++) {
+        const yanlisKod = s.ok && s.code === '000000' ? '111111' : '000000';
+        const v = decideVerify(kayit, 'sifirla', yanlisKod, t + 1);
+        if (!v.ok && v.reason === 'yanlis') {
+          tahmin += 1;
+          kayit = { ...kayit, attempts: kayit.attempts + 1 };
+        }
+      }
+    }
+    assert(`bir saatte en fazla ${OTP_MAX_ATTEMPTS} tahmin değerlendiriliyor`,
+      tahmin === OTP_MAX_ATTEMPTS, `${tahmin} tahmin`);
   }
 
   {
@@ -1376,6 +1411,44 @@ void (async () => {
         'https://mobil.kouseng.com/sertifika/K7M2QX90',
       dogrulamaUrl('https://mobil.kouseng.com/', 'K7M2QX90'),
     );
+  }
+
+  // --- PDF sırası: herkese açık rota istek başına Chromium açmamalı --------
+  //
+  // `/sertifika/<no>.pdf` kimliksiz ve her istek bir tarayıcı açıyordu —
+  // ölçüldü, 10 paralel istek 109 Chromium süreci. Sıra tarayıcısız sınanıyor.
+  {
+    const is = {
+      adSoyad: 'Elif Yılmaz',
+      etkinlik: 'Git Atölyesi',
+      tarih: '12 Mart 2026',
+      belgeNo: 'K7M2QX90',
+      dogrulamaUrl: 'https://x/sertifika/K7M2QX90',
+      qrSvg: '',
+    };
+    let calisan = 0;
+    let tepe = 0;
+    const sahte = async () => {
+      calisan += 1;
+      tepe = Math.max(tepe, calisan);
+      await new Promise((r) => setTimeout(r, 20));
+      calisan -= 1;
+      return [Buffer.from('pdf')];
+    };
+    const sonuclar = await Promise.allSettled(Array.from({ length: 10 }, () => sertifikaPdf([is], sahte)));
+    assert('aynı anda tek PDF çiziliyor', tepe === 1, `${tepe} eşzamanlı`);
+    const reddedilen = sonuclar.filter((r) => r.status === 'rejected' && r.reason instanceof PdfMesgul).length;
+    assert(`sıra dolunca fazlası reddediliyor (${10 - PDF_SIRA_SINIRI})`, reddedilen === 10 - PDF_SIRA_SINIRI,
+      `${reddedilen} reddedildi`);
+    // Patlayan bir çizim sırayı kilitlememeli, sayaç da sızmamalı.
+    await sertifikaPdf([is], async () => {
+      throw new Error('çizim patladı');
+    }).catch(() => {});
+    const sonra = await Promise.allSettled(
+      Array.from({ length: PDF_SIRA_SINIRI }, () => sertifikaPdf([is], sahte)),
+    );
+    assert('hata ve boşalmadan sonra sıra yeniden tam kapasite',
+      sonra.every((r) => r.status === 'fulfilled'));
   }
 
   // --- Güvenlik sertleştirmesi ---------------------------------------------

@@ -2275,3 +2275,38 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   reddettiği için test yine "reddedildi" görüyordu. Saldırganın şekli
   istemcininki değil: numara işgali için yalnızca kayıt dokümanı yeter.
   **Meşru yolu istemcinin şekliyle, saldırıyı saldırganın şekliyle sınayın.**
+
+### Güvenlik taraması, #55 sonrası yüzey — üç bulgu, üçü de ölçüldü
+
+- **Yeni kod, deneme sayacını sıfırlıyordu.** `decideSend` her kodda
+  `attempts: 0` yazıyordu; e-posta başına saatte 5 kod × kod başına 5 deneme =
+  kimliksiz parola sıfırlamada kodu hiç görmeden **saatte 25 tahmin** (altı
+  hane, sürekli saldırıda yılda ~%20). Denemeler artık pencereyle sayılıyor ve
+  deneme hakkı bitmişken yeni kod verilmiyor (`kilitli`). `check:panel`
+  saldırganın döngüsünü simüle ediyor: eski davranışta 25, yenisinde 5.
+  **Bir sayacı kim sıfırlayabiliyorsa, sınır onun elinde.**
+- **Herkese açık `/sertifika/<no>.pdf` istek başına bir Chromium açıyordu.**
+  Ölçüldü: tek render 11 süreç, 10 eşzamanlı istek 109 süreç (RSS toplamı
+  0,8 → 7,9 GB). Belge numarası tasarım gereği paylaşılıyor, yani paneli —
+  OTP, kayıt, bildirim dâhil — düşürmek için geçerli bir numara yetiyordu.
+  `sertifikaPdf` artık tek sıra (aynı anda bir tarayıcı), sıra doluysa
+  `PdfMesgul` → 503. Sınır bütün çağıranların geçtiği yerde, rotada değil.
+  Düzeltme sonrası aynı 10 istek: 6'sı 503, bellek tepesi tek render'ınki.
+  **Pahalı işi tetikleyen kimliksiz her rota, ilk olarak bir DoS kapısıdır.**
+- **`create or replace view` seçenekleri sıfırlıyor.** Akış filtresi
+  migration'ı `public.aigundem_feed_articles_v1`'i `with (security_invoker =
+  true)` yazmadan yeniden tanımladı; Postgres seçeneği sessizce düşürdü ve
+  görünüm sahibinin yetkisiyle, RLS'i atlayarak çalışmaya başladı. Supabase
+  denetçisi ERROR dedi (`security_definer_view`); o gün sızan satır yoktu
+  (anon iki yoldan da 11 satır görüyordu), tehlike alttaki tabloya ileride
+  konacak her kısıttı. `20260922232513_feed_view_security_invoker`.
+  Bu görünümü yeniden tanımlayan her migration seçeneği yazmak zorunda —
+  ve her DDL'den sonra `get_advisors` çalıştırılmalı: bunu bir tarama buldu,
+  migration'ı yazan tur değil.
+- Taranıp temiz çıkanlar: parola sıfırlamanın tekdüzeliği (cevap postadan
+  önce, kayıtlı olmayan adrese de aynı cevap), yönetici sayfalarındaki her
+  kullanıcı verisi (`esc()`), sertifika numarasının üretimi
+  (`crypto.randomInt`, ret örneklemeli) ve 404 sayfası, QR yoklama kuralı
+  (artık `check:rules`'ta). Çeviri ucunun F0 kotası birkaç IP'yle bir
+  saatliğine bitirilebiliyor — defterde zaten kabul edilmiş risk, fatura
+  değil özellik kaybı. `npm audit`'in dört kökü defterdeki tabloyla aynı.

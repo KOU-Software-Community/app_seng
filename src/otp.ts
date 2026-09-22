@@ -174,7 +174,9 @@ export function otpMesaj(err: unknown): string {
     case 'suresi_doldu':
       return 'Kodun süresi doldu. Yeni kod iste.';
     case 'kilitli':
-      return 'Çok fazla yanlış deneme yapıldı. Yeni kod iste.';
+      return saniye
+        ? `Çok fazla yanlış deneme yapıldı. ${Math.ceil(saniye / 60)} dakika sonra yeni kod isteyebilirsin.`
+        : 'Çok fazla yanlış deneme yapıldı. Biraz bekleyip yeni kod iste.';
     case 'kod_yok':
       return 'Önce kod iste.';
     case 'telefon_kullanimda':
