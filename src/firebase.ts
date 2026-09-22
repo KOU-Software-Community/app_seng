@@ -174,9 +174,8 @@ export async function pushRaffleEntry(entry: {
   // "bütün verileriniz silinir" derken. Kimse bunu bildiremez: silinmiş bir
   // şeyin kaldığını ancak veritabanına bakan biri görür.
   //
-  // Kayıtlardaki gibi isteğe bağlı: hesabı olmayan sürüm de yazmaya devam
-  // edebilmeli. Auth dinamik içe aktarılıyor — hesapsız kullanıcı için Auth
-  // SDK'sını bu yola sokmanın anlamı yok.
+  // İsteğe bağlı: çekiliş formu giriş istemiyor. Auth dinamik içe aktarılıyor
+  // — hesapsız kullanıcı için Auth SDK'sını bu yola sokmanın anlamı yok.
   const { currentUser } = await import('./auth');
   const uid = currentUser()?.uid;
 
@@ -226,9 +225,8 @@ export async function pushRegistration(payload: RegistrationPayload): Promise<st
   //
   // `arrayUnion` idempotent: aynı jeton ikinci kez eklenmez. Yeniden gönderim
   // ne kopya kayıt üretiyor (doküman kimliği `regId`) ne de sayıyı şişiriyor.
-  // Kaydın sahibi: kural `uid`'i zorunlu kılmıyor (mağazada hesapsız bir
-  // sürüm var ve zorunlu kılmak onu anında kırardı), ama yazabiliyorsak
-  // yazıyoruz — kaydı cihazdan bağımsız okunabilir kılan tek alan bu.
+  // Kaydın sahibi: kural `uid`'i zorunlu kılıyor ve numarayı hesabın teklik
+  // kaydına bağlıyor, yani oturum yoksa yazma reddediliyor.
   //
   // Auth modülü dinamik olarak içe aktarılıyor: hesabı olmayan bir kullanıcı
   // için Auth SDK'sını kayıt yoluna sokmanın anlamı yok.

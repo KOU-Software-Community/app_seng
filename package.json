@@ -81,6 +81,7 @@
     "check:release": "node scripts/check-release.mjs",
     "lint": "expo lint",
     "rules:deploy": "node scripts/deploy-rules.mjs",
+    "check:rules": "node scripts/check-rules.mjs",
     "push": "tsx scripts/send-push.ts",
     "export": "tsx scripts/export-registrations.ts",
     "demo:hesap": "tsx scripts/demo-account.ts",

@@ -76,22 +76,15 @@ export default function RegistrationRoute() {
     );
   }
 
-  // KAPI YALNIZCA BURADA, kuralda değil — ve bu yorum bir kez tersini yazdı.
-  // `registrations` create dalında `email_verified` diye bir koşul yok;
-  // olamaz da, çünkü `uid` bugün isteğe bağlı (mağazada hesapsız bir sürüm
-  // var) ve doğrulama koşulu ancak kimliğe bağlanabilir. Yani bu ekran bir
-  // kolaylık değil, tek zorlayıcı. Doğrudan Firestore'a yazan biri kuralı
-  // geçer; ona karşı savunma kayıt akışında değil, `uid` zorunlu hâle
-  // geldiğinde kurala eklenecek `request.auth.token.email_verified == true`
-  // satırında olacak.
-  //
-  // Bu defterde "davranışı anlatan bir belge, davranış değildir" maddesi zaten
-  // var — bu, yorum hâli.
+  // Zorlayan taraf kural: kayıt yalnızca hesabın teklik kaydındaki numarayla
+  // yazılabiliyor ve teklik kaydı e-posta doğrulanınca doğuyor
+  // (`firestore.rules` → registrations). Bu kapı, reddedilecek bir formu
+  // doldurtmamak için.
   if (user && !emailVerified) {
     return (
       <AuthGate
         title="Önce e-postanı doğrula"
-        body={`${user.email} adresine gönderdiğimiz bağlantıya bastıktan sonra kaydını tamamlayabilirsin.`}
+        body={`${user.email} adresine gönderdiğimiz kodu girdikten sonra kaydını tamamlayabilirsin.`}
         primary="Hesabıma git"
         onPrimary={() => router.push('/(tabs)/hesap')}
         onBack={() => router.back()}

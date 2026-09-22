@@ -2253,10 +2253,25 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   çünkü sahiplenme doğrulamayla oluyor ve doğrulanmamış hesap bedava. Hesap
   başına saatte beş değişiklik: çakışma cevabı, "bu numaranın hesabı var mı"
   sorusunu cevaplayan bir oracle.
-- **YAZILMADI:** `users/{uid}` kuralı istemcinin profile doğrudan başka bir
-  numara yazmasına hâlâ izin veriyor, yani profil ile `studentClaims`
-  ayrışabilir — panelin yoklama ve sertifika listeleri profildeki numarayı
-  gösteriyor. Kapatması update dalında
-  `affectedKeys().hasAny(['telefon', 'ogrenciNo'])` reddi; hiçbir meşru
-  istemci yolu profili oluşturduktan sonra bu iki alanı yazmıyor (`signUp`
-  yalnızca oluşturuyor, düzeltmeler panelden geçiyor). Kural turuna bırakıldı.
+- **Kural tarafı da kapandı — hesapsız sürüm emekliye ayrılınca.** Operatör
+  eski sürüme force update gönderiyor, dolayısıyla `registrations`'ta `uid`
+  zorunlu ve numara teklik kaydına bağlı:
+  `get(…/studentClaims/$(studentNo)).data.uid == request.auth.uid`. Teklik
+  kaydı yalnızca doğrulamayla doğduğu için `email_verified` ayrıca aranmıyor.
+  Koltuk (`eventSeats`) aynı batch'teki kayda bağlı (`getAfter`), profildeki
+  telefon ve numara istemciden değişmiyor. **Bedeli:** teklik kaydından ÖNCE
+  (12–13 Eylül, eski doğrulama bağlantısıyla) doğrulanmış hesapların teklik
+  kaydı yok ve kaydolamıyorlar. Bunlar yalnızca test hesabı olabilir: o
+  tarihte mağazadaki sürüm hesapsızdı.
+- **Kurallar artık burada koşuyor, ve bu defterin birkaç satırı bu yüzden
+  eskidi.** "Kuralları koşturacak ortam yok" diyen her kayıt o günün ölçümü:
+  emülatör JAR'ı `storage.googleapis.com`'dan iniyor, Java 21 konteynerde
+  ve CI'da var. `npm run check:rules` kuralları emülatörde çalıştırıyor, CI da
+  her push'ta koşturuyor. Kuralı değiştiren her tur önce oraya senaryo ekler.
+- **Batch'le yazılan saldırı senaryosu, kuralın bir deliğini maskeleyebilir.**
+  İlk hâlde saldırılar `pushRegistration` ile aynı batch'le (kayıt + koltuk)
+  denendi ve dört bozmadan ikisi yeşil kaldı: teklik bağı ya da sahiplik
+  kontrolü silinince kayıt geçiyordu, ama koltuk kuralı batch'in tamamını
+  reddettiği için test yine "reddedildi" görüyordu. Saldırganın şekli
+  istemcininki değil: numara işgali için yalnızca kayıt dokümanı yeter.
+  **Meşru yolu istemcinin şekliyle, saldırıyı saldırganın şekliyle sınayın.**

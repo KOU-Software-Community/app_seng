@@ -57,7 +57,7 @@ export const USER_QUERY_COLLECTIONS = ['registrations', 'raffleEntries', 'attend
  * `uid` TAŞIMAYAN kayıtlar da silinmek zorunda, ve onlar yalnızca öğrenci
  * numarasından bulunabiliyor.
  *
- * Mağazada hesapsız bir sürüm var ve o sürümün yazdığı `registrations`
+ * Mağazada hesapsız bir sürüm vardı ve o sürümün yazdığı `registrations`
  * dokümanında `uid` alanı yok — `where('uid','==',uid)` onları hiç görmüyor.
  * Yani hesabını silen bir kullanıcının adı, numarası, bölümü ve telefonu
  * veritabanında kalıyordu, üstelik sayfa "bütün verileriniz silinir" diyerek.
