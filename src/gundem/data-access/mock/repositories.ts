@@ -83,6 +83,15 @@ export function createMockFeedRepository(): FeedRepository {
       return ok(paginate(filtered.sort(compareArticles), params.cursor, limit));
     },
 
+    async articlesByIds(ids: readonly ArticleId[]): Promise<Result<Article[]>> {
+      const istenen = new Set(ids.map((id) => id?.trim()).filter(Boolean));
+      if (istenen.size === 0) return ok([]);
+      // Sıra bilerek uygulanmıyor — sözleşme sırayı garanti etmiyor ve çağıran
+      // kendi sırasını (kayıt sırası) kuruyor. Sahte depo burada gerçeğini
+      // taklit ediyor: sıraya güvenen bir çağıran üretimde de bozulurdu.
+      return ok(mockArticles().filter((a) => istenen.has(a.id)));
+    },
+
     async getArticle(id: ArticleId): Promise<Result<Article>> {
       const trimmed = id?.trim();
       if (!trimmed) {

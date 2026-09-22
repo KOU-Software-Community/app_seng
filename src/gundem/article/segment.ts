@@ -29,15 +29,28 @@ export type Segment = 'en' | 'tr';
 export const hasSummary = (summary: ArticleSummary | undefined): boolean =>
   !!summary && summary.bullets.some((bullet) => bullet.trim().length > 0);
 
+/**
+ * `yedekCeviri` — Azure'dan (panel üzerinden) gelen çeviri.
+ *
+ * AI'ın ürettiği çeviri ile bu ikisi AYNI ÜRÜN değil ama kullanıcı açısından
+ * aynı: Türkçe metin. Sıra bilerek "önce bedava olan": sunucunun zaten
+ * ürettiği çeviri varsa Azure'a hiç gidilmiyor, kota harcanmıyor. Azure
+ * yalnızca AI işi ölmüşken devreye giriyor — ki ölçülen üretim verisinde 22
+ * ölü işin 13'ü hız limitinden ölmüştü ve o haberlerde kullanıcı çeviriyi
+ * HİÇ göremiyordu.
+ */
 export function segmentState(
   article: Article | undefined,
   summary: ArticleSummary | undefined,
+  yedekCeviri: string | null = null,
 ): { visible: boolean; enabled: boolean } {
   const state = summary?.translationState ?? article?.summary?.translationState;
   if (!article || article.language === 'tr' || state === 'not_required') {
     return { visible: false, enabled: false };
   }
-  return { visible: true, enabled: state === 'ready' };
+  // Düğme METNE bakarak açılıyor, bayrağa değil — bayrağa bakan hâli bu
+  // depoda bir kez "basınca hiçbir şey olmuyor"a dönüşmüştü.
+  return { visible: true, enabled: state === 'ready' || Boolean(yedekCeviri) };
 }
 
 /** Seçilen segmentin gövdesi ve etiketi. */
@@ -45,8 +58,10 @@ export function bodyFor(
   article: Article,
   summary: ArticleSummary | undefined,
   segment: Segment,
+  yedekCeviri: string | null = null,
 ): { text: string; label: string } {
-  const translation = summary?.translationTr ?? article.summary?.translationTr ?? null;
+  const translation =
+    summary?.translationTr ?? article.summary?.translationTr ?? yedekCeviri ?? null;
   return segment === 'tr' && translation
     ? { text: translation, label: 'Çeviri · Türkçe' }
     : { text: article.bodyOriginal, label: 'Orijinal · English' };

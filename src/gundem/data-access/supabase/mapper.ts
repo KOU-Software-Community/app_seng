@@ -97,17 +97,42 @@ function toBullets(articleId: string, bullets: string[]): [string, string, strin
  * `translation_state` "ready" derken metin boşsa eskiden düğme açılıyor,
  * kullanıcı basıyor ve `bodyFor` sessizce orijinale düşüyordu.
  */
+/**
+ * Çeviri durumu kararı — TEK YER.
+ *
+ * Bu kural iki yerde ayrı ayrı yazılmıştı ve **ayrıştı**: akış yolu (burası)
+ * durumu metinden türetiyordu, zenginleştirme yolu (`repositories.ts`)
+ * `not_required` değilse koşulsuz `ready` yazıyordu. Sonucu ekranda görünen
+ * bir hata: çeviri metni boşken düğme AÇIK geliyor, kullanıcı basıyor ve
+ * `bodyFor` sessizce orijinale düşüyor — yani düğme hiçbir şey yapmıyor.
+ *
+ * Deponun defteri bu hatayı "düzeltildi" diye yazıyordu; düzeltme yalnızca bu
+ * dosyaya girmişti. **Aynı kararı iki yerde uygulamak, ikisinin ayrışmasının
+ * tek sebebidir** — o yüzden artık bir fonksiyon, iki çağıran.
+ *
+ * Kural: bayrağa değil METNE bakılıyor. Elde Türkçe metin varsa hazırdır.
+ */
+export function ceviriDurumu(input: {
+  ham: string | null | undefined;
+  dil?: string | null;
+  wireState?: string | null;
+}): { state: TranslationState; text: string | null } {
+  const text = input.ham?.trim() ? input.ham : null;
+  if (input.dil === 'tr' || input.wireState === 'not_required') {
+    return { state: 'not_required', text: null };
+  }
+  return text ? { state: 'ready', text } : { state: 'pending', text: null };
+}
+
 export function toSummary(row: FeedArticleRow): ArticleSummary | undefined {
   const language = toLanguage(row.language, `article ${row.article_id}`);
-  const translation = row.translation_tr?.trim() ? row.translation_tr : null;
-
-  // A Turkish article is never translated; the DB trigger enforces the same rule.
-  const state: TranslationState =
-    language === 'tr' || row.translation_state === 'not_required'
-      ? 'not_required'
-      : translation
-        ? 'ready'
-        : 'pending';
+  const karar = ceviriDurumu({
+    ham: row.translation_tr,
+    dil: language,
+    wireState: row.translation_state,
+  });
+  const translation = karar.text;
+  const state: TranslationState = karar.state;
 
   return {
     bullets:

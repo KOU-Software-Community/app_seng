@@ -44,6 +44,41 @@ const when = (iso: unknown): string => {
   return `${pad(club.getUTCDate())}.${pad(club.getUTCMonth() + 1)} ${pad(club.getUTCHours())}:${pad(club.getUTCMinutes())}`;
 };
 
+/**
+ * Azure çeviri satırı.
+ *
+ * Dört durumun dördü de ayrı cümle: "yapılandırılmamış" ile "hiç çağrılmadı"
+ * aynı sessizliği üretiyordu ve operatörün ayıramadığı şey tam olarak buydu.
+ */
+const ceviriSatiri = (c: {
+  durum: string;
+  zaman: string | null;
+  sebep: string | null;
+  basarili: number;
+  basarisiz: number;
+}): string => {
+  if (c.durum === 'yapilandirilmamis')
+    return (
+      '<b>Azure YAPILANDIRILMAMIŞ</b> — <code>AZURE_TRANSLATOR_KEY</code> yok. ' +
+      'AI çevirisi gelmeyen haberde kullanıcı çeviriyi hiç görmüyor.'
+    );
+  if (c.durum === 'hic-cagrilmadi')
+    return (
+      '<b>Bu süreçte hiç çağrılmadı.</b> Anahtar duruyor; ilk çeviri isteğinden ' +
+      'sonra sonuç burada yazacak.'
+    );
+  const sayac = `<b>${c.basarili}</b> başarılı, <b>${c.basarisiz}</b> başarısız`;
+  if (c.durum === 'ok')
+    return (
+      `Son başarı: <b>${when(c.zaman)}</b> · ${sayac}` +
+      (c.sebep ? ` · en son hata: <code>${esc(c.sebep)}</code>` : '')
+    );
+  return (
+    '<b style="color:#B3261E">Son çağrı başarısız.</b> ' +
+    `<code>${esc(c.sebep ?? 'sebep bilinmiyor')}</code> (${when(c.zaman)}) · ${sayac}`
+  );
+};
+
 export type MailStatus = { ready: boolean; from: string | null; eksik: string[] };
 
 export function notificationsPage(input: {
@@ -51,6 +86,14 @@ export function notificationsPage(input: {
   mail: MailStatus;
   /** Sertifika PDF'i açılışta basılabildi mi. `null` ise deneme hiç koşmadı. */
   pdf: { hazir: boolean; sure: number; bayt?: number; hata?: string } | null;
+  /** Azure çevirisinin bu süreçteki son durumu — `admin/translateApi.ts`. */
+  ceviri: {
+    durum: 'yapilandirilmamis' | 'hic-cagrilmadi' | 'ok' | 'hata';
+    zaman: string | null;
+    sebep: string | null;
+    basarili: number;
+    basarisiz: number;
+  };
   devices: DeviceSummary;
   log: LogRow[];
   pending: PendingRow[];
@@ -174,6 +217,20 @@ export function notificationsPage(input: {
         Süreç açılır, sağlık kontrolü geçer, Coolify yeşil görünür ve ölüm ilk
         sertifika isteğinde — etkinlikten haftalar sonra, bir öğrenci belgesini
         beklerken — gelir. Açılışta bir belge basmak hatayı buraya çekiyor.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Çeviri (Azure)</h2>
+      <p class="hint">
+        ${ceviriSatiri(input.ceviri)}
+      </p>
+      <p class="hint">
+        Açılış günlüğündeki <code>[ceviri] Azure Translator hazır</code> satırı
+        yalnızca <b>anahtarın girildiğini</b> söylüyor, çalıştığını değil —
+        ondan sonraki sessizlik "çalışıyor" ile "kimse çağırmadı" arasında
+        ayrım yapmıyordu. Farkı buradaki sayaç kuruyor; her çağrıyı loglamak
+        makale başına bir satır demekti.
       </p>
     </div>
 

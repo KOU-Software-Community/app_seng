@@ -86,3 +86,44 @@ describe('cursor opacity (N2)', () => {
     expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
   });
 });
+
+/**
+ * Kayıtlılar ekranının kaybettiği haberler.
+ *
+ * Eski hâl kayıtlı kimlikleri AKIŞIN YÜKLENMİŞ SAYFALARIYLA kesiştiriyordu:
+ * `orderBySaved(...).filter(a => a !== undefined)` bulamadığını sessizce
+ * düşürüyor, yani akış penceresinden düşmüş bir kayıt listeden yok oluyordu.
+ * Hata yok, log yok; ekranda "Kaydedilen haber yok" yazıyordu.
+ *
+ * Bu testin kurduğu durum tam olarak o: istenen kimlik akışın İLK SAYFASINDA
+ * değil. Toplu okuma onu yine de getiriyor.
+ */
+describe('articlesByIds — kayıtlı haber akış penceresine bağlı değil', () => {
+  it('ilk sayfada olmayan bir kimliği de getiriyor', async () => {
+    const repos = createMockRepositories();
+    const ilkSayfa = await repos.feed.listArticles({ limit: 2 });
+    if (!ilkSayfa.ok) throw new Error('mock akış okunamadı');
+    const gorunen = new Set(ilkSayfa.data.items.map((a) => a.id));
+
+    const hepsi = await repos.feed.listArticles({ limit: 50 });
+    if (!hepsi.ok) throw new Error('mock akış okunamadı');
+    const disarida = hepsi.data.items.find((a) => !gorunen.has(a.id));
+    if (!disarida) throw new Error('fikstür değişmiş: ilk sayfa her şeyi kapsıyor');
+
+    const sonuc = await repos.feed.articlesByIds([disarida.id]);
+    if (!sonuc.ok) throw new Error('articlesByIds hata verdi');
+    expect(sonuc.data.map((a) => a.id)).toEqual([disarida.id]);
+  });
+
+  it('boş listede ağa hiç gitmiyor', async () => {
+    const sonuc = await createMockRepositories().feed.articlesByIds([]);
+    if (!sonuc.ok) throw new Error('beklenen ok');
+    expect(sonuc.data).toEqual([]);
+  });
+
+  it('bilinmeyen kimliği sessizce atlıyor, hata vermiyor', async () => {
+    const sonuc = await createMockRepositories().feed.articlesByIds(['yok-boyle-bir-id']);
+    if (!sonuc.ok) throw new Error('beklenen ok');
+    expect(sonuc.data).toEqual([]);
+  });
+});
