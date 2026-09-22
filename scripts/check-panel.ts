@@ -31,6 +31,8 @@ import {
 import { isBucketMissing, keyProblem } from '../admin/photos';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
+import { ceviriSagligi, registerTranslateApi } from '../admin/translateApi';
+import { notificationsPage } from '../admin/notificationsView';
 import {
   USER_DOC_COLLECTIONS,
   USER_QUERY_COLLECTIONS,
@@ -1667,6 +1669,119 @@ void (async () => {
 
     if (eskiDeger === undefined) delete process.env.ADMIN_AUTO_PUSH;
     else process.env.ADMIN_AUTO_PUSH = eskiDeger;
+  }
+
+  // --- Azure çeviri sağlığı: sessizlik iki şey demek olmasın ---
+  //
+  // Korunan şey bir teşhis: açılış satırı yalnızca anahtarın girildiğini
+  // söylüyor, çalıştığını değil. Bu sayaç silinirse `/bildirimler` sayfası
+  // "hiç çağrılmadı" demeye devam eder ve hiçbir şey hata vermez — bu depoda
+  // aynı sınıfın kaydı (`pdfDumanTesti`) zaten yazılı.
+  {
+    // Sahte Express: yalnızca `post` yakalanıyor, handler elde kalıyor.
+    let handler: ((req: never, res: never) => Promise<void>) | null = null;
+    const app = {
+      post: (_yol: string, h: (req: never, res: never) => Promise<void>) => {
+        handler = h;
+      },
+    } as never;
+
+    const azureCevap = (metin: string) =>
+      (async () =>
+        ({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          async json() {
+            return [{ detectedLanguage: { language: 'en' }, translations: [{ text: metin, to: 'tr' }] }];
+          },
+        }) as unknown as Response) as unknown as typeof fetch;
+
+    const azurePatlak = (kod: number) =>
+      (async () =>
+        ({ ok: false, status: kod, statusText: 'Forbidden', async json() {
+          return {};
+        } }) as unknown as Response) as unknown as typeof fetch;
+
+    // `clientIp` yalnızca `req.ip`'ye bakıyor (CF başlığı yoksa), yani sahte
+    // istek bu kadar basit olabiliyor.
+    const cagir = async (fetchImpl: typeof fetch) => {
+      handler = null;
+      registerTranslateApi(app, {
+        env: { AZURE_TRANSLATOR_KEY: 'sahte' } as unknown as NodeJS.ProcessEnv,
+        fetchImpl,
+        now: () => new Date('2026-09-22T09:00:00Z').getTime(),
+      });
+      const res = { json: () => {}, status: () => res } as never;
+      await handler!({ ip: '1.2.3.4', body: { metin: 'Hello world.' } } as never, res);
+    };
+
+    await cagir(azureCevap('Merhaba dünya.'));
+    const sonrasi = ceviriSagligi();
+    assert(
+      'başarılı çeviri sağlığı "ok"a çeviriyor ve sayacı artırıyor',
+      sonrasi.durum === 'ok' && sonrasi.basarili === 1 && sonrasi.zaman !== null,
+      JSON.stringify(sonrasi),
+    );
+
+    await cagir(azurePatlak(403));
+    const hatali = ceviriSagligi();
+    assert(
+      'başarısız çeviri sağlığı "hata"ya çeviriyor ve sebebi yazıyor',
+      hatali.durum === 'hata' && hatali.basarisiz === 1 && hatali.sebep === 'kota',
+      JSON.stringify(hatali),
+    );
+
+    // Operatörün açıkça istediği şey: "gereksiz her işlemi loglamasa daha iyi".
+    // Bu iddia olmadan bir sonraki tur ilk-başarı koşulunu düşürür ve makale
+    // başına bir satır basmaya başlar; belirtisi yalnızca şişen bir log olur.
+    const gercekLog = console.log;
+    const yakalanan: string[] = [];
+    console.log = (...parcalar: unknown[]) => {
+      yakalanan.push(parcalar.join(' '));
+    };
+    try {
+      await cagir(azureCevap('İkinci çeviri.'));
+    } finally {
+      console.log = gercekLog;
+    }
+    assert(
+      'ikinci başarı YENİ log satırı basmıyor (sayaç artıyor)',
+      yakalanan.filter((l) => l.includes('[ceviri]')).length === 0 && ceviriSagligi().basarili === 2,
+      `${JSON.stringify(yakalanan)} basarili: ${ceviriSagligi().basarili}`,
+    );
+
+    // Sağlık nesnesi doğru olup sayfada hiç çizilmemesi mümkün, ve belirtisi
+    // yalnızca olmayan bir satır — bu depoda "yazılmış ama bağlanmamış ekran"
+    // olarak kayıtlı. İki durum ayrı ayrı çiziliyor: tek bir sabit metin,
+    // nesne hiç okunmadan da yeşil verirdi.
+    const sayfa = (c: Parameters<typeof notificationsPage>[0]['ceviri']) =>
+      notificationsPage({
+        autoPush: true,
+        mail: { ready: true, from: 'a@b.c', eksik: [] },
+        pdf: null,
+        ceviri: c,
+        devices: { total: 0, byPlatform: {}, masterOn: 0, byCategory: {} },
+        log: [],
+        pending: [],
+        categories: [],
+      });
+    const bos = sayfa({ durum: 'hic-cagrilmadi', zaman: null, sebep: null, basarili: 0, basarisiz: 0 });
+    const dolu = sayfa({
+      durum: 'ok',
+      zaman: '2026-09-22T09:00:00.000Z',
+      sebep: null,
+      basarili: 7,
+      basarisiz: 0,
+    });
+    assert(
+      '/bildirimler sayfası çeviri durumunu çiziyor (iki durum ayrışıyor)',
+      bos.includes('Bu süreçte hiç çağrılmadı') &&
+        !bos.includes('Son başarı') &&
+        dolu.includes('Son başarı') &&
+        dolu.includes('<b>7</b> başarılı'),
+      'kart silinmiş ya da nesneyi okumuyor',
+    );
   }
 
 

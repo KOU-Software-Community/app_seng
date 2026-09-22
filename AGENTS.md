@@ -1703,6 +1703,48 @@ Dört kök danışma, dördü de tek tek çağrı yeri okunarak karara bağland�
   sayılmaz. IP kovası + 20.000 karakter tavanı var; F0 sert tavanlı olduğu
   için en kötü sonuç geçici özellik kaybı, fatura değil.
 
+### Azure çeviri sağlığı — sessizliğin iki anlamı
+
+- **"Çalışmadığında bassın" zaten kuruluydu; eksik olan ters yöndü.**
+  `admin/translateApi.ts` yalnızca başarısızlıkta `console.warn` basıyor,
+  başarılı çağrı tamamen sessiz. Boşluk şurada: açılıştaki
+  `[ceviri] Azure Translator hazır` satırından sonraki sessizlik **iki farklı
+  şey** demek olabiliyordu — "çalışıyor" ya da "kimse çağırmadı" — ve operatör
+  ikisini ayıramıyordu. Üretimde `curl` ile çalıştığı kanıtlandı, ama bunu
+  panelin kendisi söyleyemiyordu. **Bir bileşenin hata basması, çalıştığını
+  söylediği anlamına gelmiyor.**
+- **Cevap yeni bir log satırı değil, `pdfDurumu()` kalıbı.** Modül düzeyinde
+  bir durum nesnesi (`ceviriSagligi()`) ve `/bildirimler` sayfasında bir
+  satır — deponun bu iş için zaten kurduğu yer. Her başarıyı loglamak farkı
+  kurardı ama makale başına bir satır demekti, ki operatörün açıkça istemediği
+  şey buydu. Tek yeni günlük satırı **ömür boyu bir kez**: ilk başarılı
+  çeviride, sonra asla.
+- **Periyodik bir Azure ping'i YAPILMADI.** "Heartbeat" kelimesinin düz okuması
+  o, ama kotadan yiyor, panele bir zamanlayıcı daha ekliyor ve ilk gerçek
+  başarısızlığın zaten söyleyeceği şeyi en fazla yarım saat önce söylüyor.
+  Üstelik yanıltıcı: iki kelimelik bir ping'in geçmesi 8.000 karakterlik bir
+  haber gövdesinin geçeceğini kanıtlamıyor — uzunluk sınırları ayrı.
+- **`sebep` başarıdan sonra TEMİZLENMİYOR.** "En son ne oldu" ile "en son hata
+  neydi" ayrı sorular; ikincisi kotanın saat içinde tükendiğini teşhis eden tek
+  bilgi. Sayfa ikisini birden yazıyor.
+- **Ad çakışması gerçekti:** `ceviriDurumu` `supabase/mapper.ts`'te zaten var
+  ve çeviri **durumu kararını** veriyor. Sağlık nesnesi `ceviriSagligi`.
+- **Kırma testlerinden çıkan şey, iddianın ölçtüğü şeyi gösterdi.** Beş kırma
+  koşturuldu ve üçüncüsü ayırt ediciydi: ilk-başarı koşulu `if (true)` yapılınca
+  — yani her çağrı loglanınca — **ilk iki iddia yeşil kalıyor**, yalnızca "ikinci
+  başarı yeni log basmıyor" kırmızı veriyor. Operatörün istediği asıl şey
+  ("gereksiz her işlemi loglamasa") başka hiçbir iddianın göremediği şeydi.
+- **Sağlık nesnesinin doğru olması, sayfada çizildiği anlamına gelmiyor.**
+  `notificationsPage`'i hiçbir şey render etmiyordu; kart silinse belirti
+  yalnızca olmayan bir satır olurdu, ki kimse bildirmez (bu defterde "yazılmış
+  ama bağlanmamış ekran" olarak zaten kayıtlı). İddia sayfayı **iki ayrı
+  durumla** çiziyor: tek bir sabit metin arasaydı, nesneyi hiç okumayan bir
+  kart da yeşil verirdi — ölçüldü, kart sabit metne indirilince kırmızı verdi.
+- **Panel yönlendirmesinin kendisi bir kontrol gerektirmiyor.**
+  `notificationsPage`'in girdi tipinde `ceviri` zorunlu, yani `server.ts`'ten
+  satır silinince `tsc` düşüyor — ölçüldü (TS2345). Tip sistemi zaten tutan bir
+  şey için ikinci bir guard yazmak, bakımı olan ama korumayan koddur.
+
 ### Üç ölü parça, üç ayrı ölüm biçimi
 
 - **`react-native-worklets-core` ile `react-native-worklets` AYRI paketler ve

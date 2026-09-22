@@ -76,7 +76,7 @@ import {
 } from '../src/pushPolicy';
 import { startDeletionSweeper } from './deletion';
 import { registerAccountApi } from './accountApi';
-import { ceviriDurumSatiri, registerTranslateApi } from './translateApi';
+import { ceviriDurumSatiri, ceviriSagligi, registerTranslateApi } from './translateApi';
 import { certificateHtml } from './certificate';
 import {
   belgeTarihi,
@@ -1295,6 +1295,7 @@ app.get('/bildirimler', async (req, res) => {
       categories,
       mail: { ready: mailReady(), from: mailFrom(), eksik: mailEksik },
       pdf: pdfDurumu(),
+      ceviri: ceviriSagligi(),
       notice: typeof req.query.sonuc === 'string' ? req.query.sonuc : undefined,
     }),
   );
