@@ -2176,17 +2176,20 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   oturum aynısını yazıyordu: `Skipping orphaned enabledPlugins entry
   ponytail@ponytail: marketplace not registered`; `claude plugin list` →
   "No plugins installed". Plugin o günden beri bulutta bir kez bile
-  yüklenmedi ve hiçbir şey hata vermedi — kural seti gelmeyince model yalnızca
-  biraz daha az tembel davranıyor, bunu kimse bir hata olarak bildirmez.
-  `expo@claude-plugins-official` da aynı durumda.
+  yüklenmedi ve hiçbir şey hata vermedi. Operatörün gördüğü belirti: oturum
+  "ultra aktif" diyor, ama tek bir uyarı gelmiyordu. "Aktif" diyen şey
+  mekanizma değildi — ne kural seti bağlamdaydı ne de modu tutan hook'lar
+  yüklüydü. `expo@claude-plugins-official` da aynı durumda.
 - **Bulutta kuran şey ortamın setup script'i** (claude.ai → ortam → *Setup
   script*):
 
   ```bash
   #!/bin/bash
   export PATH="/opt/claude-code/bin:$PATH"
-  claude plugin marketplace add "DietrichGebert/ponytail#v4.10.0" || true
+  claude plugin marketplace add DietrichGebert/ponytail || true
   claude plugin install ponytail@ponytail || true
+  claude plugin marketplace update ponytail || true
+  claude plugin update ponytail@ponytail || true
   mkdir -p ~/.claude && touch ~/.claude/.ponytail-statusline-nudged
   ```
 
@@ -2211,12 +2214,21 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   `.ponytail-statusline-nudged` önbellekte yoksa kural seti her oturum
   "statusline kurmayı teklif et" talimatıyla geliyor — bulutta statusline
   yokken. Ölçüldü: işaretsiz 1, işaretli 0.
-- **Sürüm iki yerde sabit ve ikisi aynı kalmalı:** script'teki `#v4.10.0`
-  (bulut) ve settings.json'daki `ref` (yerel). Önceki kayıt "plugin
-  974d940'a sabitli" diyordu; config'de hiçbir pin yoktu. Plugin her istemde
-  ve her alt ajanda node çalıştırıyor; v4.10.0'daki hook'lar okundu — ağ
-  yok, alt süreç yok, yalnızca `~/.claude` altına bayrak dosyası ve kural
-  metni. Yükseltirken ikisini birlikte değiştirin; script değişince ortam
-  önbelleği yeniden kuruluyor.
-- **Setup script depoya değil ortama ait.** Aynı ortamı kullanan her bulut
-  oturumu, başka depolar dahil, ponytail'le açılır.
+- **Sürüm bilerek sabitlenmiyor — operatör kararı: güncelleme alsın.**
+  Bulutta plugin auto-updater kapalı (`Plugin autoupdate: skipped
+  (auto-updater disabled)`), yani yeni sürüm ancak setup script yeniden
+  koşunca geliyor: script değişince ya da ortam önbelleği ~7 günde bir
+  yenilenince. Yenileme eski anlık görüntünün üstünde koşarsa `add` ve
+  `install` "already" deyip geçiyor; son iki `update` satırı bu yüzden var.
+  Ölçüldü: 4.9.0 kurulu bir anlık görüntüde script sürümü 4.10.0'a taşıyor,
+  o iki satır olmadan 4.9.0'da kalıyor. Bedeli de yazılı olsun: plugin her
+  istemde ve her alt ajanda node çalıştırıyor ve upstream'e düşen her şey
+  incelenmeden geliyor. v4.10.0'daki hook'lar okundu — ağ yok, alt süreç
+  yok, yalnızca `~/.claude` altına bayrak dosyası ve kural metni; sonraki
+  sürümler okunmadı. Önceki kayıt "plugin 974d940'a sabitli" diyordu;
+  config'de hiçbir zaman pin olmadı.
+- **Setup script depoya değil ortama ait, ve bu bilerek.** Operatör
+  ponytail'i bütün projelerinde istiyor: aynı ortamı kullanan her bulut
+  oturumu, başka depolar dahil, ponytail'le açılıyor. Varsayılan seviye
+  `full`; ortam değişkeni `PONYTAIL_DEFAULT_MODE=ultra` onu değiştiriyor
+  (sandbox'ta ölçüldü: `level: ultra`, bayrak `ultra`).
