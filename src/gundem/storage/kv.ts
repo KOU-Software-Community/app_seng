@@ -93,6 +93,24 @@ export const kv: KvStore = createAsyncStorageStore();
  * bağlı. Şekil değişirse `v2:` altına yazılır ve eski blob yanlış çözülmek
  * yerine yok sayılır.
  *
+ * **Üç anahtar `v2:`ye taşındı ve sebebi bir şekil değişikliği DEĞİL.** AI
+ * Gündem veritabanındaki bütün haber geçmişi silindi (2473 satır), yani bu üç
+ * anahtarın içindeki makale kimlikleri artık hiçbir şeye karşılık gelmiyor.
+ * Şekil aynı, işaret ettikleri şey öldü. Aynı kaldıraç, yeni bir sebeple —
+ * numaraya bakıp olmayan bir sözleşme değişikliği aramayın.
+ *
+ * Taşınmayanların gerekçesi de burada, çünkü asıl karar o:
+ *
+ * - `enabledSourceIds` — **kaynaklar silinmedi**, yalnızca haberler. O
+ *   kimlikler geçerli; sıfırlamak kullanıcının kaynak seçimini boşuna bozardı.
+ * - `deviceId` — makale kimliği değil, ve yenilemek sunucudaki
+ *   `request_enrichment_miss` kovasının kimliğini de sıfırlardı.
+ * - `settings`, `recentSearches` — içlerinde makale kimliği yok.
+ *
+ * Eski `v1:` kayıtları AsyncStorage'da kalıyor (birkaç KB ölü JSON). Onları
+ * silen bir göç kodu yazılmadı: tek seferlik bir olay için sonsuza kadar
+ * yaşayacak bir kod, temizlediği şeyden pahalı.
+ *
  * `kyk.` öneki de kasıtlı: AsyncStorage bu uygulamada kulüp tarafıyla ortak
  * (`kyk.state.v1`), iki bölümün anahtarları aynı isim alanında yaşıyor.
  */
@@ -105,8 +123,8 @@ export const KV_KEYS = {
 
   /** Cihaza özel kullanıcı durumu — hiçbiri sunucuya gitmiyor. */
   enabledSourceIds: 'v1:kyk.gundem.user.enabled_sources',
-  savedArticles: 'v1:kyk.gundem.user.saved',
-  readArticles: 'v1:kyk.gundem.user.read',
+  savedArticles: 'v2:kyk.gundem.user.saved',
+  readArticles: 'v2:kyk.gundem.user.read',
   settings: 'v1:kyk.gundem.user.settings',
   recentSearches: 'v1:kyk.gundem.user.recent_searches',
 
@@ -114,5 +132,5 @@ export const KV_KEYS = {
    * Arka plan zenginleştirmesinin günlük bütçesi. Cihaza özel: sunucudaki
    * `request_enrichment_miss` sayacı da cihaz kimliğine göre tutuluyor.
    */
-  warmBudget: 'v1:kyk.gundem.enrichment.warm_budget',
+  warmBudget: 'v2:kyk.gundem.enrichment.warm_budget',
 } as const;

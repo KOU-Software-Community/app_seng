@@ -5,7 +5,7 @@ import React, { type ReactNode } from 'react';
 import { ok, type Result } from '../../domain/errors';
 import type { EnrichmentResult } from '../../domain/types';
 import { queryKeys } from '../../data-access/queryKeys';
-import { memoryStore } from '../../storage/kv';
+import { KV_KEYS, memoryStore } from '../../storage/kv';
 import { useEnrichmentWarmup } from '../useEnrichmentWarmup';
 import { WARM_BATCH, WARM_DAILY_CAP } from '../warmup';
 
@@ -38,7 +38,10 @@ const clients: QueryClient[] = [];
 afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
   mockRequestEnrichment.mockReset();
-  void memoryStore.removeItem('v1:kyk.gundem.enrichment.warm_budget');
+  // Anahtar elle yazılıydı ve sabit `v2:`ye taşınınca temizlik yanlış
+  // anahtara gitti: bütçe testler arasında sızdı. Deponun kendi kuralı —
+  // aynı kararı iki yerde yazmak, ikisinin ayrışmasının tek sebebi.
+  void memoryStore.removeItem(KV_KEYS.warmBudget);
 });
 
 /** Her çağrı ayrı bir "uygulama açılışı"; depo paylaşılıyor, bellek değil. */
