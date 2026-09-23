@@ -2161,6 +2161,18 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   (Gemini + NVIDIA yedek) tavanı ikiye katlıyor, kaldırmıyor. Orijinal
   `3 iş / 2 dakika` ayarı muhtemelen tam bu yüzden öyle seçilmişti; geri
   alındı.
+- **O geri alma depoya hiç yazılmadı.** Üretimde SQL ile 3'e dönüldü, ama
+  `20260922175500_sweep_enqueue_cron.sql` 10 demeye devam etti (süpürme de
+  canlıda her dakika, dosyada 10 dakikada bir). Başka bir inceleme aracı o
+  dosyayı okuyup "işçi 3→10" diye raporladı; dosyayı yeniden uygulayan biri
+  de işçiyi yine durdururdu. Düzeltme `20260923103132_cron_canliya_esitle`.
+  **Canlıda elle yapılan her değişiklik aynı turda migration olarak yazılır**
+  — yoksa depo, üretimi güvenle yanlış anlatan bir belgeye döner.
+- **Squash merge'de dalın commit'leri `main`'in geçmişine girmez.** "Hangi
+  dal merge edildi" sorusunu git soyundan (`branch --merged`) cevaplayan bir
+  araç, #48'den sonraki her PR'ı merge edilmemiş sanıyor. Cevap GitHub'ın PR
+  kaydında (`merged_at`); dallar merge'den sonra silinmediği için kalıntılar
+  bu yanılgıyı besliyor.
 - **Toplu prompt da çözüm değil.** Her haber 3 madde özet + TAM çeviri
   üretiyor; 10 haberi tek çağrıya koymak çıktıyı 10 katına çıkarır ve model
   cevabı keser — bu defterde `output_truncated` olarak zaten kayıtlı, altı iş
