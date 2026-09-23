@@ -102,6 +102,8 @@ skills-lock.json
 *.keystore
 play-store-key.json
 AuthKey_*.p8
+credentials.json
+credentials/
 
 # Firebase service account keys — never commit.
 # Unlike the EXPO_PUBLIC_* client config (which ships inside the app by design
