@@ -89,6 +89,15 @@ const sifreGonderLimiti = loginLimiter(Date.now, 20, 60 * 60_000);
 const sifreDegistirLimiti = loginLimiter(Date.now, 120, 60 * 60_000);
 
 /**
+ * Hesap başına öğrenci numarası değişikliği — 5 / saat.
+ *
+ * Çakışma cevabı "bu numaranın uygulamada hesabı var mı" sorusunu
+ * cevaplıyor; sınırsız olsaydı doğrulanmış tek bir hesap numara uzayını
+ * tarayabilirdi. Anahtar uid, IP değil: kampüs NAT'ı.
+ */
+const numaraLimiti = loginLimiter(Date.now, 5, 60 * 60_000);
+
+/**
  * Sıfırlama kaydının kimliği.
  *
  * Ham e-posta kimlik yapılmıyor: doküman adı kişisel veri olurdu ve koleksiyonu
@@ -252,12 +261,12 @@ export function registerAccountApi(
         // Sunucu bağlantıyı kabul edip alıcıyı reddettiğinde `sendMail`
         // fırlatmıyor. İstemciye "gönderildi" demek yanlış olurdu.
         await ref.delete().catch(() => {});
-        return res.status(502).json({ hata: 'posta_gonderilemedi' });
+        return res.status(503).json({ hata: 'posta_gonderilemedi' });
       }
     } catch (err) {
       await ref.delete().catch(() => {});
       console.error('[posta] doğrulama kodu gönderilemedi:', err);
-      return res.status(502).json({ hata: 'posta_gonderilemedi' });
+      return res.status(503).json({ hata: 'posta_gonderilemedi' });
     }
 
     res.json({ durum: 'gonderildi', saniye: Math.round(OTP_TTL_MS / 1000) });
@@ -331,6 +340,47 @@ export function registerAccountApi(
   });
 
   /**
+   * Öğrenci numarasını değiştir; eskisi serbest kalıyor (`claimIdentity`).
+   *
+   * **Yalnızca doğrulanmış hesap.** Sahiplenme doğrulamayla birlikte oluyor.
+   * Doğrulanmamış hesaba açılsaydı bedava hesaplarla numara kapatılırdı —
+   * doğrulama yolundaki kod şartı atlanarak.
+   *
+   * Eski numarayla yapılmış etkinlik kayıtları taşınmıyor: kayıt, yazıldığı
+   * andaki numarayı taşıyor.
+   */
+  app.post('/api/hesap/ogrenci-no', async (req, res) => {
+    const kim = await kimlikCoz(req, res, authOf);
+    if (!kim) return;
+    if (!kim.dogrulanmis) return res.status(403).json({ hata: 'dogrulanmamis' });
+
+    const kilit = numaraLimiti.lockedFor(kim.uid);
+    if (kilit > 0) {
+      return res.status(429).json({ hata: 'cok_sik', saniye: Math.ceil(kilit / 1000) });
+    }
+    numaraLimiti.fail(kim.uid);
+
+    const ogrenciNo = String((req.body as Record<string, unknown>)?.ogrenciNo ?? '').trim();
+    if (!STUDENT_NO_RE.test(ogrenciNo)) return res.status(400).json({ hata: 'numara_gecersiz' });
+
+    const profil = db.collection('users').doc(kim.uid);
+    const kullanici = (await profil.get()).data() ?? {};
+    const telefon = normalizePhone(String(kullanici.telefon ?? ''));
+    if (!telefon) return res.status(400).json({ hata: 'telefon_gecersiz' });
+
+    const eski = typeof kullanici.ogrenciNo === 'string' ? kullanici.ogrenciNo : undefined;
+    const sonuc = await claimIdentity(db, kim.uid, { telefon, ogrenciNo }, { telefon, ogrenciNo: eski });
+    if (!sonuc.ok) {
+      return res.status(409).json({
+        hata: sonuc.alan === 'telefon' ? 'telefon_kullanimda' : 'numara_kullanimda',
+      });
+    }
+
+    await profil.set({ ogrenciNo }, { merge: true });
+    res.json({ durum: 'guncellendi' });
+  });
+
+  /**
    * Parola sıfırlama kodu gönder. **Kimliksiz.**
    *
    * Cevap her durumda birebir aynı: aynı kod, aynı gövde, aynı alanlar. Adres
@@ -338,7 +388,7 @@ export function registerAccountApi(
    * `bekle` cevabını veriyor — oracle sayaçta da yok.
    *
    * **Cevap postadan ÖNCE dönüyor ve bu bilinçli bir ihlal.** `/api/hesap/kod`
-   * gönderim patlarsa kaydı siliyor ve 502 dönüyor; orada çağıran zaten kimliği
+   * gönderim patlarsa kaydı siliyor ve 503 dönüyor; orada çağıran zaten kimliği
    * bilinen kişi. Burada gönderimin sonucunu söylemek, adresin kayıtlı olduğunu
    * söylemek demek — üstelik `getUserByEmail` + SMTP el sıkışması "hiçbir şey
    * yapma"dan yüzlerce ms uzun, yani zamanlama tek başına bir oracle olurdu.

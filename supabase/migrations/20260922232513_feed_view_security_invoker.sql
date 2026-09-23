@@ -1,0 +1,16 @@
+-- `create or replace view` SEÇENEKLERİ KORUMUYOR.
+--
+-- 20260922190000_feed_only_ready görünümü `with (security_invoker = true)`
+-- yazmadan yeniden tanımladı ve Postgres seçeneği sessizce sıfırladı: görünüm
+-- sahibinin (postgres) yetkisiyle, alttaki tabloların RLS'ini atlayarak
+-- çalışmaya başladı. Supabase güvenlik denetçisi bunu ERROR diye işaretledi
+-- (security_definer_view); dört kardeş görünüm `security_invoker=true`.
+--
+-- Ölçüldü: anon için iki yol da aynı 11 satırı veriyordu, yani o gün sızan
+-- bir satır yoktu — bugün veri zaten herkese açık. Tehlike gizli olanı:
+-- alttaki bir tabloya ileride konacak her RLS kısıtı bu görünümde delinirdi.
+-- Düzeltmeden sonra anon yine 11 satır görüyor, akış boşalmadı.
+--
+-- Bu görünümü yeniden tanımlayan her migration `with (security_invoker = true)`
+-- yazmak zorunda.
+alter view public.aigundem_feed_articles_v1 set (security_invoker = true);

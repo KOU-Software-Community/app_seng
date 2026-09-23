@@ -166,7 +166,7 @@ export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<
 
   if (error) {
     if (isBucketMissing(error)) throw missingBucketMessage();
-    throw new PhotoUploadError(`Görsel yüklenemedi: ${error.message}`);
+    throw new PhotoUploadError(`Görsel Supabase Storage'a yüklenemedi: ${error.message}`);
   }
 
   return bucket.getPublicUrl(path).data.publicUrl;

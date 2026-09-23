@@ -2161,6 +2161,18 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   (Gemini + NVIDIA yedek) tavanı ikiye katlıyor, kaldırmıyor. Orijinal
   `3 iş / 2 dakika` ayarı muhtemelen tam bu yüzden öyle seçilmişti; geri
   alındı.
+- **O geri alma depoya hiç yazılmadı.** Üretimde SQL ile 3'e dönüldü, ama
+  `20260922175500_sweep_enqueue_cron.sql` 10 demeye devam etti (süpürme de
+  canlıda her dakika, dosyada 10 dakikada bir). Başka bir inceleme aracı o
+  dosyayı okuyup "işçi 3→10" diye raporladı; dosyayı yeniden uygulayan biri
+  de işçiyi yine durdururdu. Düzeltme `20260923103132_cron_canliya_esitle`.
+  **Canlıda elle yapılan her değişiklik aynı turda migration olarak yazılır**
+  — yoksa depo, üretimi güvenle yanlış anlatan bir belgeye döner.
+- **Squash merge'de dalın commit'leri `main`'in geçmişine girmez.** "Hangi
+  dal merge edildi" sorusunu git soyundan (`branch --merged`) cevaplayan bir
+  araç, #48'den sonraki her PR'ı merge edilmemiş sanıyor. Cevap GitHub'ın PR
+  kaydında (`merged_at`); dallar merge'den sonra silinmediği için kalıntılar
+  bu yanılgıyı besliyor.
 - **Toplu prompt da çözüm değil.** Her haber 3 madde özet + TAM çeviri
   üretiyor; 10 haberi tek çağrıya koymak çıktıyı 10 katına çıkarır ve model
   cevabı keser — bu defterde `output_truncated` olarak zaten kayıtlı, altı iş
@@ -2232,3 +2244,124 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   oturumu, başka depolar dahil, ponytail'le açılıyor. Varsayılan seviye
   `full`; ortam değişkeni `PONYTAIL_DEFAULT_MODE=ultra` onu değiştiriyor
   (sandbox'ta ölçüldü: `level: ultra`, bayrak `ultra`).
+
+### Öğrenci numarası — teklik hesapta vardı, kayıtta yoktu
+
+- **`studentClaims` hesabı koruyordu, etkinlik kaydını değil.** Kayıt
+  formunda numara ayrı ve serbest bir kutuydu: doğrulanmış bir hesap
+  başkasının numarasıyla kaydolabiliyordu, ve operatör bunu "unique öğrenci
+  no koyduk" diye kapalı sanıyordu. Form artık numarayı profilden alıyor,
+  kutu salt okunur. **Bir kuralın korunduğunu söyleyen şey, değerin aktığı
+  her yolda aynı kaynağı okuması** — teklik bir koleksiyonda duruyor diye
+  onu okumayan bir form ondan korunmuyor.
+- **Bu bir uygulama kapısı, kural değil.** `registrations` kuralında `uid`
+  hâlâ isteğe bağlı; Firestore'a doğrudan yazan biri istediği numarayla
+  kaydolabilir. Kural tarafı `uid` zorunlu olduğu gün:
+  `get(…/studentClaims/$(studentNo)).data.uid == request.auth.uid`.
+- **Numara değişikliği panelden geçiyor** (`/api/hesap/ogrenci-no`), profile
+  doğrudan yazılmıyor: eski numaranın teklik kaydı da serbest kalmalı.
+  `claimIdentity` bunu doğrulama ekranındaki çakışma düzeltmesi için zaten
+  yapıyordu, yeniden yazılmadı. Uç nokta yalnızca doğrulanmış hesaba açık,
+  çünkü sahiplenme doğrulamayla oluyor ve doğrulanmamış hesap bedava. Hesap
+  başına saatte beş değişiklik: çakışma cevabı, "bu numaranın hesabı var mı"
+  sorusunu cevaplayan bir oracle.
+- **Kural tarafı da kapandı — hesapsız sürüm emekliye ayrılınca.** Operatör
+  eski sürüme force update gönderiyor, dolayısıyla `registrations`'ta `uid`
+  zorunlu ve numara teklik kaydına bağlı:
+  `get(…/studentClaims/$(studentNo)).data.uid == request.auth.uid`. Teklik
+  kaydı yalnızca doğrulamayla doğduğu için `email_verified` ayrıca aranmıyor.
+  Koltuk (`eventSeats`) aynı batch'teki kayda bağlı (`getAfter`), profildeki
+  telefon ve numara istemciden değişmiyor. **Bedeli:** teklik kaydından ÖNCE
+  (12–13 Eylül, eski doğrulama bağlantısıyla) doğrulanmış hesapların teklik
+  kaydı yok ve kaydolamıyorlar. Bunlar yalnızca test hesabı olabilir: o
+  tarihte mağazadaki sürüm hesapsızdı.
+- **Kurallar artık burada koşuyor, ve bu defterin birkaç satırı bu yüzden
+  eskidi.** "Kuralları koşturacak ortam yok" diyen her kayıt o günün ölçümü:
+  emülatör JAR'ı `storage.googleapis.com`'dan iniyor, Java 21 konteynerde
+  ve CI'da var. `npm run check:rules` kuralları emülatörde çalıştırıyor, CI da
+  her push'ta koşturuyor. Kuralı değiştiren her tur önce oraya senaryo ekler.
+- **Batch'le yazılan saldırı senaryosu, kuralın bir deliğini maskeleyebilir.**
+  İlk hâlde saldırılar `pushRegistration` ile aynı batch'le (kayıt + koltuk)
+  denendi ve dört bozmadan ikisi yeşil kaldı: teklik bağı ya da sahiplik
+  kontrolü silinince kayıt geçiyordu, ama koltuk kuralı batch'in tamamını
+  reddettiği için test yine "reddedildi" görüyordu. Saldırganın şekli
+  istemcininki değil: numara işgali için yalnızca kayıt dokümanı yeter.
+  **Meşru yolu istemcinin şekliyle, saldırıyı saldırganın şekliyle sınayın.**
+
+### Güvenlik taraması, #55 sonrası yüzey — üç bulgu, üçü de ölçüldü
+
+- **Yeni kod, deneme sayacını sıfırlıyordu.** `decideSend` her kodda
+  `attempts: 0` yazıyordu; e-posta başına saatte 5 kod × kod başına 5 deneme =
+  kimliksiz parola sıfırlamada kodu hiç görmeden **saatte 25 tahmin** (altı
+  hane, sürekli saldırıda yılda ~%20). Denemeler artık pencereyle sayılıyor ve
+  deneme hakkı bitmişken yeni kod verilmiyor (`kilitli`). `check:panel`
+  saldırganın döngüsünü simüle ediyor: eski davranışta 25, yenisinde 5.
+  **Bir sayacı kim sıfırlayabiliyorsa, sınır onun elinde.**
+- **Herkese açık `/sertifika/<no>.pdf` istek başına bir Chromium açıyordu.**
+  Ölçüldü: tek render 11 süreç, 10 eşzamanlı istek 109 süreç (RSS toplamı
+  0,8 → 7,9 GB). Belge numarası tasarım gereği paylaşılıyor, yani paneli —
+  OTP, kayıt, bildirim dâhil — düşürmek için geçerli bir numara yetiyordu.
+  `sertifikaPdf` artık tek sıra (aynı anda bir tarayıcı), sıra doluysa
+  `PdfMesgul` → 503. Sınır bütün çağıranların geçtiği yerde, rotada değil.
+  Düzeltme sonrası aynı 10 istek: 6'sı 503, bellek tepesi tek render'ınki.
+  **Pahalı işi tetikleyen kimliksiz her rota, ilk olarak bir DoS kapısıdır.**
+- **`create or replace view` seçenekleri sıfırlıyor.** Akış filtresi
+  migration'ı `public.aigundem_feed_articles_v1`'i `with (security_invoker =
+  true)` yazmadan yeniden tanımladı; Postgres seçeneği sessizce düşürdü ve
+  görünüm sahibinin yetkisiyle, RLS'i atlayarak çalışmaya başladı. Supabase
+  denetçisi ERROR dedi (`security_definer_view`); o gün sızan satır yoktu
+  (anon iki yoldan da 11 satır görüyordu), tehlike alttaki tabloya ileride
+  konacak her kısıttı. `20260922232513_feed_view_security_invoker`.
+  Bu görünümü yeniden tanımlayan her migration seçeneği yazmak zorunda —
+  ve her DDL'den sonra `get_advisors` çalıştırılmalı: bunu bir tarama buldu,
+  migration'ı yazan tur değil.
+- Taranıp temiz çıkanlar: parola sıfırlamanın tekdüzeliği (cevap postadan
+  önce, kayıtlı olmayan adrese de aynı cevap), yönetici sayfalarındaki her
+  kullanıcı verisi (`esc()`), sertifika numarasının üretimi
+  (`crypto.randomInt`, ret örneklemeli) ve 404 sayfası, QR yoklama kuralı
+  (artık `check:rules`'ta). Çeviri ucunun F0 kotası birkaç IP'yle bir
+  saatliğine bitirilebiliyor — defterde zaten kabul edilmiş risk, fatura
+  değil özellik kaybı. `npm audit`'in dört kökü defterdeki tabloyla aynı.
+
+### Fotoğraf yüklerken 502 — Cloudflare cevabı yutuyordu, Supabase tıkanmıştı
+
+- **Cloudflare, origin'in 502 ve 504'ünü kendi sayfasıyla değiştiriyor ve
+  gövdeyi atıyor** (Cloudflare belgesi: *"Cloudflare returns a
+  Cloudflare-branded HTTP 502 or 504 error when your origin web server
+  responds with a standard HTTP 502 … or 504"*). Panel görsel yükleme
+  hatasında bilerek 502 dönüyordu — anlamca doğru, ama sebebi yazan form hiç
+  görünmedi ve operatör "sunucu 502'ye düştü ama ayakta" gördü. Aynı sınıf OTP
+  postasında da vardı: 502 + JSON → Cloudflare HTML'i → istemci JSON okuyamıyor
+  → "İnternetini kontrol et". Panel artık 503 dönüyor; `check:release`
+  `admin/*.ts`'te 502/504 bırakmıyor. 500 ve 503 geçiyor: Cloudflare'in kendi
+  sorun giderme sayfaları "HTML'de cloudflare geçmiyorsa sayfayı origin
+  üretti" diyor.
+- **Bu dal sessizdi.** `PhotoUploadError` yalnızca sayfaya yazılıyordu, sayfayı
+  da Cloudflare attığı için sebep hiçbir yerde kalmıyordu. Artık günlükte.
+- **Asıl sebep Supabase'di: Storage 544 `DatabaseTimeout`.** Storage nesne
+  kaydını Postgres'e yazıyor (`findBucketById`), ve 2026-09-23 17:44 UTC'den
+  sonra veritabanına bağlanamadı. Postgres günlüğü aynı saatlerde: birkaç
+  buffer'lık checkpoint yazması 25–103 sn, `pg_settings` okuması 11 sn, pg_cron
+  "job startup timeout", 17:45'ten sonra hiç REST isteği yok. Bu sorgu
+  yavaşlığı değil, örneğin kendisinin tıkanması — ve AI Gündem aynı projede.
+- **Tetikleyici yoktu; zemin zaten sınırdaydı.** 17:43:00'teki süpürme
+  0,37 sn'de bitti, 17:44:00'te bütün cron işleri "job startup timeout" verdi.
+  O dakikada trafik artışı (gün boyu saatte 150–190 istek), yavaş sorgu, dış
+  bağlantı ya da bizden bir değişiklik yok. Proje **Nano** (en fazla 0,5 GB
+  RAM; `effective_cache_size` 384 MB = 512 MB'ın %75'i). Restart'tan 20 dakika
+  sonra, boştayken: RAM dolu, ~200 MB swap'ta, bellek taahhüdü 1,15 GB, CPU'nun
+  boş olmayan kısmı neredeyse tamamen IOwait. Supabase'in kendi servisleri
+  0,5 GB'ı zaten dolduruyor; çalışma kümesi biraz büyüyünce swap'a sürekli yazıp
+  okumaya başlıyor ve her süreç diski bekliyor. Günlükteki tablo bu. 17:44'ün
+  kendisini gösteren grafik yok, metrikler kilitlenme boyunca toplanmamış;
+  yani **zemin ölçüldü, tetikleyici doğrulanmadı.** Restart geçici çözüm:
+  makine 20 dakikada yine swap'ta.
+- **Restart kanıtı siliyor.** `pg_stat_statements` ve kümülatif istatistikler
+  restart'la sıfırlandı, Postgres günlüğü de kilitlenme sırasında 18:46'da
+  kesilmişti. Geriye dönük dakika dakika kalan tek kayıt `cron.job_run_details`.
+  Bir dahaki sefere restart'tan ÖNCE Observability grafiklerinin (Memory, CPU)
+  görüntüsü alınmalı.
+- **Bu Supabase projesi yalnızca AI Gündem değil.** `public`'te bir berber
+  randevu uygulamasının tabloları ve `tidasan_enquiries` duruyor (1–7 satır,
+  yük değiller), ama hepsi aynı 0,5 GB'ı paylaşıyor. `cron.job_run_details`
+  veritabanının yarısı (32 MB) ve günde ~2.250 satır büyüyor; pg_cron silmiyor.

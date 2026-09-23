@@ -41,7 +41,10 @@ export default function RegistrationRoute() {
   const { user, profile, loading: authLoading, emailVerified } = useAuth();
 
   const [name, setName] = useState('');
-  const [studentNo, setStudentNo] = useState('');
+  // Numara hesaptan geliyor ve burada yazılmıyor: hesapta tek (`studentClaims`),
+  // formda serbest olsaydı herkes istediği numarayla — başkasınınkiyle de —
+  // kaydolurdu. Yanlışsa Hesabım'dan değişiyor.
+  const studentNo = profile?.ogrenciNo ?? '';
   const [department, setDepartment] = useState('');
   const [year, setYear] = useState('');
   const [kvkk, setKvkk] = useState(false);
@@ -73,22 +76,15 @@ export default function RegistrationRoute() {
     );
   }
 
-  // KAPI YALNIZCA BURADA, kuralda değil — ve bu yorum bir kez tersini yazdı.
-  // `registrations` create dalında `email_verified` diye bir koşul yok;
-  // olamaz da, çünkü `uid` bugün isteğe bağlı (mağazada hesapsız bir sürüm
-  // var) ve doğrulama koşulu ancak kimliğe bağlanabilir. Yani bu ekran bir
-  // kolaylık değil, tek zorlayıcı. Doğrudan Firestore'a yazan biri kuralı
-  // geçer; ona karşı savunma kayıt akışında değil, `uid` zorunlu hâle
-  // geldiğinde kurala eklenecek `request.auth.token.email_verified == true`
-  // satırında olacak.
-  //
-  // Bu defterde "davranışı anlatan bir belge, davranış değildir" maddesi zaten
-  // var — bu, yorum hâli.
+  // Zorlayan taraf kural: kayıt yalnızca hesabın teklik kaydındaki numarayla
+  // yazılabiliyor ve teklik kaydı e-posta doğrulanınca doğuyor
+  // (`firestore.rules` → registrations). Bu kapı, reddedilecek bir formu
+  // doldurtmamak için.
   if (user && !emailVerified) {
     return (
       <AuthGate
         title="Önce e-postanı doğrula"
-        body={`${user.email} adresine gönderdiğimiz bağlantıya bastıktan sonra kaydını tamamlayabilirsin.`}
+        body={`${user.email} adresine gönderdiğimiz kodu girdikten sonra kaydını tamamlayabilirsin.`}
         primary="Hesabıma git"
         onPrimary={() => router.push('/(tabs)/hesap')}
         onBack={() => router.back()}
@@ -102,8 +98,6 @@ export default function RegistrationRoute() {
   const full = isFull(event, registeredCount(event.id)) && !registrationFor(event.id);
 
   const noValid = new RegExp(`^\\d{${STUDENT_NO_LENGTH}}$`).test(studentNo);
-  // Only complain once they have started typing.
-  const noError = studentNo.length > 0 && !noValid;
   const valid = !full && name.trim().length > 2 && noValid && !!department && !!year && kvkk;
 
   const submit = () => {
@@ -156,22 +150,14 @@ export default function RegistrationRoute() {
           <Field label="Öğrenci Numarası">
             <TextInput
               value={studentNo}
-              // Students paste from all sorts of places — strip anything non-numeric
-              // and cap the length rather than rejecting the whole entry.
-              onChangeText={(t) => setStudentNo(t.replace(/\D/g, '').slice(0, STUDENT_NO_LENGTH))}
-              placeholder="21xxxxxxx"
-              placeholderTextColor={colors.faint}
-              inputMode="numeric"
-              keyboardType="number-pad"
-              onFocus={() => setFocused('no')}
-              onBlur={() => setFocused(null)}
-              style={[inputStyle('no', noError), { letterSpacing: 0.5 }]}
+              editable={false}
+              style={[inputStyle('no'), { letterSpacing: 0.5, color: colors.muted }]}
             />
-            {noError ? (
-              <Txt weight="semibold" size={12} color={colors.danger} style={{ marginTop: 7 }}>
-                Öğrenci numarası {STUDENT_NO_LENGTH} haneli olmalı.
+            <Pressable onPress={() => router.push('/(tabs)/hesap')} hitSlop={8} style={{ marginTop: 7 }}>
+              <Txt weight="semibold" size={12} color={colors.blue500}>
+                Yanlışsa Hesabım sekmesinden değiştirebilirsin.
               </Txt>
-            ) : null}
+            </Pressable>
           </Field>
 
           <Field label="Bölüm">

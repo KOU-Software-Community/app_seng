@@ -165,7 +165,7 @@ export function registerTranslateApi(app: Express, deps: Bagimliliklar = {}): vo
       basarisiz: saglik.basarisiz + 1,
     };
     console.warn(`[ceviri] azure ${sonuc.durum}`, 'kod' in sonuc ? `(${sonuc.kod}: ${sonuc.mesaj})` : '');
-    res.status(sonuc.durum === 'kota' || sonuc.durum === 'hiz' ? 503 : 502).json({ durum: sonuc.durum });
+    res.status(503).json({ durum: sonuc.durum });
   });
 }
 

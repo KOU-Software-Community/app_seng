@@ -1,3 +1,7 @@
+-- DİKKAT: aşağıdaki `max_jobs: 10` ve 10 dakikalık süpürme canlıda kalmadı
+-- (10'u Edge fonksiyonu reddediyor). Canlıyla eşleşen hâl:
+-- 20260923103132_cron_canliya_esitle.sql.
+--
 -- Süpürmeyi zamanlayan beşinci cron işi + işçinin hızlandırılması.
 --
 -- Fonksiyon ayrı bir migration'da (20260922174500_sweep_enqueue_function.sql)

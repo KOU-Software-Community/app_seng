@@ -101,13 +101,42 @@ async function tarayiciAc(): Promise<Tarayici> {
 
 export type PdfIsi = Omit<SertifikaVerisi, 'fontBase'>;
 
+/** Sıra doluyken gelen istek; herkese açık rota bunu 503'e çeviriyor. */
+export class PdfMesgul extends Error {}
+
+/** Çalışan dâhil sıradaki en fazla iş. Bir render ~2 sn. */
+export const PDF_SIRA_SINIRI = 4;
+
+// ponytail: süreç içi sıra; panel birden çok örnekle koşarsa her biri kendi sırası.
+let sira: Promise<unknown> = Promise.resolve();
+let bekleyen = 0;
+
 /**
- * Bir veya daha çok sertifikayı PDF'e basar.
+ * Bir veya daha çok sertifikayı PDF'e basar — **aynı anda tek Chromium**.
  *
  * Toplu çağrılıyor çünkü tarayıcı açılışı sabit maliyet: 200 katılımcı için
  * 200 kez açmak dakikalar, bir kez açmak saniyeler.
+ *
+ * Sıra bir güvenlik sınırı. Herkese açık `/sertifika/<no>.pdf` her istekte bir
+ * tarayıcı açıyordu ve önünde hiçbir şey yoktu; belge numarası da tasarım
+ * gereği paylaşılıyor. Ölçüldü: bir render 11 Chromium süreci, 10 eşzamanlı
+ * render 109 süreç. Birkaç paralel istek paneli — OTP, kayıt, bildirim
+ * dâhil — belleksiz bırakabilirdi. Sıra dolunca beklemek yerine reddediliyor,
+ * çünkü bekleyen her istek açık bir soket.
+ *
+ * `cizici` yalnızca `check:panel` için: sıranın kendisi tarayıcısız sınanıyor.
  */
-export async function sertifikaPdf(isler: PdfIsi[]): Promise<Buffer[]> {
+export function sertifikaPdf(isler: PdfIsi[], cizici = bas): Promise<Buffer[]> {
+  if (bekleyen >= PDF_SIRA_SINIRI) return Promise.reject(new PdfMesgul('PDF sırası dolu'));
+  bekleyen += 1;
+  const is = sira.then(() => cizici(isler)).finally(() => {
+    bekleyen -= 1;
+  });
+  sira = is.catch(() => {});
+  return is;
+}
+
+async function bas(isler: PdfIsi[]): Promise<Buffer[]> {
   if (!isler.length) return [];
   const browser = await tarayiciAc();
   try {

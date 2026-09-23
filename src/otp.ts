@@ -31,6 +31,8 @@ export type OtpError =
   | 'numara_gecersiz'
   | 'telefon_kullanimda'
   | 'numara_kullanimda'
+  | 'dogrulanmamis'
+  | 'cok_sik'
   | 'parola_zayif'
   | 'eposta_gecersiz'
   | 'panel_yok'
@@ -127,6 +129,11 @@ export async function kodDogrula(
   await cagir('/api/hesap/dogrula', { code, ...duzeltme });
 }
 
+/** Öğrenci numarasını değiştirir; eskisi serbest kalıyor. Doğrulanmış hesap ister. */
+export async function ogrenciNoDegistir(ogrenciNo: string): Promise<void> {
+  await cagir('/api/hesap/ogrenci-no', { ogrenciNo });
+}
+
 /**
  * Parola sıfırlama kodu ister. **Oturum gerekmiyor** — parolasını unutan
  * kişinin zaten oturumu yok.
@@ -167,7 +174,9 @@ export function otpMesaj(err: unknown): string {
     case 'suresi_doldu':
       return 'Kodun süresi doldu. Yeni kod iste.';
     case 'kilitli':
-      return 'Çok fazla yanlış deneme yapıldı. Yeni kod iste.';
+      return saniye
+        ? `Çok fazla yanlış deneme yapıldı. ${Math.ceil(saniye / 60)} dakika sonra yeni kod isteyebilirsin.`
+        : 'Çok fazla yanlış deneme yapıldı. Biraz bekleyip yeni kod iste.';
     case 'kod_yok':
       return 'Önce kod iste.';
     case 'telefon_kullanimda':
@@ -178,6 +187,10 @@ export function otpMesaj(err: unknown): string {
       return 'Telefon numarasını 5xx xxx xx xx biçiminde yaz.';
     case 'numara_gecersiz':
       return 'Öğrenci numaran dokuz haneli olmalı.';
+    case 'dogrulanmamis':
+      return 'Önce e-postanı doğrula.';
+    case 'cok_sik':
+      return 'Numaranı çok sık değiştirdin. Bir saat sonra tekrar dene.';
     case 'parola_zayif':
       return `Parola en az ${MIN_PASSWORD} karakter olmalı.`;
     case 'eposta_gecersiz':

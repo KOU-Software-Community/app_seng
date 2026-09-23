@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { formatPhone } from '../../src/accountSchema';
+import { STUDENT_NO_RE, digits, formatPhone } from '../../src/accountSchema';
 import { signOut } from '../../src/auth';
 import { useAuth } from '../../src/authStore';
+import { Field, Input } from '../../src/components/AuthForm';
 import { PixelIcon } from '../../src/components/Pixel';
 import {
   DottedRule,
@@ -14,6 +15,7 @@ import {
   Txt,
 } from '../../src/components/ui';
 import { useContent } from '../../src/content';
+import { ogrenciNoDegistir, otpMesaj } from '../../src/otp';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '../../src/data';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius } from '../../src/theme';
@@ -84,6 +86,7 @@ export default function HesapRoute() {
               <Bilgi label="Ad Soyad" value={profile?.adSoyad ?? '—'} />
               <Bilgi label="E-posta" value={user.email ?? '—'} />
               <Bilgi label="Telefon" value={profile ? formatPhone(profile.telefon) : '—'} />
+              <OgrenciNo no={profile?.ogrenciNo} duzenlenebilir={emailVerified} />
               <Bilgi label="Doğum tarihi" value={profile?.dogumTarihi ?? '—'} />
             </View>
           </>
@@ -265,6 +268,98 @@ function Bilgi({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Öğrenci numarası — yanlış yazıldıysa buradan düzeltiliyor.
+ *
+ * Profile doğrudan yazılmıyor, panelden geçiyor: numara bir teklik kaydına
+ * (`studentClaims`) bağlı ve eskisinin serbest kalması gerekiyor. Düzenleme
+ * yalnızca doğrulanmış hesapta — sahiplenme doğrulamayla oluyor.
+ */
+function OgrenciNo({ no, duzenlenebilir }: { no?: string; duzenlenebilir: boolean }) {
+  const { reloadProfile } = useAuth();
+  // `null` → düzenlenmiyor.
+  const [deger, setDeger] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+
+  if (deger === null) {
+    return (
+      <View style={[styles.bilgiRow, styles.satir]}>
+        <View style={{ flex: 1 }}>
+          <Txt size={12.5} color={colors.muted}>
+            Öğrenci numarası
+          </Txt>
+          <Txt weight="semibold" size={14} color={colors.text} style={{ marginTop: 2 }}>
+            {no ?? '—'}
+          </Txt>
+        </View>
+        {duzenlenebilir ? (
+          <Pressable onPress={() => setDeger(no ?? '')} accessibilityRole="button" hitSlop={10}>
+            <Txt weight="semibold" size={13} color={colors.blue500}>
+              Değiştir
+            </Txt>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  const hazir = STUDENT_NO_RE.test(deger) && deger !== no && !gonderiliyor;
+  const kaydet = async () => {
+    setGonderiliyor(true);
+    setHata(null);
+    try {
+      await ogrenciNoDegistir(deger);
+      await reloadProfile().catch(() => {});
+      setDeger(null);
+    } catch (err) {
+      setHata(otpMesaj(err));
+    } finally {
+      setGonderiliyor(false);
+    }
+  };
+
+  return (
+    <View style={styles.bilgiRow}>
+      <Field label="Öğrenci numarası" error={hata ?? undefined}>
+        <Input
+          value={deger}
+          onChangeText={(v) => setDeger(digits(v, 9))}
+          placeholder="9 hane"
+          keyboardType="number-pad"
+          maxLength={9}
+          error={!!hata}
+          autoFocus
+        />
+      </Field>
+      <View style={[styles.satir, { justifyContent: 'flex-end', gap: 22, marginTop: 10 }]}>
+        <Pressable
+          onPress={() => {
+            setDeger(null);
+            setHata(null);
+          }}
+          accessibilityRole="button"
+          hitSlop={10}
+        >
+          <Txt weight="semibold" size={13} color={colors.muted}>
+            Vazgeç
+          </Txt>
+        </Pressable>
+        <Pressable
+          onPress={() => void kaydet()}
+          disabled={!hazir}
+          accessibilityRole="button"
+          hitSlop={10}
+        >
+          <Txt weight="semibold" size={13} color={hazir ? colors.blue500 : colors.faint}>
+            {gonderiliyor ? 'Kaydediliyor…' : 'Kaydet'}
+          </Txt>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function SatirLink({
   icon,
   label,
@@ -314,6 +409,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   bilgiRow: { paddingVertical: 7 },
+  satir: { flexDirection: 'row', alignItems: 'center' },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   kayitRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },

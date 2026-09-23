@@ -39,6 +39,16 @@ jobs:
       # typecheck · release · schema · html · raffle
       - run: npm run check:all
 
+      # firestore.rules emülatörde GERÇEKTEN çalıştırılıyor. Kurallar bu depoda
+      # iki kez sessizce kırıldı ve ikisinde de "koşturacak ortam yok"
+      # deniyordu. Emülatör Java istiyor; sürüm runner'ın varsayılanına
+      # bırakılmıyor.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm run check:rules
+
       # Paketleme ve import hataları typecheck'e takılmıyor: eksik bir dosya ya
       # da çözülemeyen bir modül ancak Metro paketlerken ortaya çıkıyor.
       - run: npx expo export --platform ios

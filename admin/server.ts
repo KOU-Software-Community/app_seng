@@ -86,7 +86,7 @@ import {
 } from './certificates';
 import { deliverCertificates, dogrulamaUrl } from './certificateDelivery';
 import { sertifikaPage, sertifikaYokPage } from './certificateView';
-import { FONT_DIR, pdfDumanTesti, pdfDurumu, sertifikaPdf } from './pdf';
+import { FONT_DIR, PdfMesgul, pdfDumanTesti, pdfDurumu, sertifikaPdf } from './pdf';
 import {
   attendanceRows,
   ensureQr,
@@ -460,7 +460,14 @@ app.get('/sertifika/:no', async (req, res) => {
 
   if (pdfMi) {
     // PDF, sayfanın kendisinin basılmış hâli — ayrı bir çizim değil.
-    const [dosya] = await sertifikaPdf([veri]);
+    let dosya: Buffer;
+    try {
+      [dosya] = await sertifikaPdf([veri]);
+    } catch (err) {
+      if (!(err instanceof PdfMesgul)) throw err;
+      res.setHeader('Retry-After', '10');
+      return res.status(503).type('text').send('Belge şu anda hazırlanamıyor. Birkaç saniye sonra tekrar deneyin.');
+    }
     res.type('application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -713,8 +720,12 @@ async function saveEventWithPhotos(
     // yarım bir kayıt yok — ama gitmiş dosyalar varsa onları bırakmıyoruz.
     await deletePhotos(uploaded);
     if (!(err instanceof PhotoUploadError)) throw err;
+    // Bu dal sessizdi: sebep yalnızca sayfadaydı, sayfayı da Cloudflare atıyordu.
+    console.error('[panel] görsel yüklenemedi:', err.message);
+    // 502 DEĞİL: Cloudflare origin'in 502/504'ünü kendi "Bad gateway" sayfasıyla
+    // değiştiriyor ve bu mesaj hiç görünmüyordu. `check:release` bunu tutuyor.
     res
-      .status(502)
+      .status(503)
       .type('html')
       .send(eventForm(form(), { photos: err.message }, view));
     return;
