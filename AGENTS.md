@@ -2365,3 +2365,11 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   randevu uygulamasının tabloları ve `tidasan_enquiries` duruyor (1–7 satır,
   yük değiller), ama hepsi aynı 0,5 GB'ı paylaşıyor. `cron.job_run_details`
   veritabanının yarısı (32 MB) ve günde ~2.250 satır büyüyor; pg_cron silmiyor.
+- **Rahatlatma uygulandı, kök çözülmedi** (`20260923201926_cron_yuk_azalt`).
+  Süpürme `3-59/10`: günde 1.440 yerine 144 bağlantı, işçi ve çekimle aynı
+  dakikaya düşmüyor. `cron.job_run_details` her gece 03:17 UTC'de 7 güne
+  budanıyor; ilk koşumda 21.810 satır silindi. Dosya 32 MB'ta kalır, boşalan yer
+  yeniden kullanılır: küçülmez ama artık büyümez. Süpürmeyi geri 1 dakikaya
+  **çekmeyin**: haberi kuyruğa erken koymanın kazancı yok (darboğaz işçi ve
+  günlük AI tavanı), bedeli Nano'da her dakika yeni bir bağlantı. Kalıcı çözüm
+  Micro.
