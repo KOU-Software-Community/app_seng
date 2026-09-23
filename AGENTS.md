@@ -2339,10 +2339,29 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
 - **Bu dal sessizdi.** `PhotoUploadError` yalnızca sayfaya yazılıyordu, sayfayı
   da Cloudflare attığı için sebep hiçbir yerde kalmıyordu. Artık günlükte.
 - **Asıl sebep Supabase'di: Storage 544 `DatabaseTimeout`.** Storage nesne
-  kaydını Postgres'e yazıyor (`findBucketById`), ve 2026-09-23 17:40 UTC'den
+  kaydını Postgres'e yazıyor (`findBucketById`), ve 2026-09-23 17:44 UTC'den
   sonra veritabanına bağlanamadı. Postgres günlüğü aynı saatlerde: birkaç
-  buffer'lık checkpoint yazması 25–44 sn, `pg_settings` okuması 11 sn, pg_cron
+  buffer'lık checkpoint yazması 25–103 sn, `pg_settings` okuması 11 sn, pg_cron
   "job startup timeout", 17:45'ten sonra hiç REST isteği yok. Bu sorgu
   yavaşlığı değil, örneğin kendisinin tıkanması — ve AI Gündem aynı projede.
-  Sebebi (disk IO bütçesi, bellek, CPU) günlükten görülmüyor, Dashboard →
-  Reports'tan bakılmalı. **Doğrulanmadı.**
+- **Tetikleyici yoktu; zemin zaten sınırdaydı.** 17:43:00'teki süpürme
+  0,37 sn'de bitti, 17:44:00'te bütün cron işleri "job startup timeout" verdi.
+  O dakikada trafik artışı (gün boyu saatte 150–190 istek), yavaş sorgu, dış
+  bağlantı ya da bizden bir değişiklik yok. Proje **Nano** (en fazla 0,5 GB
+  RAM; `effective_cache_size` 384 MB = 512 MB'ın %75'i). Restart'tan 20 dakika
+  sonra, boştayken: RAM dolu, ~200 MB swap'ta, bellek taahhüdü 1,15 GB, CPU'nun
+  boş olmayan kısmı neredeyse tamamen IOwait. Supabase'in kendi servisleri
+  0,5 GB'ı zaten dolduruyor; çalışma kümesi biraz büyüyünce swap'a sürekli yazıp
+  okumaya başlıyor ve her süreç diski bekliyor. Günlükteki tablo bu. 17:44'ün
+  kendisini gösteren grafik yok, metrikler kilitlenme boyunca toplanmamış;
+  yani **zemin ölçüldü, tetikleyici doğrulanmadı.** Restart geçici çözüm:
+  makine 20 dakikada yine swap'ta.
+- **Restart kanıtı siliyor.** `pg_stat_statements` ve kümülatif istatistikler
+  restart'la sıfırlandı, Postgres günlüğü de kilitlenme sırasında 18:46'da
+  kesilmişti. Geriye dönük dakika dakika kalan tek kayıt `cron.job_run_details`.
+  Bir dahaki sefere restart'tan ÖNCE Observability grafiklerinin (Memory, CPU)
+  görüntüsü alınmalı.
+- **Bu Supabase projesi yalnızca AI Gündem değil.** `public`'te bir berber
+  randevu uygulamasının tabloları ve `tidasan_enquiries` duruyor (1–7 satır,
+  yük değiller), ama hepsi aynı 0,5 GB'ı paylaşıyor. `cron.job_run_details`
+  veritabanının yarısı (32 MB) ve günde ~2.250 satır büyüyor; pg_cron silmiyor.
