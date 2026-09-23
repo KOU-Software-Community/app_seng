@@ -2322,3 +2322,27 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   (artık `check:rules`'ta). Çeviri ucunun F0 kotası birkaç IP'yle bir
   saatliğine bitirilebiliyor — defterde zaten kabul edilmiş risk, fatura
   değil özellik kaybı. `npm audit`'in dört kökü defterdeki tabloyla aynı.
+
+### Fotoğraf yüklerken 502 — Cloudflare cevabı yutuyordu, Supabase tıkanmıştı
+
+- **Cloudflare, origin'in 502 ve 504'ünü kendi sayfasıyla değiştiriyor ve
+  gövdeyi atıyor** (Cloudflare belgesi: *"Cloudflare returns a
+  Cloudflare-branded HTTP 502 or 504 error when your origin web server
+  responds with a standard HTTP 502 … or 504"*). Panel görsel yükleme
+  hatasında bilerek 502 dönüyordu — anlamca doğru, ama sebebi yazan form hiç
+  görünmedi ve operatör "sunucu 502'ye düştü ama ayakta" gördü. Aynı sınıf OTP
+  postasında da vardı: 502 + JSON → Cloudflare HTML'i → istemci JSON okuyamıyor
+  → "İnternetini kontrol et". Panel artık 503 dönüyor; `check:release`
+  `admin/*.ts`'te 502/504 bırakmıyor. 500 ve 503 geçiyor: Cloudflare'in kendi
+  sorun giderme sayfaları "HTML'de cloudflare geçmiyorsa sayfayı origin
+  üretti" diyor.
+- **Bu dal sessizdi.** `PhotoUploadError` yalnızca sayfaya yazılıyordu, sayfayı
+  da Cloudflare attığı için sebep hiçbir yerde kalmıyordu. Artık günlükte.
+- **Asıl sebep Supabase'di: Storage 544 `DatabaseTimeout`.** Storage nesne
+  kaydını Postgres'e yazıyor (`findBucketById`), ve 2026-09-23 17:40 UTC'den
+  sonra veritabanına bağlanamadı. Postgres günlüğü aynı saatlerde: birkaç
+  buffer'lık checkpoint yazması 25–44 sn, `pg_settings` okuması 11 sn, pg_cron
+  "job startup timeout", 17:45'ten sonra hiç REST isteği yok. Bu sorgu
+  yavaşlığı değil, örneğin kendisinin tıkanması — ve AI Gündem aynı projede.
+  Sebebi (disk IO bütçesi, bellek, CPU) günlükten görülmüyor, Dashboard →
+  Reports'tan bakılmalı. **Doğrulanmadı.**

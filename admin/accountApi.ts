@@ -261,12 +261,12 @@ export function registerAccountApi(
         // Sunucu bağlantıyı kabul edip alıcıyı reddettiğinde `sendMail`
         // fırlatmıyor. İstemciye "gönderildi" demek yanlış olurdu.
         await ref.delete().catch(() => {});
-        return res.status(502).json({ hata: 'posta_gonderilemedi' });
+        return res.status(503).json({ hata: 'posta_gonderilemedi' });
       }
     } catch (err) {
       await ref.delete().catch(() => {});
       console.error('[posta] doğrulama kodu gönderilemedi:', err);
-      return res.status(502).json({ hata: 'posta_gonderilemedi' });
+      return res.status(503).json({ hata: 'posta_gonderilemedi' });
     }
 
     res.json({ durum: 'gonderildi', saniye: Math.round(OTP_TTL_MS / 1000) });
@@ -388,7 +388,7 @@ export function registerAccountApi(
    * `bekle` cevabını veriyor — oracle sayaçta da yok.
    *
    * **Cevap postadan ÖNCE dönüyor ve bu bilinçli bir ihlal.** `/api/hesap/kod`
-   * gönderim patlarsa kaydı siliyor ve 502 dönüyor; orada çağıran zaten kimliği
+   * gönderim patlarsa kaydı siliyor ve 503 dönüyor; orada çağıran zaten kimliği
    * bilinen kişi. Burada gönderimin sonucunu söylemek, adresin kayıtlı olduğunu
    * söylemek demek — üstelik `getUserByEmail` + SMTP el sıkışması "hiçbir şey
    * yapma"dan yüzlerce ms uzun, yani zamanlama tek başına bir oracle olurdu.

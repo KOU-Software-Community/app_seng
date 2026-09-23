@@ -1806,6 +1806,21 @@ check(
   },
 );
 
+check(
+  'panel 502/504 dönmüyor',
+  'Panel Cloudflare arkasında ve Cloudflare origin\u2019in 502/504 cevabını kendi ' +
+    '"Bad gateway" sayfasıyla değiştiriyor, gövdeyi atıyor. Görsel yükleme hatası bu ' +
+    'yüzden hiç görünmedi; OTP postası patladığında da uygulama JSON yerine HTML aldı ' +
+    've "internetini kontrol et" dedi.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const bulunan = readdirSync(join(root, 'admin'))
+      .filter((f) => f.endsWith('.ts'))
+      .filter((f) => /\b50[24]\b/.test(strip(read(`admin/${f}`))));
+    return bulunan.length ? `502/504 dönen dosya: ${bulunan.join(', ')}` : null;
+  },
+);
+
 const failed = results.filter((r) => r.problem);
 
 for (const r of results) {

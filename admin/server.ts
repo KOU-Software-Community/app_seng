@@ -720,8 +720,12 @@ async function saveEventWithPhotos(
     // yarım bir kayıt yok — ama gitmiş dosyalar varsa onları bırakmıyoruz.
     await deletePhotos(uploaded);
     if (!(err instanceof PhotoUploadError)) throw err;
+    // Bu dal sessizdi: sebep yalnızca sayfadaydı, sayfayı da Cloudflare atıyordu.
+    console.error('[panel] görsel yüklenemedi:', err.message);
+    // 502 DEĞİL: Cloudflare origin'in 502/504'ünü kendi "Bad gateway" sayfasıyla
+    // değiştiriyor ve bu mesaj hiç görünmüyordu. `check:release` bunu tutuyor.
     res
-      .status(502)
+      .status(503)
       .type('html')
       .send(eventForm(form(), { photos: err.message }, view));
     return;
