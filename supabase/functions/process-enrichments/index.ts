@@ -199,7 +199,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
         // and `ready > 0` says the whole path works end to end.
         provider: resolved.provider,
         model: resolved.model,
-        fallback: resolved.fallback?.provider ?? null,
+        // The chain actually resolved — a model that silently dropped out of it
+        // (no key, env override) shows up here, not as a missing summary.
+        fallbacks: resolved.fallbacks?.map((f) => f.model) ?? [],
         effort: config.effort,
         skipped: result.skipped ?? null,
         ready: result.ready,
@@ -210,7 +212,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
           disposition: o.disposition,
           code: o.code,
           attempt: o.attempt,
-          // Differs from `model` above only when the fallback answered.
+          // Differs from `model` above only when a later link answered.
           used_model: o.usedModel ?? null,
           input_tokens: o.usage?.inputTokens ?? 0,
           output_tokens: o.usage?.outputTokens ?? 0,

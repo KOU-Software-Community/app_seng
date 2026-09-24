@@ -367,6 +367,17 @@ export type ProcessResult = {
 export const MAX_JOBS_PER_RUN = 3;
 
 /**
+ * No job STARTS after this many seconds into a run.
+ *
+ * An Edge Function is killed at 150 s of wall clock on this plan, and one job
+ * can spend a provider's whole 60 s timeout — the NVIDIA link reasons before it
+ * answers. Killed mid-run, the jobs it held stay leased until the lease runs
+ * out and come back with an attempt spent on nothing. 80 + 60 stays under 150;
+ * the jobs not started go back unattempted and the next run takes them.
+ */
+export const RUN_BUDGET_SECONDS = 80;
+
+/**
  * Lease, enrich, write back.
  *
  * With no API key this touches nothing at all — it does not lease, so jobs stay
@@ -406,7 +417,12 @@ export async function processEnrichments(
   for (const job of jobs) {
     if (cappedOut) {
       // Everything still leased goes back to the queue, unattempted.
-      outcomes.push(await requeueForCap(deps, job, dayWindow.retryAfterSeconds));
+      outcomes.push(await requeueUnattempted(deps, job, dayWindow.retryAfterSeconds, 'daily_cap'));
+      continue;
+    }
+
+    if (deps.now().getTime() - now.getTime() > RUN_BUDGET_SECONDS * 1000) {
+      outcomes.push(await requeueUnattempted(deps, job, 0, 'run_budget'));
       continue;
     }
 
@@ -422,7 +438,7 @@ export async function processEnrichments(
     );
     if (!underCap) {
       cappedOut = true;
-      outcomes.push(await requeueForCap(deps, job, dayWindow.retryAfterSeconds));
+      outcomes.push(await requeueUnattempted(deps, job, dayWindow.retryAfterSeconds, 'daily_cap'));
       continue;
     }
 
@@ -553,27 +569,28 @@ export async function runOneJob(
  * was stranded forever — never summarised, never failed, invisible.
  *
  * releaseJobUnattempted is the explicit inverse of leasing and is used ONLY
- * here, where no Claude call was made. Every other path keeps the increment,
- * because it really did spend an attempt.
+ * here, where no provider call was made — the daily cap and the run budget.
+ * Every other path keeps the increment, because it really did spend an attempt.
  */
-async function requeueForCap(
+async function requeueUnattempted(
   deps: ProcessDeps,
   job: EnrichmentJob,
   retryAfterSeconds: number,
+  code: 'daily_cap' | 'run_budget',
 ): Promise<JobOutcome> {
   const availableAt = addSeconds(deps.now(), retryAfterSeconds);
   const ok = await deps.db.releaseJobUnattempted(
     job.job_id,
     job.lease_token,
     availableAt,
-    'daily_cap',
+    code,
   );
   return {
     jobId: job.job_id,
     articleId: job.article_id,
     attempt: job.attempt_count,
     disposition: ok ? 'retried' : 'lease_lost',
-    code: ok ? 'daily_cap' : 'lease_lost',
+    code: ok ? code : 'lease_lost',
   };
 }
 

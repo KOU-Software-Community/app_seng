@@ -8,6 +8,15 @@
  * Shape measured by the coordinator on 2026-08-21 against
  * `meta/llama-3.3-70b-instruct`, which answered correctly in JSON mode.
  *
+ * That model reached end of life on 2026-08-26 and has answered `410 Gone`
+ * ever since — the fallback was dead for a month and nothing said so, because
+ * the old fallback wrapper reported the primary's 429 instead. Measured on
+ * 2026-09-24 against the live catalogue with this exact request: of eighteen
+ * candidates, `nvidia/nemotron-3-super-120b-a12b` was the only one that
+ * answered within the timeout with the right keys and Turkish bullets
+ * (`openai/gpt-oss-20b` answered, but summarised in English). It reasons before
+ * answering, so it is slow: the last link of the chain, not the first.
+ *
  * NOTE ON JSON MODE: `response_format: {type:'json_object'}` requires the word
  * "JSON" to appear in the prompt — OpenAI's rule, which NIM inherits. Our
  * system prompt already says it in the ÇIKTI section, and a test pins that so a
@@ -28,7 +37,7 @@ import { parseAndValidate } from '../schemas.ts';
 import { classifyProviderStatus, postJson, PROVIDER_TIMEOUT_MS, type FetchImpl } from './http.ts';
 
 export const NVIDIA_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
-export const NVIDIA_DEFAULT_MODEL = 'meta/llama-3.3-70b-instruct';
+export const NVIDIA_DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
 
 export type NvidiaConfig = {
   apiKey: string;

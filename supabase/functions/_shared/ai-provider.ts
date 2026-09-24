@@ -38,14 +38,38 @@ import type { SecretEnv } from './secret.ts';
 export type AiProviderName = 'gemini' | 'nvidia' | 'anthropic';
 
 /**
- * Preference order for `auto`, and the order a fallback is picked in.
+ * Preference order for `auto`, and the order the fallback chain is built in.
  *
  * Gemini first because `gemini-2.5-flash` is the cheapest of the three per
  * article and answered a schema'd call correctly when measured. NVIDIA second
- * because it is OpenAI-compatible and the 70B model is a genuine substitute.
- * Anthropic last because no key for it exists.
+ * because it is OpenAI-compatible. Anthropic last because no key for it exists.
  */
 export const PROVIDER_ORDER: readonly AiProviderName[] = ['gemini', 'nvidia', 'anthropic'];
+
+/**
+ * More free Gemini capacity behind the same key.
+ *
+ * Google counts free-tier quota per MODEL per project, and the free
+ * `gemini-2.5-flash` quota is about twenty requests a day — measured, not
+ * documented: two days running it answered ~20 calls after the reset and then
+ * 429'd everything, while ~30 articles a day arrive. Each of these models has a
+ * quota of its own, so the chain multiplies the free budget instead of waiting
+ * for tomorrow.
+ *
+ * Measured on 2026-09-24 with the exact request `buildGeminiRequest` sends
+ * (response schema + `thinkingBudget: 0`): all three returned valid JSON with
+ * Turkish bullets and a Turkish translation. Left out, and why:
+ * `gemini-2.5-flash-lite` is closed to new users (404), `gemini-3.5-flash-lite`
+ * and the Gemma 4 models reject `thinkingBudget` (400).
+ *
+ * The job row keeps the primary's model whichever of these answers, so none of
+ * them touches the cache key.
+ */
+export const GEMINI_FALLBACK_MODELS: readonly string[] = [
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
+];
 
 export const AI_PROVIDER_ENV = 'AI_PROVIDER';
 
@@ -71,8 +95,8 @@ export type ResolvedAiProvider = {
   /** Goes into the job row and the cache key. */
   model: string;
   client: SummariseClient;
-  /** Present when a second provider has a key. */
-  fallback?: { provider: AiProviderName; model: string };
+  /** The rest of the chain, in the order it is tried. Absent when there is none. */
+  fallbacks?: Array<{ provider: AiProviderName; model: string }>;
 };
 
 export type AiProviderResolution = ResolvedAiProvider | { provider: null };
@@ -241,58 +265,123 @@ export async function resolveAiProvider(
   }
   if (!primary) return { provider: null };
 
-  // The fallback is the next provider in the fixed order that has a key,
-  // whether or not the primary was explicit — "a second provider has a key" is
-  // the whole condition. Removing the second key is how you opt out.
-  let fallback: Candidate | null = null;
+  // The chain: the primary, the extra Gemini models behind the same key, then
+  // every other provider that has a key — whether or not the primary was
+  // explicit. Removing a key is how you opt a provider out.
+  const chain: Candidate[] = [primary];
+  const withGeminiExtras = async (head: Candidate) => {
+    if (head.provider !== 'gemini') return;
+    const apiKey = await keyFor('gemini');
+    if (apiKey === null) return;
+    for (const model of GEMINI_FALLBACK_MODELS) {
+      if (model === head.model) continue;
+      const client = buildClient('gemini', model, apiKey, options, env);
+      if (client) chain.push({ provider: 'gemini', model, client });
+    }
+  };
+  await withGeminiExtras(primary);
   for (const provider of PROVIDER_ORDER) {
     if (provider === primary.provider) continue;
-    fallback = await candidateFor(provider);
-    if (fallback) break;
+    const next = await candidateFor(provider);
+    if (!next) continue;
+    chain.push(next);
+    await withGeminiExtras(next);
   }
 
-  if (!fallback) {
+  if (chain.length === 1) {
     return { provider: primary.provider, model: primary.model, client: primary.client };
   }
 
   return {
     provider: primary.provider,
     model: primary.model,
-    client: withFallback(primary, fallback),
-    fallback: { provider: fallback.provider, model: fallback.model },
+    client: withFallbacks(chain),
+    fallbacks: chain.slice(1).map((c) => ({ provider: c.provider, model: c.model })),
   };
 }
 
+/** The article is the problem: another model is not asked, the job fails. */
+function isContentFailure(outcome: SummariseOutcome): boolean {
+  return (
+    !outcome.ok &&
+    (outcome.code.startsWith('schema_') ||
+      outcome.code === 'refusal' ||
+      outcome.code === 'no_text_block' ||
+      outcome.code === 'unexpected_stop')
+  );
+}
+
 /**
- * Try the primary; on a RETRYABLE failure, try the secondary once.
+ * Walk the chain until one link answers.
  *
  * Inside the same job, before backoff: a 429 from Google's free tier is exactly
- * the case where a second provider earns its keep, and waiting an hour to
- * discover NVIDIA would have answered immediately is the wrong trade.
+ * the case where the next link earns its keep, and waiting an hour to discover
+ * it would have answered immediately is the wrong trade.
  *
- * A non-retryable failure is NOT retried elsewhere. `refusal`, `auth`,
- * `bad_request` and every `schema_*` mean the request or the article is the
- * problem, and asking a different model produces the same answer at double the
- * cost — except `refusal`, where a second opinion on a safety stop is a
- * deliberate policy choice nobody has made.
+ * A CONTENT failure of the primary (`refusal`, `schema_*`, `no_text_block`,
+ * `unexpected_stop`) is final: the article is the problem and a second model
+ * produces the same answer — and a second opinion on a safety stop is a policy
+ * nobody has chosen. Everything else moves on, including the primary's `auth`,
+ * `not_found` and `bad_request`: those describe the provider, not the article,
+ * and a retired model is exactly how the NVIDIA fallback died (410, a month,
+ * unnoticed).
  *
- * The successful outcome carries the SECONDARY's model, which the worker logs
- * as `usedModel`. It is not what lands in the row: the row keeps the job's
- * model so the cache key stays the one `request-enrichment` looks up.
+ * When every link fails, the report decides what happens to the job:
+ * - a link failed on content → that failure, so the job ends instead of
+ *   circling forever as "busy";
+ * - the primary truncated → `output_truncated`, so the retry escalates;
+ * - otherwise nobody had capacity → `rate_limited`. The database treats that as
+ *   the providers' state, not the article's: no attempt spent, queue paused.
+ *
+ * Every failed link is logged with its own code. The old wrapper reported only
+ * the primary's, which is why nobody saw the fallback answering 410.
+ *
+ * A success carries the model that answered; the worker logs it as `usedModel`.
+ * It is not what lands in the row: the row keeps the job's model so the cache
+ * key stays the one `request-enrichment` looks up.
  */
-export function withFallback(primary: Candidate, secondary: Candidate): SummariseClient {
+export function withFallbacks(
+  chain: readonly Candidate[],
+  warn: (line: string) => void = console.warn,
+): SummariseClient {
+  const [primary, ...rest] = chain;
+  const logFailure = (link: Candidate, outcome: SummariseOutcome) => {
+    if (outcome.ok) return;
+    warn(
+      JSON.stringify({
+        event: 'provider_failed',
+        provider: link.provider,
+        model: link.model,
+        code: outcome.code,
+        ...(outcome.detail ? { detail: outcome.detail } : {}),
+      }),
+    );
+  };
+
   return {
     async summarise(input: SummariseInput): Promise<SummariseOutcome> {
       const first = await primary.client.summarise(input);
-      if (first.ok || !first.retryable) return first;
+      if (first.ok || isContentFailure(first)) return first;
+      logFailure(primary, first);
 
-      const second = await secondary.client.summarise(input);
-      if (second.ok) return second;
+      let content: SummariseOutcome | null = null;
+      for (const link of rest) {
+        const outcome = await link.client.summarise(input);
+        if (outcome.ok) return outcome;
+        logFailure(link, outcome);
+        if (content === null && isContentFailure(outcome)) content = outcome;
+      }
 
-      // Both failed. Report the PRIMARY's failure: it is the provider the
-      // operator chose, its code drives the backoff, and a secondary that is
-      // also down should not rewrite the diagnosis.
-      return first;
+      if (content !== null) return content;
+      if (!first.ok && first.code === 'output_truncated') return first;
+      return {
+        ok: false,
+        code: 'rate_limited',
+        retryable: true,
+        ...(!first.ok && first.retryAfterSeconds !== undefined
+          ? { retryAfterSeconds: first.retryAfterSeconds }
+          : {}),
+      };
     },
   };
 }
