@@ -106,6 +106,7 @@ import { resolvePort } from './port';
 import { verifyPassword } from './webAuth';
 import { csvCell } from './csv';
 import {
+  PROXY_AGLARI,
   SESSION_SECONDS,
   clientIp,
   cookieHeader,
@@ -157,8 +158,10 @@ const app = express();
 // Coolify/Traefik gibi bir ters proxy arkasında HTTPS proxy'de sonlanıyor ve
 // uygulamaya istek düz HTTP olarak geliyor. Bu ayar olmadan `req.secure`
 // sunucuda da hep false döner ve oturum çerezi `Secure` almazdı.
-// `1`: yalnızca en yakın proxy'ye güven — istemcinin uydurduğu başlığa değil.
-app.set('trust proxy', 1);
+// YALNIZCA ÖZEL AĞDAKİ BİR EŞE güven (`PROXY_AGLARI`). `1` ilk eşi kim olursa
+// olsun proxy sayıyordu: kaynağa doğrudan bağlanan biri X-Forwarded-For ile
+// `req.ip`'yi istediği adrese taşıyabiliyordu — sayaçların anahtarı dâhil.
+app.set('trust proxy', PROXY_AGLARI);
 app.use(express.urlencoded({ extended: false }));
 // Uygulamanın çağırdığı uç noktalar JSON konuşuyor. Sınır düşük: bu gövdeler
 // yalnızca bir kod ve iki numara taşıyor.
@@ -348,7 +351,7 @@ app.post('/logout', (req, res) => {
   // silinse bile kopyalanmış ya da geri düğmesiyle geri gelen bir değer
   // oturumu açmaya devam ediyordu. Ortak bir bilgisayarda "çıkış yaptım"
   // diyen yönetici, aslında yapmamış oluyordu.
-  revokeToken(readCookie(req));
+  revokeToken(SECRET, readCookie(req));
   res.setHeader('Set-Cookie', cookieHeader({ name: COOKIE, value: '', secure: req.secure, maxAge: 0 }));
   res.redirect('/login');
 });
@@ -848,9 +851,12 @@ async function allEvents(): Promise<ClubEvent[]> {
  * Panelin kendi herkese açık kökü.
  *
  * Ortam değişkeni varsa o kazanıyor; yoksa isteğin kendisinden türetiliyor.
- * İkincisi `Host` başlığına güveniyor ve o başlık istemcinin yazdığı şey —
- * ama bu sayfayı yalnızca giriş yapmış yönetici görüyor ve gördüğü adres
- * kendi yazdığı adres, yani kimseyi kandıracak bir yol yok.
+ * İkincisi `Host` başlığına güveniyor ve o başlık istemcinin yazdığı şey.
+ * Herkese açık `/sertifika/:no` sayfası da buradan geçiyor (belgenin
+ * üstündeki QR ve adres), yani "yalnızca yönetici görüyor" DOĞRU DEĞİL —
+ * ama uydurma bir `Host` yalnızca onu yazanın kendi cevabını değiştiriyor,
+ * başkasına ulaşmıyor. Üretimde `EXPO_PUBLIC_LEGAL_BASE_URL` tanımlı olmalı
+ * ki belgeye basılan adres isteğe değil yapılandırmaya bağlı olsun.
  */
 function panelKoku(req: Request): string {
   const env = (process.env.EXPO_PUBLIC_LEGAL_BASE_URL ?? '').trim().replace(/\/+$/, '');

@@ -2373,3 +2373,88 @@ ve hepsinin sebebi aynı: **bir ayarı değiştirip cevabına bakmadım.**
   **çekmeyin**: haberi kuyruğa erken koymanın kazancı yok (darboğaz işçi ve
   günlük AI tavanı), bedeli Nano'da her dakika yeni bir bağlantı. Kalıcı çözüm
   Micro.
+
+### Güvenlik testlerinin değerlendirmesi — testin ölçmediği şey
+
+Mevcut testler okundu, aynı yüzeye saldırganın şekliyle bakan testler yazıldı
+ve önce **eski** koda karşı koşturuldu. Rapor `docs/guvenlik-testleri-degerlendirmesi.md`;
+yeni testler `check:security` (panel) ve `check:rules`'un ikinci yarısı.
+
+- **Doğru başlığın okunduğunu ölçen iddia, sahte başlığın okunmadığını
+  ölçmez.** `clientIp` `CF-Connecting-IP`'ye koşulsuz güveniyordu ve `check:panel`
+  bunu üç iddiayla **yeşil** gösteriyordu: üçü de doğru başlığın okunduğunu
+  ölçüyordu, sahte olanın okunMAdığını hiçbiri ölçmüyordu. Panelin kaynak
+  adresine doğrudan ulaşan biri her isteğe başka bir değer yazıp IP'ye bağlı
+  bütün sayaçları — yönetici parolası denemesi dâhil — sıfırlıyordu; ölçüldü,
+  50 istekte 0 red. "Cloudflare yoksa başlık da yok" cümlesi Cloudflare'in ne
+  eklediğini anlatıyordu, saldırganın ne ekleyebildiğini değil. Başlığa ancak
+  eş adresi (`req.ip`) Cloudflare'in yayımladığı aralıklardaysa ya da
+  yerel/özel bir adresse (Cloudflare Tunnel buradan bağlanıyor) güveniliyor;
+  liste `admin/session.ts`'te, canlı listeyle karşılaştırıldı. **Bir sayaç
+  eklerken anahtarın kim tarafından yazılabildiğini ölçün, kim tarafından
+  yazılması gerektiğini değil.**
+- **Kimliksiz bir uç noktanın yazdığı her şey bir bellek haritasıdır.**
+  `/logout` gelen çerez değerini olduğu gibi iptal listesine koyuyordu ve liste
+  her yazmada baştan sona taranıyordu — 16 KB'lık uydurma çerezlerle bir
+  döngü, tek Map'te gigabaytlar. Yalnızca imzası doğrulanan jeton saklanıyor;
+  imzasız değerin iptali zaten anlamsız, `verifyToken` onu hiç geçirmiyor.
+- **`is timestamp` "bir tarih" diyor, "şimdi" demiyor; `hasOnly` neyin
+  değişebildiğini söylüyor, neye değişebildiğini değil.** Yoklama saati
+  update'te dizeye, create'te 2020'ye çekilebiliyordu; kayıt, katılım, cihaz ve
+  profil damgaları istemciden seçilebiliyordu. İstemci zaten `serverTimestamp()`
+  yazdığı için `== request.time` hiçbir meşru yazmayı değiştirmiyor.
+  `registrations`'ın update dalı bunu aylardır istiyordu — create dalı
+  istemiyordu; aynı dosyada iki dalın farklı sıkılıkta olması bir işaret.
+- **Kural yalnızca yazmayı sınıyorsa okuma kör noktadır.** 18 iddianın hiçbiri
+  bir okuma denemiyordu: başkasının kaydı, yoklaması, profili, dokuz kapalı
+  koleksiyon, catch-all. Hepsi kapalı çıktı — ama bunu bu tur öğrendik,
+  kuralı yazan tur değil.
+- **Profildeki e-posta panelin posta gönderdiği adres.** `users.email`
+  serbestti; sertifika PDF'i oraya gidiyor. Create artık jetonun e-postasını
+  istiyor (`signUp` ikisine de aynı normalleşmiş adresi yazıyor), update
+  e-postayı değiştirmiyor. Ayrıcalıklı tarafın okuduğu her alan yazan tarafın
+  saldırı yüzeyi — bu defterde yazılıydı; bir alanı daha kapsıyormuş.
+- **Aynı doküman kimliğine art arda yazan kural senaryoları birbirini
+  maskeliyor.** İlk create geçince sonrakiler update dalına düşüyor ve o dal
+  katı: eksik bir create denetimi yeşil görünüyor. Eski kurallara karşı
+  ölçüldü — iki tavan denetimi bu yüzden "geçmiş" görünüyordu. Her create
+  senaryosu kendi kimliğinde; hasOnly ile reddedilen senaryo saat senaryosundan
+  önce.
+- **Sahte başlık testinin karşı kontrolü şart.** Herkesi tek kovaya düşüren
+  bir "düzeltme" sahte başlık döngüsünü geçerdi. `check:security` farklı
+  eşlerin ve Cloudflare arkasındaki farklı istemcilerin sınıra takılmadığını
+  ayrıca ölçüyor — ve ilk hâlinde kontrol döngüsü ana döngüyle aynı adresi
+  paylaştığı için kendi kendini kilitledi. Kontrol döngüsünün anahtarları
+  ana döngününkilerle kesişmemeli.
+- **`String.replace`'in ikinci argümanında `$'` özel bir kalıptır.** Kural
+  regex'indeki `{16}$'` dosyanın kalanını içeri kopyaladı; emülatör "L255
+  Unexpected ';'" dedi ve dört ardışık hata verdi. Metin değiştiren her script
+  değiştirici fonksiyon kullanmalı: `s.replace(a, () => b)`.
+- **Supabase'in GraphQL ucu PostgREST'in şema kapısına bakmıyor.** `aigundem`
+  şeması PostgREST'e kapalı ama `/graphql/v1` yetkilere bakıyor ve `anon`
+  tablolarda SELECT taşıyor (görünümler `security_invoker` olduğu için taşımak
+  zorunda): akış filtresi GraphQL'den aşılabiliyor. Veri haber içeriği, gizli
+  değil. Uygulanmadı; cevap `graphql_public.graphql`'ın `anon`'dan alınması
+  (uygulama GraphQL kullanmıyor). Canlı DB değişikliği operatörün kararı.
+- **`trust proxy 1` ilk eşi kim olursa olsun proxy sayıyor, ve bu `req.ip`'yi
+  veri olmaktan çıkarıyor.** Cloudflare kapısı `req.ip`'ye bakıyordu; Copilot
+  incelemesi haklı çıktı: kaynağa doğrudan bağlanan biri `X-Forwarded-For:
+  104.16.1.2` yazınca Express `req.ip`'yi o yapıyor ve sahte `CF-Connecting-IP`
+  yine kabul ediliyordu. Express'in kendi `proxy-addr`'ıyla ölçüldü. Ayar artık
+  `PROXY_AGLARI` (loopback, linklocal, uniquelocal): Traefik ve cloudflared
+  docker ağından geliyor, doğrudan bağlantıda `req.ip` soket adresi kalıyor.
+  **Bir başlığın kime güvenilerek okunduğunu sormak yetmiyor; o güveni veren
+  adresin kendisinin nereden geldiğini de sormak gerekiyor.** Bedeli: proxy
+  başka bir makinedeyse (herkese açık adres) listeye eklenmeli, yoksa Secure
+  çerezi ve sayaç anahtarı proxy'nin adresine düşer.
+- **Bir kural eski veriyi düzeltmez.** "E-posta değişmesin" eski kurallarla
+  yazılmış uyumsuz bir adresi sonsuza kadar geçerli bırakıyordu (Copilot, aynı
+  inceleme). Kural artık her yazmada hesabın adresine eşitlik istiyor — uyumsuz
+  profil adresi düzeltilmeden güncellenemiyor, düzeltmesi tek yol. Ama asıl
+  kapı panelde: sertifika postasının adresi profilden değil **Auth kaydından**
+  okunuyor (`attendanceRows`). Ayrıcalıklı tarafın bir alanı okuması
+  gerekiyorsa, istemcinin yazdığı kopyayı değil kaynağı okusun; migration o
+  zaman gerekmiyor.
+- **`grep -c "assert("` fonksiyonun tanım satırını da sayıyor.** Rapor 32
+  dedi, gerçek 31'di ve bunu bir inceleyici yakaladı. Raporun kendi sayısı da
+  bir ölçümdür: `^\s*assert(` ile sayın, ya da grubu tek tek toplayın.

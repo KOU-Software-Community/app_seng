@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { BlockList, isIP } from 'node:net';
 
 /**
  * Oturum çerezinin başlığını üretir.
@@ -74,12 +75,19 @@ export function issueToken(secret: Buffer, now = Date.now()): string {
  */
 const iptalEdilen = new Map<string, number>();
 
-export function revokeToken(token: string | null, now = Date.now()): void {
-  if (!token) return;
+export function revokeToken(secret: Buffer, token: string | null, now = Date.now()): boolean {
+  // YALNIZCA İMZASI DOĞRULANAN JETON SAKLANIYOR. `/logout` kimliksiz ve
+  // gövdesiz: gelen çerez değeri ne olursa olsun listeye giriyordu, ve liste
+  // her yazmada baştan sona taranıyor. On altı KB'lık uydurma çerezlerle bir
+  // döngü, tek bir Map'te gigabaytlar ve her istekte uzayan bir tarama
+  // demekti — kimliksiz, sınırsız. İmzasız bir değerin iptali zaten anlamsız:
+  // `verifyToken` onu hiçbir zaman geçirmiyor.
+  if (!token || !verifyToken(secret, token, now)) return false;
   // Süresi dolmuşları temizle: liste bir sekmeye basılan çıkış sayısı kadar
   // büyüyor, yani küçük — ama sınırsız değil.
   for (const [t, s] of iptalEdilen) if (s <= now) iptalEdilen.delete(t);
   iptalEdilen.set(token, now + SESSION_SECONDS * 1000);
+  return true;
 }
 
 export function verifyToken(secret: Buffer, token: string | null, now = Date.now()): boolean {
@@ -133,7 +141,70 @@ export function sameOrigin(
 }
 
 /**
+ * Cloudflare'in yayımladığı kenar aralıkları — https://www.cloudflare.com/ips
+ * (2026-09-24'te canlı listeyle karşılaştırıldı, birebir aynı). Liste yıllardır
+ * değişmedi; değişirse buradaki kopya da güncellenmeli, yoksa yeni bir
+ * kenardan gelen başlık yok sayılır ve o kenarın arkasındaki herkes `req.ip`
+ * ile tek kovaya düşer — sahte başlığa güvenmekten yine de iyi.
+ */
+const CLOUDFLARE = [
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+  '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+  '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+  '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+  '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+];
+
+/**
+ * Özel ve yerel aralıklar. Cloudflare Tunnel (cloudflared) buradan bağlanıyor:
+ * kaynak sunucu internete hiç açık değil, başlığı yazan yine Cloudflare.
+ */
+const OZEL = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7', 'fe80::/10'];
+
+/**
+ * Express'in `trust proxy` ayarı — X-Forwarded-For'a YALNIZCA bu ağlardan gelen
+ * bir eşten inanılıyor (Coolify'ın Traefik'i, cloudflared: docker ağı).
+ *
+ * `trust proxy 1` ilk eşi KİM OLURSA OLSUN proxy sayıyordu. Kaynağa doğrudan
+ * bağlanan bir istemci `X-Forwarded-For: 104.16.1.2` yazıp `req.ip`'yi
+ * Cloudflare aralığına taşıyabiliyor, ardından yukarıdaki kapı sahte
+ * `CF-Connecting-IP`'yi kabul ediyordu — ölçüldü (`proxy-addr`, PR #74
+ * incelemesi). Özel ağ listesiyle doğrudan bağlantıda `req.ip` soket adresi
+ * kalıyor; hiçbir başlık onu oynatamıyor. `req.secure` de aynı listeye
+ * bakıyor: proxy başka bir makinedeyse (herkese açık adres) buraya eklenmeli,
+ * yoksa Secure çerezi ve sayaç anahtarı proxy'nin adresine düşer.
+ * Adlar Express'in kendi ön tanımları: `loopback` 127/8 ve ::1, `linklocal`
+ * 169.254/16 ve fe80::/10, `uniquelocal` 10/8, 172.16/12, 192.168/16, fc00::/7.
+ */
+export const PROXY_AGLARI = ['loopback', 'linklocal', 'uniquelocal'];
+
+const guvenilenEs = new BlockList();
+for (const cidr of [...CLOUDFLARE, ...OZEL]) {
+  const [adres, onek] = cidr.split('/');
+  guvenilenEs.addSubnet(adres, Number(onek), adres.includes(':') ? 'ipv6' : 'ipv4');
+}
+
+/** Eş adresi Cloudflare kenarı ya da yerel bir proxy mi? IPv4-mapped IPv6 de tanınıyor. */
+export function proxyGuvenilir(es: string): boolean {
+  const surum = isIP(es);
+  if (!surum) return false;
+  return guvenilenEs.check(es, surum === 6 ? 'ipv6' : 'ipv4');
+}
+
+/**
  * İstek gerçekten kimden geliyor — hız sınırlarının ANAHTARI.
+ *
+ * **BAŞLIĞI İSTEMCİ DE YAZABİLİYOR.** `CF-Connecting-IP`'ye koşulsuz güvenen
+ * ilk hâl, panelin kaynak adresine doğrudan ulaşan herkese (alan adı
+ * Cloudflare'de değilse, ya da Coolify'ın adresi biliniyorsa) her istekte
+ * başka bir değer yazıp IP'ye bağlı BÜTÜN sayaçları — yönetici parolası
+ * denemesi dâhil — sıfırlama imkânı veriyordu. Ölçüldü: 50 istekte 0 red.
+ * Ve `check:panel` bunu yeşil gösteriyordu, çünkü doğru başlığın okunduğunu
+ * ölçüyor, sahte başlığın okunMAdığını hiç ölçmüyordu. Başlığa ancak eş
+ * adresi (`req.ip`) Cloudflare'in kenar aralıklarındaysa ya da yerel/özel bir
+ * adresse güveniliyor; `check:security` sahte başlıklı döngüyü koşturuyor.
+ * `req.ip`'nin kendisi güvenilir olmak zorunda: bunu `PROXY_AGLARI` sağlıyor.
  *
  * **`trust proxy 1` bir proxy sayıyor.** Panelin önünde Coolify/Traefik var;
  * alan adı Cloudflare'e bağlıysa **iki** proxy oluyor ve Express en yakın
@@ -158,11 +229,14 @@ export function clientIp(req: {
   header?(name: string): string | undefined;
 }): string {
   const oku = (ad: string) => req.get?.(ad) ?? req.header?.(ad) ?? undefined;
+  const es = (req.ip ?? '').trim();
   const cf = (oku('cf-connecting-ip') ?? '').trim();
-  // Cloudflare tek bir adres yazıyor; virgül görürsek başlık bizim
-  // beklediğimiz şey değil ve güvenilmiyor.
-  if (cf && !cf.includes(',')) return cf;
-  return (req.ip ?? '').trim() || 'bilinmiyor';
+  // Başlık ancak Cloudflare'in (ya da yerel bir tünelin) elinden geçmişse
+  // gerçek; herkese açık bir eşten gelen başlık istemcinin kendi yazdığı şey.
+  // Cloudflare tek bir adres yazıyor; IP olmayan bir değer (virgüllü liste,
+  // metin) beklediğimiz şey değil ve güvenilmiyor.
+  if (cf && isIP(cf) && proxyGuvenilir(es)) return cf;
+  return es || 'bilinmiyor';
 }
 
 export const LOGIN_MAX_FAILURES = 10;

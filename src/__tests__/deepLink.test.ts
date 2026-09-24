@@ -18,6 +18,16 @@ describe('safeNext', () => {
     expect(safeNext('/\\evil.example')).toBeNull();
   });
 
+  // Başındaki boşluk ve çift ters bölü tek karakterlik kontrolleri aşan
+  // varyantlar: kırpma sonrası yine `//` ile başlıyor ya da ters bölü
+  // eğik çizgi gibi okunuyor.
+  it('boşluk ve ters bölü varyantlarını reddediyor', () => {
+    expect(safeNext(' //evil.example')).toBeNull();
+    expect(safeNext('\t//evil.example')).toBeNull();
+    expect(safeNext('/\\\\evil.example')).toBeNull();
+    expect(safeNext('\\/evil.example')).toBeNull();
+  });
+
   it('yol olmayanı reddediyor', () => {
     expect(safeNext(undefined)).toBeNull();
     expect(safeNext('')).toBeNull();
