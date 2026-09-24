@@ -642,6 +642,13 @@ check(
       return 'sayaçlar req.ip\u2019yi doğrudan okuyor — Cloudflare arkasında hepsi aynı kovaya düşer';
     }
     if (!/clientIp\(req\)/.test(server)) return 'panel istemci adresini clientIp ile çözmüyor';
+    //    Ve req.ip'nin kendisi güvenilir olmalı: `trust proxy 1` ilk eşi kim
+    //    olursa olsun proxy sayıyor, doğrudan bağlanan biri X-Forwarded-For ile
+    //    req.ip'yi istediği adrese taşıyabiliyordu. Liste session.ts'te,
+    //    davranışı check:security ölçüyor; burası server.ts'in onu kullandığı.
+    if (!/app\.set\('trust proxy', PROXY_AGLARI\)/.test(server)) {
+      return "trust proxy PROXY_AGLARI değil — doğrudan bağlantıdan gelen X-Forwarded-For yutulur";
+    }
 
     // 10) Çıkış gerçekten çıkış olmalı: çerezi silmek jetonu geçersizleştirmiyor.
     if (!/revokeToken\(/.test(server)) {

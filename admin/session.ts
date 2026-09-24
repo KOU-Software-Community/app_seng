@@ -162,6 +162,23 @@ const CLOUDFLARE = [
  */
 const OZEL = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7', 'fe80::/10'];
 
+/**
+ * Express'in `trust proxy` ayarı — X-Forwarded-For'a YALNIZCA bu ağlardan gelen
+ * bir eşten inanılıyor (Coolify'ın Traefik'i, cloudflared: docker ağı).
+ *
+ * `trust proxy 1` ilk eşi KİM OLURSA OLSUN proxy sayıyordu. Kaynağa doğrudan
+ * bağlanan bir istemci `X-Forwarded-For: 104.16.1.2` yazıp `req.ip`'yi
+ * Cloudflare aralığına taşıyabiliyor, ardından yukarıdaki kapı sahte
+ * `CF-Connecting-IP`'yi kabul ediyordu — ölçüldü (`proxy-addr`, PR #74
+ * incelemesi). Özel ağ listesiyle doğrudan bağlantıda `req.ip` soket adresi
+ * kalıyor; hiçbir başlık onu oynatamıyor. `req.secure` de aynı listeye
+ * bakıyor: proxy başka bir makinedeyse (herkese açık adres) buraya eklenmeli,
+ * yoksa Secure çerezi ve sayaç anahtarı proxy'nin adresine düşer.
+ * Adlar Express'in kendi ön tanımları: `loopback` 127/8 ve ::1, `linklocal`
+ * 169.254/16 ve fe80::/10, `uniquelocal` 10/8, 172.16/12, 192.168/16, fc00::/7.
+ */
+export const PROXY_AGLARI = ['loopback', 'linklocal', 'uniquelocal'];
+
 const guvenilenEs = new BlockList();
 for (const cidr of [...CLOUDFLARE, ...OZEL]) {
   const [adres, onek] = cidr.split('/');
@@ -187,6 +204,7 @@ export function proxyGuvenilir(es: string): boolean {
  * ölçüyor, sahte başlığın okunMAdığını hiç ölçmüyordu. Başlığa ancak eş
  * adresi (`req.ip`) Cloudflare'in kenar aralıklarındaysa ya da yerel/özel bir
  * adresse güveniliyor; `check:security` sahte başlıklı döngüyü koşturuyor.
+ * `req.ip`'nin kendisi güvenilir olmak zorunda: bunu `PROXY_AGLARI` sağlıyor.
  *
  * **`trust proxy 1` bir proxy sayıyor.** Panelin önünde Coolify/Traefik var;
  * alan adı Cloudflare'e bağlıysa **iki** proxy oluyor ve Express en yakın

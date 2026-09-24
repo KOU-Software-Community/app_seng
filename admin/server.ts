@@ -106,6 +106,7 @@ import { resolvePort } from './port';
 import { verifyPassword } from './webAuth';
 import { csvCell } from './csv';
 import {
+  PROXY_AGLARI,
   SESSION_SECONDS,
   clientIp,
   cookieHeader,
@@ -157,8 +158,10 @@ const app = express();
 // Coolify/Traefik gibi bir ters proxy arkasında HTTPS proxy'de sonlanıyor ve
 // uygulamaya istek düz HTTP olarak geliyor. Bu ayar olmadan `req.secure`
 // sunucuda da hep false döner ve oturum çerezi `Secure` almazdı.
-// `1`: yalnızca en yakın proxy'ye güven — istemcinin uydurduğu başlığa değil.
-app.set('trust proxy', 1);
+// YALNIZCA ÖZEL AĞDAKİ BİR EŞE güven (`PROXY_AGLARI`). `1` ilk eşi kim olursa
+// olsun proxy sayıyordu: kaynağa doğrudan bağlanan biri X-Forwarded-For ile
+// `req.ip`'yi istediği adrese taşıyabiliyordu — sayaçların anahtarı dâhil.
+app.set('trust proxy', PROXY_AGLARI);
 app.use(express.urlencoded({ extended: false }));
 // Uygulamanın çağırdığı uç noktalar JSON konuşuyor. Sınır düşük: bu gövdeler
 // yalnızca bir kod ve iki numara taşıyor.

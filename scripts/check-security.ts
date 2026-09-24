@@ -21,8 +21,9 @@ import { sertifikaMaili } from '../admin/certificateMail';
 import { sertifikaPage, sertifikaYokPage } from '../admin/certificateView';
 import { deleteAccountPage } from '../admin/legal';
 import { notificationsPage } from '../admin/notificationsView';
+import { attendanceRows } from '../admin/qr';
 import { qrPage } from '../admin/qrView';
-import { clientIp, issueToken, revokeToken, sameOrigin, verifyToken } from '../admin/session';
+import { PROXY_AGLARI, clientIp, issueToken, revokeToken, sameOrigin, verifyToken } from '../admin/session';
 import { CEVIRI_IP_LIMITI, registerTranslateApi } from '../admin/translateApi';
 import { loginPage } from '../admin/views';
 
@@ -102,6 +103,48 @@ void (async () => {
       clientIp(istek({ ip: CF_ES, headers: { 'cf-connecting-ip': '<script>' } })) === CF_ES,
     );
     assert('başlık yokken eş adresi kullanılıyor', clientIp(istek({ ip: HALK })) === HALK);
+  }
+
+  // ------------------------------------------ Express'in kendi zinciri: X-Forwarded-For
+  //
+  // Yukarıdaki iddialar `req.ip`'yi veri sayıyor; oysa onu Express'in
+  // `trust proxy` ayarı üretiyor. `1` ilk eşi kim olursa olsun proxy
+  // sayıyordu: kaynağa doğrudan bağlanan biri `X-Forwarded-For: 104.16.1.2`
+  // yazıp `req.ip`'yi Cloudflare aralığına taşıyor, ardından yukarıdaki kapı
+  // sahte başlığı kabul ediyordu (PR #74 incelemesi). Aşağısı Express'in
+  // kullandığı `proxy-addr`'ı sunucuyla AYNI listeyle çağırıyor: soket
+  // adresi + başlıklar girip `req.ip` çıkıyor, sonra `clientIp`'ye veriliyor.
+  {
+    // `proxy-addr` Express'in kendi bağımlılığı ve tip paketi yok.
+    const proxyaddr = require('proxy-addr') as {
+      (req: unknown, trust: unknown): string;
+      compile(list: readonly string[]): unknown;
+    };
+    const guven = proxyaddr.compile([...PROXY_AGLARI]);
+    const expressIp = (remoteAddress: string, xff?: string) =>
+      proxyaddr({ connection: { remoteAddress }, headers: xff ? { 'x-forwarded-for': xff } : {} }, guven);
+    const bas = { 'cf-connecting-ip': SAHTE };
+
+    const dogrudan = expressIp(HALK, CF_ES);
+    assert('doğrudan bağlantıda sahte X-Forwarded-For req.ip’yi taşıyamıyor', dogrudan === HALK, dogrudan);
+    assert(
+      'doğrudan bağlantı + sahte XFF + sahte CF başlığı soket adresinde kalıyor',
+      clientIp(istek({ ip: dogrudan, headers: bas })) === HALK,
+    );
+    // Traefik (docker ağı) gerçek eşi XFF'nin sonuna ekliyor: Cloudflare varsa kenar,
+    // yoksa istemcinin kendisi.
+    const traefikCf = expressIp('172.18.0.2', CF_ES);
+    assert(
+      'Traefik arkasında Cloudflare kenarı req.ip oluyor ve başlık okunuyor',
+      traefikCf === CF_ES && clientIp(istek({ ip: traefikCf, headers: bas })) === SAHTE,
+      traefikCf,
+    );
+    const traefikCfsiz = expressIp('::ffff:172.18.0.2', HALK);
+    assert(
+      'Traefik arkasında Cloudflare yokken sahte başlık yok sayılıyor',
+      traefikCfsiz === HALK && clientIp(istek({ ip: traefikCfsiz, headers: bas })) === HALK,
+      traefikCfsiz,
+    );
   }
 
   // ------------------------------------------------- sayaç aşımı, uçtan uca
@@ -271,6 +314,43 @@ void (async () => {
     assert('belge-yok sayfası adresteki numarayı kaçırıyor', zararsiz(sertifikaYokPage(kotu)));
     const posta = sertifikaMaili({ adSoyad: kotu, etkinlik: kotu, tarih: kotu, belgeNo: kotu, dogrulamaUrl: kotu });
     assert('sertifika postası ad ve etkinliği kaçırıyor', zararsiz(posta.html));
+  }
+
+  // ------------------------------------ sertifika postasının adresi kimin elinde
+  //
+  // `users.email`i istemci yazıyor. Kural artık hesabın adresini istiyor ama
+  // eski kurallarla yazılmış bir profil başka bir adres taşıyabilir (PR #74
+  // incelemesi). Panel adresi profilden okuduğu sürece o adres sertifika
+  // PDF'ini alır; Auth kaydı kullanıcının değiştiremediği tek kaynak.
+  {
+    const profil = { adSoyad: 'Elif Yılmaz', email: 'kurban@example.com', ogrenciNo: '210000001' };
+    const db = {
+      collection: () => ({
+        where: () => ({
+          get: async () => ({
+            empty: false,
+            docs: [{ get: (k: string) => ({ eventId: 'e1', uid: 'u1' } as Record<string, unknown>)[k] }],
+          }),
+        }),
+        doc: (id: string) => ({ id }),
+      }),
+      getAll: async (...refs: unknown[]) => refs.map(() => ({ data: () => profil })),
+    };
+    const auth = {
+      getUsers: async (ids: { uid: string }[]) => ({
+        users: ids.map(({ uid }) => ({ uid, email: 'gercek@example.com' })),
+        notFound: [],
+      }),
+    };
+    const [satir] = await attendanceRows(db as never, 'e1', () => auth as never);
+    assert(
+      'yoklama listesinin e-postası Auth kaydından geliyor, profilden değil',
+      satir.email === 'gercek@example.com',
+      satir.email,
+    );
+    const authYok = { getUsers: async () => ({ users: [], notFound: [{ uid: 'u1' }] }) };
+    const [satir2] = await attendanceRows(db as never, 'e1', () => authYok as never);
+    assert('Auth kaydı yoksa profil adresine düşülmüyor', satir2.email === '', satir2.email);
   }
 })().then(() => {
   console.log(failed ? `\n${failed} kontrol başarısız.` : '\nTüm kontroller geçti.');

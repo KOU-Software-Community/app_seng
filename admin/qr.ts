@@ -9,6 +9,7 @@
  */
 import { randomBytes } from 'node:crypto';
 
+import { getAuth, type Auth } from 'firebase-admin/auth';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 import { toLocalIso } from '../src/eventSchema';
@@ -161,7 +162,11 @@ export type YoklamaSatiri = {
  * kişisel veri kopyası değil. İki yerde tutmak, ikisinin ayrışmasının tek
  * sebebi olurdu — ad profilde değişince yoklama eski adı gösterirdi.
  */
-export async function attendanceRows(db: Firestore, eventId: string): Promise<YoklamaSatiri[]> {
+export async function attendanceRows(
+  db: Firestore,
+  eventId: string,
+  authOf: () => Pick<Auth, 'getUsers'> = getAuth,
+): Promise<YoklamaSatiri[]> {
   const snap = await db.collection(ATTENDANCE_COLLECTION).where('eventId', '==', eventId).get();
   if (snap.empty) return [];
 
@@ -175,6 +180,19 @@ export async function attendanceRows(db: Firestore, eventId: string): Promise<Yo
     docs.forEach((d, i) => profiller.set(uidler[i], d.data() ?? {}));
   }
 
+  // E-POSTA PROFİLDEN DEĞİL, AUTH KAYDINDAN. `users.email`i istemci yazıyor;
+  // kural artık hesabın adresini istiyor ama eski kurallarla yazılmış bir
+  // profil başka bir adres taşıyabilir — ve sertifika PDF'i buradaki adrese
+  // gidiyor. Auth kaydı kullanıcının kendi başına değiştiremediği tek kaynak.
+  // Auth'ta kayıt yoksa profil adresine DÜŞÜLMÜYOR: boş kalıyor, panel
+  // "e-posta yok" diyor. `getUsers` bir çağrıda en çok 100 kimlik alıyor.
+  const epostalar = new Map<string, string>();
+  for (let i = 0; i < uidler.length; i += 100) {
+    const parca = uidler.slice(i, i + 100);
+    const { users } = await authOf().getUsers(parca.map((uid) => ({ uid })));
+    for (const u of users) epostalar.set(u.uid, u.email ?? '');
+  }
+
   return snap.docs
     .map((d) => {
       const uid = String(d.get('uid') ?? '');
@@ -186,7 +204,7 @@ export async function attendanceRows(db: Firestore, eventId: string): Promise<Yo
         uid,
         adSoyad: String(p.adSoyad ?? '(profil yok)'),
         ogrenciNo: String(p.ogrenciNo ?? ''),
-        email: String(p.email ?? ''),
+        email: epostalar.get(uid) ?? '',
         kaynak: (d.get('kaynak') === 'panel' ? 'panel' : 'qr') as 'qr' | 'panel',
         checkedInAt: zamanMetni(d.get('checkedInAt')),
         sertifikaNo: sertifika?.no,

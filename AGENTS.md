@@ -2436,3 +2436,25 @@ yeni testler `check:security` (panel) ve `check:rules`'un ikinci yarısı.
   zorunda): akış filtresi GraphQL'den aşılabiliyor. Veri haber içeriği, gizli
   değil. Uygulanmadı; cevap `graphql_public.graphql`'ın `anon`'dan alınması
   (uygulama GraphQL kullanmıyor). Canlı DB değişikliği operatörün kararı.
+- **`trust proxy 1` ilk eşi kim olursa olsun proxy sayıyor, ve bu `req.ip`'yi
+  veri olmaktan çıkarıyor.** Cloudflare kapısı `req.ip`'ye bakıyordu; Copilot
+  incelemesi haklı çıktı: kaynağa doğrudan bağlanan biri `X-Forwarded-For:
+  104.16.1.2` yazınca Express `req.ip`'yi o yapıyor ve sahte `CF-Connecting-IP`
+  yine kabul ediliyordu. Express'in kendi `proxy-addr`'ıyla ölçüldü. Ayar artık
+  `PROXY_AGLARI` (loopback, linklocal, uniquelocal): Traefik ve cloudflared
+  docker ağından geliyor, doğrudan bağlantıda `req.ip` soket adresi kalıyor.
+  **Bir başlığın kime güvenilerek okunduğunu sormak yetmiyor; o güveni veren
+  adresin kendisinin nereden geldiğini de sormak gerekiyor.** Bedeli: proxy
+  başka bir makinedeyse (herkese açık adres) listeye eklenmeli, yoksa Secure
+  çerezi ve sayaç anahtarı proxy'nin adresine düşer.
+- **Bir kural eski veriyi düzeltmez.** "E-posta değişmesin" eski kurallarla
+  yazılmış uyumsuz bir adresi sonsuza kadar geçerli bırakıyordu (Copilot, aynı
+  inceleme). Kural artık her yazmada hesabın adresine eşitlik istiyor — uyumsuz
+  profil adresi düzeltilmeden güncellenemiyor, düzeltmesi tek yol. Ama asıl
+  kapı panelde: sertifika postasının adresi profilden değil **Auth kaydından**
+  okunuyor (`attendanceRows`). Ayrıcalıklı tarafın bir alanı okuması
+  gerekiyorsa, istemcinin yazdığı kopyayı değil kaynağı okusun; migration o
+  zaman gerekmiyor.
+- **`grep -c "assert("` fonksiyonun tanım satırını da sayıyor.** Rapor 32
+  dedi, gerçek 31'di ve bunu bir inceleyici yakaladı. Raporun kendi sayısı da
+  bir ölçümdür: `^\s*assert(` ile sayın, ya da grubu tek tek toplayın.

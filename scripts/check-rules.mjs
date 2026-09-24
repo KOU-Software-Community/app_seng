@@ -201,8 +201,10 @@ try {
     closesAt: new Date(Date.now() - saat),
   });
 
-  const u1 = istemci('u1');
-  const u2 = istemci('u2');
+  // Jeton e-postası profildekiyle aynı: kural profilin e-postasını hesabın
+  // adresine eşitliyor, o yüzden e-postasız bir jetonla profil güncellenemez.
+  const u1 = istemci('u1', PROFIL.email);
+  const u2 = istemci('u2', PROFIL.email);
 
   // --- kayıtlar
   await red('kimliksiz kayıt reddediliyor', () => kayitYaz(istemci(), kayit('210000001', null, 'koltuk-anon-1')));
@@ -500,13 +502,29 @@ try {
     setDoc(doc(u4, 'users', 'u4'), profil({ createdAt: gecmis })),
   );
   await izin('kendi profili yazılabiliyor', () => setDoc(doc(u4, 'users', 'u4'), profil()));
-  await red('profil e-postası sonradan değişmiyor', () =>
+  await red('profil e-postası yabancı bir adrese çevrilemiyor', () =>
     updateDoc(doc(u4, 'users', 'u4'), { email: 'baska@example.com' }),
   );
   await red('profil oluşturulma saati sonradan değişmiyor', () =>
     updateDoc(doc(u4, 'users', 'u4'), { createdAt: gelecek }),
   );
   await izin('profil adı sonradan değişebiliyor', () => updateDoc(doc(u4, 'users', 'u4'), { adSoyad: 'Elif Yıldız Demir' }));
+
+  // Eski kurallarla yazılmış, hesabın adresinden farklı e-posta taşıyan profil
+  // (PR #74 incelemesi): yalnızca "değişmesin" denseydi bu adres sonsuza kadar
+  // geçerli kalırdı. Şimdi adres düzeltilmeden hiçbir alan güncellenemiyor,
+  // düzeltmesi de tek yol — hesabın kendi adresi.
+  await tohum('users/u5', { ...PROFIL, email: 'kurban@example.com', telefon: '+905551112277', ogrenciNo: '210000005' });
+  const u5 = istemci('u5', 'u5@example.com');
+  await red('uyumsuz e-postalı eski profil düzeltilmeden güncellenemiyor', () =>
+    updateDoc(doc(u5, 'users', 'u5'), { adSoyad: 'Başka Ad' }),
+  );
+  await red('uyumsuz e-posta başka bir yabancı adrese çevrilemiyor', () =>
+    updateDoc(doc(u5, 'users', 'u5'), { email: 'baska@example.com' }),
+  );
+  await izin('e-postayı hesabın adresine eşitleyen güncelleme geçiyor', () =>
+    updateDoc(doc(u5, 'users', 'u5'), { email: 'u5@example.com', adSoyad: 'Düzeltilmiş Ad' }),
+  );
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   failed += 1;

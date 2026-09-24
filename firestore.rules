@@ -290,6 +290,17 @@ service cloud.firestore {
           && request.resource.data.adSoyad.size() <= 80
           && request.resource.data.email is string
           && request.resource.data.email.size() <= 254
+          // E-posta HESABIN KENDİ ADRESİ, ve her yazmada — create'te de update'te
+          // de. Panel sertifika PDF'ini bu adrese gönderiyordu (artık Auth
+          // kaydından okuyor) ve yoklama listesinde gösteriyor; serbest olsaydı
+          // profile başkasının adresi yazılıp kulübün alan adından ona posta
+          // gönderilebilirdi. `signUp` hesaba da profile de aynı normalleşmiş
+          // adresi yazıyor, o yüzden eşitlik her kayıtta tutuyor. Update'te de
+          // aranmasının sebebi eski kurallar: yalnızca "değişmesin" denseydi
+          // eski kurallarla yazılmış uyumsuz bir adres sonsuza kadar geçerli
+          // kalırdı; şimdi böyle bir profil adresi düzeltilmeden güncellenemiyor
+          // ve düzeltmesi tek yol.
+          && request.resource.data.email == request.auth.token.email
           // Telefon `normalizePhone`un ürettiği tek biçim: +90 + on hane.
           && request.resource.data.telefon is string
           && request.resource.data.telefon.matches('^[+]90[0-9]{10}$')
@@ -306,13 +317,8 @@ service cloud.firestore {
           && request.resource.data.kosullarOnayAt.size() <= 40;
       }
 
-      // E-posta hesabın KENDİ adresi. Panel sertifika PDF'ini buradaki adrese
-      // gönderiyor ve yoklama listesinde bunu gösteriyor; serbest olsaydı
-      // profile başkasının adresi yazılıp kulübün alan adından ona posta
-      // gönderilebilirdi. `signUp` hesaba da profile de aynı normalleşmiş
-      // adresi yazıyor, o yüzden eşitlik her kayıtta tutuyor.
+      // Oluşturulma damgası sunucu saati; e-posta şartı `profilGecerli` içinde.
       allow create: if profilGecerli()
-        && request.resource.data.email == request.auth.token.email
         && request.resource.data.createdAt == request.time;
 
       // Telefon ve numara oluşturulduktan sonra istemciden DEĞİŞMİYOR: ikisi de
@@ -321,10 +327,12 @@ service cloud.firestore {
       // `studentClaims` ayrışırdı — panelin listeleri ve koltuk kuralı numarayı
       // buradan okuyor.
       //
-      // E-posta ve oluşturulma damgası da değişmiyor: e-postanın gerekçesi
-      // yukarıda, damgayı istemci hiç yazmıyor.
+      // Oluşturulma damgası da değişmiyor: onu istemci hiç yazmıyor. E-posta
+      // burada listelenmiyor, `profilGecerli` onu hesabın adresine eşitliyor —
+      // yani uyumsuz eski bir adres hesabınkine ÇEVRİLEBİLİYOR, başka bir
+      // şeye çevrilemiyor.
       allow update: if profilGecerli()
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['telefon', 'ogrenciNo', 'email', 'createdAt']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['telefon', 'ogrenciNo', 'createdAt']);
 
       // Profil silme panelin işi (hesap silme akışı Admin SDK ile temizliyor).
       // İstemciye açılsaydı kullanıcı profilini silip teklik kaydını boşta
