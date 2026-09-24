@@ -138,7 +138,12 @@ sessizlik "gerekmiyor" anlamına gelmiyor.
 | **Mobil uygulama** | `app/`, `src/`, `app.json`, uygulama bağımlılıkları | EAS derlemesi + mağaza sürümü | Mağaza yayınlayınca — güncelleme almayan kullanıcıda eski sürüm kalır |
 | **Panel (backend)** | `admin/`, `nixpacks.toml`, panel ortam değişkenleri | Coolify'da **redeploy** | Deploy biter bitmez |
 | **Firestore kuralları** | `firestore.rules` | `npm run rules:deploy` | Yayınlanır yayınlanmaz — **deploy'dan bağımsız** |
-| **Yalnızca depo** | `docs/`, `scripts/check-*`, `AGENTS.md`, testler | hiçbir şey | hiç |
+| **AI Gündem veritabanı** | `supabase/migrations/` | MCP `apply_migration` (ya da SQL Editor), dosya adı canlı sürüm numarasıyla | Uygulanır uygulanmaz |
+| **AI Gündem özet worker'ı** | `supabase/functions/` | esbuild paketi + MCP `deploy_edge_function`, `verify_jwt: false` (komut aşağıda) | Deploy biter bitmez |
+| **Yalnızca depo** | `docs/`, `scripts/check-*`, `supabase/tests/`, `AGENTS.md`, testler | hiçbir şey | hiç |
+
+`npm run deploy` diye bir script **yok**; bir yüzeyi "deploy ettim" demeden
+önce hangisinin komutunu çalıştırdığınıza bakın.
 
 İki tuzak, ikisi de yaşandı:
 
@@ -911,7 +916,9 @@ onun için üretim verisi gerekiyor. Aşağıdakiler ölçülmüş hâli.
 - **İkinci anahtar kurulu ve çalışıyor.** Log satırı bunu yazıyor:
   `"provider":"gemini","fallback":"nvidia"`. Vault'ta iki anahtar da var. Yani
   429'da NVIDIA deneniyor — ve yine de 13 iş öldüyse ya ikisi birden dolmuştu ya
-  da NVIDIA de reddetti. `withFallback` her iki taraf da düşünce **primary'nin**
+  da NVIDIA de reddetti. **Sonradan ölçüldü: "reddetti" — ve "çalışıyor" yanlıştı.**
+  O log satırı yalnızca anahtarın bulunduğunu söylüyor; model 26 Ağustos'tan beri
+  410 dönüyordu. Ayrıntı "Kuyruk bir gün geride kaldı" bölümünde. `withFallback` her iki taraf da düşünce **primary'nin**
   kodunu yazıyor, o yüzden satırdaki `rate_limited` "yalnızca Gemini doldu"
   demek değil.
 - **Ama failover'ın kapsamadığı bir sınıf var:** `refusal`, `auth`,
@@ -2458,3 +2465,83 @@ yeni testler `check:security` (panel) ve `check:rules`'un ikinci yarısı.
 - **`grep -c "assert("` fonksiyonun tanım satırını da sayıyor.** Rapor 32
   dedi, gerçek 31'di ve bunu bir inceleyici yakaladı. Raporun kendi sayısı da
   bir ölçümdür: `^\s*assert(` ile sayın, ya da grubu tek tek toplayın.
+
+### Kuyruk bir gün geride kaldı — ücretsiz kota, emekli model, rastgele sıra
+
+Akış 24 Eylül boyunca 23 Eylül 21:00'de kaldı. Haber çekimi sağlamdı (günde
+~30 yeni haber); özet hattı üç ayrı sebeple, üçü de sessizce tıkanmıştı.
+
+- **Gemini'nin ücretsiz kotası model başına günde ~20 istek — ölçüldü, belgede
+  sayı yok.** İki gün üst üste ~20 çağrı geçti, sonrası hep 429. Google'ın
+  günlük kotası **Pasifik gece yarısında (10:00 TR)** sıfırlanıyor (belgede
+  yazıyor), bizim 200'lük tavanımız 00:00 UTC'de. Worker 03:00'te başlayıp iki
+  saatte tavanı 429'larla yaktı (200 çağrının 176'sı), günün geri kalanında tek
+  çağrı yapmadı; 10:00'da yenilenen Gemini kotası gece boyu kullanılmadan
+  bekledi. **Bir tavan, reddedilen çağrıyı da sayıyorsa, ret dalgası tavanı
+  kendi başına bitirir.**
+- **Kota model başına, anahtar başına değil.** Aynı ücretsiz anahtar
+  `gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3.1-flash-lite`'a da erişiyor
+  ve her birinin kendi kotası var; worker'ın isteğiyle birebir denendi, üçü de
+  doğru Türkçe JSON verdi. Zincir artık bunları NVIDIA'dan önce deniyor.
+  Denenip elenenler: `gemini-2.5-flash-lite` yeni kullanıcılara kapalı (404),
+  `gemini-3.5-flash-lite` ve Gemma 4 `thinkingBudget` alanını reddediyor (400).
+  Modelin listesini anahtar kendisi söylüyor: `GET /v1beta/models` kota yemiyor.
+- **"fallback: nvidia" log satırı yedeğin çalıştığını değil, anahtarın
+  bulunduğunu söylüyordu.** `meta/llama-3.3-70b-instruct` 26 Ağustos'ta emekli
+  oldu ve her çağrıya `410 Gone` döndü; eski sarmalayıcı iki taraf da düşünce
+  birincilin 429'unu raporladığı için bu bir ay görünmedi. Şimdi zincirde düşen
+  her halka kendi koduyla `provider_failed` olarak loglanıyor. Yerine
+  `nvidia/nemotron-3-super-120b-a12b` geldi: kataloğun 18 adayından yalnızca o
+  zaman aşımına düşmeden doğru anahtarlarla Türkçe madde döndürdü
+  (`gpt-oss-20b` cevap verdi ama özeti İngilizce yazdı; çoğu model "Not found
+  for account" 404'ü veriyor). Düşünerek cevap verdiği için yavaş, zincirin
+  sonunda duruyor.
+- **Sıra rastgeleydi.** `lease_ai_jobs` `available_at`'e göre sıralıyordu ve
+  tavan ertelemesi her işi "ertesi gece yarısı + birkaç milisaniye"ye
+  yazıyordu: bugünün 26 haberi, geçmiş silinince yeniden çekilen ~430 eski
+  işin arasına kura ile karıştı. Artık yayını en yeni iş önce alınıyor; eskisi
+  yeni iş kalmayınca.
+- **`rate_limited` artık "zincirin hiçbir halkasında kapasite yok" demek**, ve
+  veritabanı onu makalenin değil sağlayıcıların durumu sayıyor: deneme hakkı
+  geri veriliyor, iş en az 15 dakika (yaşlandıkça daha seyrek) bekliyor, kuyruk
+  da 15 dakika duruyor. Eskiden her 429 bir işin 5 hakkından birini yiyordu ve
+  hakkı biten iş kalıcı ölüyordu — yani kota dolduğu her gün haber kaybı. İçerik
+  hatası (şema, ret) ise hâlâ nihai: yedeğin içerik hatası da raporlanıyor ki
+  hiçbir modelin işleyemediği bir haber "meşgul" diye sonsuza kadar dönmesin.
+- **Süpürme 48 saatten eski habere iş açmıyor.** Kuyruk sınırlı kalınca günlük
+  kapasite hep günlük işten büyük kalıyor; eski bir haberi biri açarsa
+  `request-enrichment` işi yine açıyor, tazelerden sonra işleniyor. İçeriği
+  değişmiş haberin eski içerik işi de siliniyor (sonucu hiç görünmeyecekti; 14
+  tane vardı).
+- **Worker'ın kaynağı artık burada** (`supabase/functions/`, follow-ai@8ad72f1'den
+  birebir alındı, değişiklik ayrı commit'te). Yalnızca `process-enrichments` ve
+  kullandığı `_shared` dosyaları; öteki dört fonksiyon follow-ai'de. Onlar
+  sağlayıcı çözümünü sadece önbellek anahtarındaki model adı için kullanıyor ve
+  o ad (`gemini-2.5-flash`) değişmedi, bu yüzden yeniden dağıtılmadılar.
+  Derleme — sürüm ve bayraklar canlı paketle birebir karşılaştırılarak seçildi:
+
+  ```
+  npx esbuild@0.28.2 supabase/functions/process-enrichments/index.ts --bundle \
+    --format=esm --platform=neutral --minify --charset=utf8 \
+    --external:@supabase/supabase-js --external:@anthropic-ai/sdk --outfile=index.js
+  ```
+
+  `index.js` ile `deno.json`'daki `imports` bloğu MCP `deploy_edge_function`'a,
+  **`verify_jwt: false`** ile (fonksiyon cron'un `x-internal-secret`'ıyla
+  kimlik doğruluyor; `true` her cron çağrısını 401'e çevirir). Dağıtım aracı
+  içeriği satır içi istiyor: önce aynı metni bir dosyaya yazıp sha256'yı
+  derlenmiş paketle karşılaştırın, sonra gönderin.
+- **Edge fonksiyonu 150 saniyede öldürülüyor** (ücretsiz plan) ve zincirin son
+  halkası 60 saniyelik zaman aşımını doldurabiliyor. Bir çalışmada 80 saniyeden
+  sonra yeni işe başlanmıyor; kalan iş hak yemeden kuyruğa dönüyor.
+- **pg_net istekleri toplu gönderiyor ve topluluk en yavaşını bekliyor.** 90
+  saniyelik zaman aşımıyla atılan test istekleri cron'un worker çağrısını da
+  arkasında bekletti. Canlıdan sağlayıcı denerken kısa zaman aşımı kullanın;
+  anahtarı konuşmaya çıkarmamak için istek veritabanından atılıyor
+  (`vault.decrypted_secrets` sorgunun içinde kalıyor).
+- **Kuyruk kararlarının testi canlı veritabanında koşuyor ve kendini geri
+  alıyor** (`supabase/tests/kuyruk.sql`): blok sonunda bilerek hata fırlatıyor,
+  mesaj "KUYRUK TESTİ GEÇTİ" ise geçti. Eski fonksiyonlara karşı yedi kontrolü
+  düştü, yenilerine karşı hepsi geçti. Zincirin ve süre bütçesinin kontrolü
+  `npm run check:worker`; dokuz davranışın her biri tek tek bozulup kırmızı
+  verdiği görüldü.
