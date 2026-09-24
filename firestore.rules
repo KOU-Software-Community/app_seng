@@ -71,6 +71,14 @@ service cloud.firestore {
         // bir şey kalmaz.
         && registrationId == request.resource.data.eventId + '__' + request.resource.data.studentNo
         && request.resource.data.regId == registrationId
+        // Sunucu saati: istemcinin seçtiği bir damga kaydı ileri ya da geri
+        // tarihe atar. Update dalı bunu zaten istiyordu; create dalı istemiyordu.
+        && request.resource.data.createdAt == request.time
+        // Kod ve serbest metin alanlarının tavanı var: istemci bu alanlara
+        // 1 MiB'a kadar her şeyi yazabiliyordu ve panel onları tabloya ve
+        // CSV'ye olduğu gibi basıyor.
+        && request.resource.data.code is string
+        && request.resource.data.code.size() <= 32
         && request.resource.data.seatId is string
         && request.resource.data.seatId.size() >= 8
         && request.resource.data.seatId.size() <= 64
@@ -87,7 +95,9 @@ service cloud.firestore {
         // `get()` istemcinin okuma izninden geçmiyor; kayıt istemciye kapalı kalıyor.
         && get(/databases/$(database)/documents/studentClaims/$(request.resource.data.studentNo)).data.uid == request.auth.uid
         && request.resource.data.department is string
-        && request.resource.data.year is string;
+        && request.resource.data.department.size() <= 80
+        && request.resource.data.year is string
+        && request.resource.data.year.size() <= 10;
     }
 
     // Koltuklar: etkinlik başına koltuk jetonları.
@@ -185,7 +195,10 @@ service cloud.firestore {
         && request.resource.data.categories.size() <= 20
         && request.resource.data.reminder is string
         && request.resource.data.reminder.size() <= 40
-        && request.resource.data.quietHours is bool;
+        && request.resource.data.quietHours is bool
+        // Sunucu saati. Tipi denetlenmeyen tek alandı: 1 MiB'lık bir doküman
+        // taşıyabiliyordu ve panel gönderimde bütün koleksiyonu okuyor.
+        && request.resource.data.updatedAt == request.time;
     }
 
     // Çekiliş tanımı: hangi alanların sorulacağı, kaç kazanan, kazananlar.
@@ -210,6 +223,7 @@ service cloud.firestore {
       // (girişsiz yazılan) katılım açık — çekiliş formu giriş istemiyor.
       allow update: if
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time
         && (
           !('uid' in resource.data.keys())
           || (request.auth != null && resource.data.uid == request.auth.uid)
@@ -228,6 +242,10 @@ service cloud.firestore {
           || (request.auth != null && request.resource.data.uid == request.auth.uid)
         )
         && request.resource.data.entryId == entryId
+        // Kimlik `makeEntryId`'nin ürettiği biçimde: 32'lik alfabeden 16
+        // sembol. Keyfi kimlik, keyfi sayıda doküman demekti.
+        && entryId.matches('^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}$')
+        && request.resource.data.createdAt == request.time
         // Var olmayan bir çekilişe katılım yazılamasın.
         && request.resource.data.eventId is string
         && exists(/databases/$(database)/documents/raffles/$(request.resource.data.eventId))
@@ -279,18 +297,34 @@ service cloud.firestore {
           && request.resource.data.ogrenciNo is string
           && request.resource.data.ogrenciNo.matches('^[0-9]{9}$')
           && request.resource.data.dogumTarihi is string
-          && request.resource.data.dogumTarihi.size() <= 10;
+          && request.resource.data.dogumTarihi.size() <= 10
+          // Onay damgaları ISO metin. Tavansız hâlde 1 MiB'lık bir profil
+          // yazılabiliyordu; panel yoklama listesi için profilleri toplu okuyor.
+          && request.resource.data.kvkkOnayAt is string
+          && request.resource.data.kvkkOnayAt.size() <= 40
+          && request.resource.data.kosullarOnayAt is string
+          && request.resource.data.kosullarOnayAt.size() <= 40;
       }
 
-      allow create: if profilGecerli();
+      // E-posta hesabın KENDİ adresi. Panel sertifika PDF'ini buradaki adrese
+      // gönderiyor ve yoklama listesinde bunu gösteriyor; serbest olsaydı
+      // profile başkasının adresi yazılıp kulübün alan adından ona posta
+      // gönderilebilirdi. `signUp` hesaba da profile de aynı normalleşmiş
+      // adresi yazıyor, o yüzden eşitlik her kayıtta tutuyor.
+      allow create: if profilGecerli()
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time;
 
       // Telefon ve numara oluşturulduktan sonra istemciden DEĞİŞMİYOR: ikisi de
       // teklik kayıtlarına bağlı ve değişiklik panelden geçiyor (doğrulamadaki
       // düzeltme, `/api/hesap/ogrenci-no`). Değişebilseydi profil ile
       // `studentClaims` ayrışırdı — panelin listeleri ve koltuk kuralı numarayı
       // buradan okuyor.
+      //
+      // E-posta ve oluşturulma damgası da değişmiyor: e-postanın gerekçesi
+      // yukarıda, damgayı istemci hiç yazmıyor.
       allow update: if profilGecerli()
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['telefon', 'ogrenciNo']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['telefon', 'ogrenciNo', 'email', 'createdAt']);
 
       // Profil silme panelin işi (hesap silme akışı Admin SDK ile temizliyor).
       // İstemciye açılsaydı kullanıcı profilini silip teklik kaydını boşta
@@ -360,7 +394,11 @@ service cloud.firestore {
       allow update: if request.auth != null
                     && resource.data.uid == request.auth.uid
                     && request.resource.data.diff(resource.data)
-                         .affectedKeys().hasOnly(['checkedInAt']);
+                         .affectedKeys().hasOnly(['checkedInAt'])
+                    // `hasOnly` alanın DEĞİŞEBİLDİĞİNİ söylüyor, NEYE
+                    // değişebildiğini değil: dize, sayı, geçmiş bir tarih —
+                    // hepsi geçiyordu. Yeniden gönderim de sunucu saatiyle.
+                    && request.resource.data.checkedInAt == request.time;
 
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly(['eventId', 'uid', 'token', 'checkedInAt'])
@@ -371,7 +409,9 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.eventId is string
         && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
-        && request.resource.data.checkedInAt is timestamp
+        // Sunucu saati, "bir timestamp" değil: `is timestamp` 2020'yi de
+        // kabul ediyordu ve yoklama saati panelde olduğu gibi görünüyor.
+        && request.resource.data.checkedInAt == request.time
         // Jeton, istemcinin OKUYAMADIĞI dokümandan geliyor.
         && request.resource.data.token == qrTanimi(request.resource.data.eventId).token
         // Pencere: etkinliğin bir saat öncesinden o günün sonuna. Bitişte

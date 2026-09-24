@@ -348,7 +348,7 @@ app.post('/logout', (req, res) => {
   // silinse bile kopyalanmış ya da geri düğmesiyle geri gelen bir değer
   // oturumu açmaya devam ediyordu. Ortak bir bilgisayarda "çıkış yaptım"
   // diyen yönetici, aslında yapmamış oluyordu.
-  revokeToken(readCookie(req));
+  revokeToken(SECRET, readCookie(req));
   res.setHeader('Set-Cookie', cookieHeader({ name: COOKIE, value: '', secure: req.secure, maxAge: 0 }));
   res.redirect('/login');
 });
@@ -848,9 +848,12 @@ async function allEvents(): Promise<ClubEvent[]> {
  * Panelin kendi herkese açık kökü.
  *
  * Ortam değişkeni varsa o kazanıyor; yoksa isteğin kendisinden türetiliyor.
- * İkincisi `Host` başlığına güveniyor ve o başlık istemcinin yazdığı şey —
- * ama bu sayfayı yalnızca giriş yapmış yönetici görüyor ve gördüğü adres
- * kendi yazdığı adres, yani kimseyi kandıracak bir yol yok.
+ * İkincisi `Host` başlığına güveniyor ve o başlık istemcinin yazdığı şey.
+ * Herkese açık `/sertifika/:no` sayfası da buradan geçiyor (belgenin
+ * üstündeki QR ve adres), yani "yalnızca yönetici görüyor" DOĞRU DEĞİL —
+ * ama uydurma bir `Host` yalnızca onu yazanın kendi cevabını değiştiriyor,
+ * başkasına ulaşmıyor. Üretimde `EXPO_PUBLIC_LEGAL_BASE_URL` tanımlı olmalı
+ * ki belgeye basılan adres isteğe değil yapılandırmaya bağlı olsun.
  */
 function panelKoku(req: Request): string {
   const env = (process.env.EXPO_PUBLIC_LEGAL_BASE_URL ?? '').trim().replace(/\/+$/, '');

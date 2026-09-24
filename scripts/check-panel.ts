@@ -1489,9 +1489,17 @@ void (async () => {
       ip,
       get: (n: string) => h[n.toLowerCase()],
     });
+    // Eş adresi yerel (Coolify'ın Traefik'i ya da cloudflared): başlık
+    // Cloudflare'in yazdığı şey. Herkese açık bir eşten gelen aynı başlığın
+    // YOK SAYILDIĞI `check:security`'de — bu iddia tek başına o deliği
+    // görmüyordu ve aylarca yeşil kaldı.
     assert(
-      'Cloudflare arkasında gerçek istemci adresi okunuyor',
+      'yerel proxy arkasında gerçek istemci adresi okunuyor',
       clientIp(baslikli({ 'cf-connecting-ip': '203.0.113.9' }, '172.16.0.1')) === '203.0.113.9',
+    );
+    assert(
+      'herkese açık eşten gelen CF-Connecting-IP yok sayılıyor',
+      clientIp(baslikli({ 'cf-connecting-ip': '203.0.113.9' }, '198.51.100.4')) === '198.51.100.4',
     );
     assert(
       'Cloudflare yokken req.ip kullanılıyor',
@@ -1508,7 +1516,7 @@ void (async () => {
     const gizli = Buffer.from('test-secret');
     const jeton = issueToken(gizli, 1_000);
     assert('jeton çıkıştan önce geçerli', verifyToken(gizli, jeton, 2_000));
-    revokeToken(jeton, 2_000);
+    revokeToken(gizli, jeton, 2_000);
     assert('çıkıştan sonra jeton geçersiz', !verifyToken(gizli, jeton, 3_000));
     const jeton2 = issueToken(gizli, 1_500);
     assert('iptal yalnızca o jetonu kapsıyor', verifyToken(gizli, jeton2, 3_000));
