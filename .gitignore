@@ -37,17 +37,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# graphify — üretilen bilgi grafiği.
-#
-# Commit edilmiyor, üç sebeple: `.graphify_python` bu konteynerin yorumlayıcısına
-# giden mutlak bir yol taşıyor, `cache/` makineye özel, ve en önemlisi commit
-# edilmiş bir grafik kod değiştiği anda bayatlıyor — bayat grafik, olmayan
-# grafikten kötüdür çünkü var olmayan bir yapıyı kendinden emin anlatır.
-#
-# Konteyner her oturumda sıfırlandığı için grafik oturum başına yeniden kurulur:
-# `/graphify .` — AST kısmı deterministik ve LLM'siz, asıl maliyet birkaç
-# dokümanın semantik çıkarımı.
-graphify-out/
+# graphify — bilgi grafiği commit ediliyor (`graphify update .` ile yenilenir),
+# tarihli anlık görüntüleri edilmiyor.
+graphify-out/????-??-??/
 
 # SessionStart hook'unun indirdiği hesap seviyesi skiller.
 #
@@ -81,6 +73,8 @@ skills-lock.json
 # Her biri deponun tam bir kopyası ve kendi .git'ini taşıyor; commit'e girerse
 # gömülü depo uyarısı veriyor ve depoyu şişiriyor.
 .claude/worktrees/
+# Kişisel Claude Code ayarları; paylaşılan olan .claude/settings.json.
+.claude/settings.local.json
 
 .claude/skills/*
 !.claude/skills/NOTICE.md
