@@ -173,8 +173,9 @@ Gerekçeleri `AGENTS.md`'nin why log'unda.
 
 ## graphify
 
-- `graphify-out/` commit'li; tarihli yedek klasörleri (`graphify-out/????-??-??/`)
-  gitignore'da, `.gitattributes` hepsini `linguist-generated` işaretliyor.
+- `graphify-out/` commit'li; tarihli yedekler (`graphify-out/????-??-??/`), `cache/` ve
+  `manifest.json` gitignore'da (mtime taşıyorlar; grafik onlarsız da aynı çıkıyor).
+  `.gitattributes` hepsini `linguist-generated` işaretliyor.
   `.graphifyignore` `design-source/` ve `.claude/skills/`'i dışarıda tutuyor; tutmazsa
   tasarım dışa aktarımının yardımcıları (`get()`, `ImageSlot`) merkez düğümlerde
   `useContent()` / `useAppStore()`'un önüne geçiyor.

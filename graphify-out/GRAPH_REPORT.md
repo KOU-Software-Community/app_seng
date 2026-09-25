@@ -1,7 +1,7 @@
 # Graph Report - app_seng  (2026-09-25)
 
 ## Corpus Check
-- 209 files · ~261,579 words
+- 209 files · ~261,588 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 4, .ttf 4, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1b269b1b`
+- Built from commit: `69c80ec9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -453,9 +453,9 @@ Nodes (3): repository, type, url
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `ui.tsx` to `arsiv.tsx`, `package.json`, `store.ts`, `integration.test.tsx`, `mock/repositories.ts`, `useEnrichmentWarmup.ts`, `Pixel.tsx`, `data-access/hooks.ts`, `kayit-ol.tsx`, `FeedView.tsx`, `app/_layout.tsx`, `store.tsx`, `data.ts`, `etkinlik/[id].tsx`, `(tabs)/index.tsx`, `cekilis-kurallari.tsx`, `auth.ts`, `announcements.tsx`, `article-summary.test.tsx`, `notification-sync.test.tsx`?**
-  _High betweenness centrality (0.128) - this node is a cross-community bridge._
+  _High betweenness centrality (0.132) - this node is a cross-community bridge._
 - **Why does `err()` connect `supabase/repositories.ts` to `push.ts`, `check-panel.ts`, `demo-account.ts`, `server.ts`, `data-access/repositories.ts`, `mock/repositories.ts`, `export-registrations.ts`?**
-  _High betweenness centrality (0.112) - this node is a cross-community bridge._
+  _High betweenness centrality (0.111) - this node is a cross-community bridge._
 - **Why does `firebase-admin` connect `admin/certificates.ts` to `push.ts`, `check-panel.ts`, `accountApi.ts`, `demo-account.ts`, `server.ts`, `package.json`, `claims.ts`, `qr.ts`, `export-registrations.ts`?**
   _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `Txt()` (e.g. with `Conventions` and `Klasörler`) actually correct?**

@@ -20608,7 +20608,7 @@
       "node_kind": "heading",
       "norm_label": "git",
       "source_file": "CLAUDE.md",
-      "source_location": "L188"
+      "source_location": "L189"
     },
     {
       "id": "claude_i_\u00e7erik_giri\u015fi",
@@ -61059,7 +61059,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L188",
+      "source_location": "L189",
       "weight": 1.0
     },
     {
@@ -75166,7 +75166,7 @@
       "confidence_score": 0.95,
       "context": "useAppStore()",
       "source_file": "CLAUDE.md",
-      "source_location": "L180",
+      "source_location": "L181",
       "weight": 1.0
     },
     {
@@ -75202,7 +75202,7 @@
       "confidence_score": 0.95,
       "context": "useContent()",
       "source_file": "CLAUDE.md",
-      "source_location": "L180",
+      "source_location": "L181",
       "weight": 1.0
     },
     {
@@ -75351,5 +75351,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1b269b1b0f135d956020829d2c52584f87572656"
+  "built_at_commit": "69c80ec9e59b7d49af1c5142cfeb52af0ab45b8c"
 }

@@ -37,9 +37,13 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# graphify — bilgi grafiği commit ediliyor (`graphify update .` ile yenilenir),
-# tarihli anlık görüntüleri edilmiyor.
+# graphify — bilgi grafiği commit ediliyor (`graphify update .` ile yenilenir).
+# Tarihli yedekler, cache/ ve manifest.json edilmiyor: son ikisi dosya mtime'ı
+# taşıyor ve kod değişmese de her taze klonda diff üretiyor. Grafik onlarsız da
+# aynı çıkıyor; `update` bütün kodu her seferinde diskten yeniden çıkarıyor.
 graphify-out/????-??-??/
+graphify-out/cache/
+graphify-out/manifest.json
 
 # SessionStart hook'unun indirdiği hesap seviyesi skiller.
 #
