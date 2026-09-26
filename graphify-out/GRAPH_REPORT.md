@@ -1,17 +1,17 @@
 # Graph Report - app_seng  (2026-09-26)
 
 ## Corpus Check
-- 225 files · ~290,454 words
+- 226 files · ~290,737 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 4, .ttf 4, .example 1)
 
 ## Summary
-- 1972 nodes · 5230 edges · 88 communities (83 shown, 5 thin omitted)
+- 1976 nodes · 5238 edges · 94 communities (91 shown, 3 thin omitted)
 - Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 369 edges (avg confidence: 0.94)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6dda4b5f`
+- Built from commit: `8931862d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,8 +19,8 @@
 - push.ts
 - check-panel.ts
 - check-security.ts
-- etkinlik/[id].tsx
-- ui.tsx
+- cekilis/[id].tsx
+- Txt
 - server.ts
 - edge.ts
 - mock/repositories.ts
@@ -28,30 +28,30 @@
 - esc
 - expo
 - package.json
-- FeedView.tsx
+- store.ts
 - supabase/repositories.ts
 - env.ts
-- admin/certificates.ts
+- certificateDelivery.ts
 - vitrin.ts
 - dependencies
 - useEnrichmentWarmup.ts
 - pdf.ts
 - demo-account.ts
-- react-native
+- ui.tsx
 - devDependencies
 - Giriş sistemi, QR yoklama, sertifika — son plan
 - data-access/hooks.ts
-- qr.tsx
+- theme.ts
 - Load-bearing decisions — the why log
 - scripts
 - AI Gündem — taşıma planı
 - 2. Fikrin değerlendirmesi — zayıf noktalar
-- hesap.tsx
+- src/otp.ts
 - integration.test.tsx
 - raffleSchema.ts
 - kv.ts
 - check-event-schema.ts
-- QueryProvider.tsx
+- kayit-ol.tsx
 - eventSchema.ts
 - photos.ts
 - store.tsx
@@ -60,8 +60,8 @@
 - (tabs)/index.tsx
 - deploy-rules.mjs
 - sync-deps.mjs
-- ref_node_path
-- react-native-safe-area-context
+- types.ts
+- cekilis-kurallari.tsx
 - html.ts
 - check-rules.mjs
 - Task 6: Panel rotaları ve zamanlayıcı — `admin/vitrin.ts`
@@ -80,31 +80,37 @@
 - ref_node_fs
 - repository
 - firebase.ts
-- cursor.ts
+- enrichment-unavailable.test.tsx
 - readingText.ts
 - QrRoute
 - tsconfig.json
 - Güvenlik testlerinin değerlendirmesi — 2026-09-24
 - qrSchema.ts
 - allowScripts
-- notificationPlan.ts
-- mock/index.ts
+- ClubEvent
+- parseSourceUrl
 - session-start.sh
 - Dosya haritası
 - article-summary.test.tsx
 - vitrinSchema.ts
-- bugs
-- overrides
+- auth.ts
+- admin/certificates.ts
 - data.ts
-- summary-state.test.ts
-- notificationsView.ts
+- react
+- FeedView
 - notifications.tsx
 - 4. Uygulama
 - KOÜ Yazılım Kulübü — mobil uygulama (KOU SENG)
-- auth.ts
+- attendance.ts
+- duyuru/[id].tsx
+- KOÜ Yazılım Kulübü — agent notes
+- Mağazaya çıkarma
+- icons.test.ts
+- Yönetim paneli
+- Görseller
 
 ## God Nodes (most connected - your core abstractions)
-1. `react` - 66 edges
+1. `react` - 67 edges
 2. `react-native` - 47 edges
 3. `Txt()` - 43 edges
 4. `colors` - 41 edges
@@ -124,53 +130,53 @@
   docs/ai-gundem-port.md → admin/photos.ts
 - `6. Copilot incelemesinden (PR #74) — üç bulgu, üçü de doğru çıktı` --references--> `attendanceRows()`  [INFERRED]
   docs/guvenlik-testleri-degerlendirmesi.md → admin/qr.ts
-- `Task 5: Panel görünümü — `admin/vitrinView.ts`, menü, CSS` --references--> `page()`  [INFERRED]
-  docs/sponsorlar-ve-slider-plani.md → admin/views.ts
+- `5.1 Menü` --references--> `page()`  [INFERRED]
+  docs/sponsorlar-ve-slider-tasarimi.md → admin/views.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (88 total, 5 thin omitted)
+## Communities (94 total, 3 thin omitted)
 
 ### Community 0 - "push.ts"
-Cohesion: 0.09
-Nodes (49): alreadyAnnounced(), announce(), autoPushEnabled(), claimOnce(), deliver(), DeviceSummary, ExpoTicket, flushPending() (+41 more)
+Cohesion: 0.08
+Nodes (52): alreadyAnnounced(), announce(), autoPushEnabled(), claimOnce(), deliver(), DeviceSummary, ExpoTicket, flushPending() (+44 more)
 
 ### Community 1 - "check-panel.ts"
 Cohesion: 0.05
-Nodes (41): makeBelgeNo(), publishCertificates(), decideSend(), decideVerify(), hashCode(), kayit(), makeCode(), OTP_MAX_ATTEMPTS (+33 more)
+Nodes (38): decideSend(), decideVerify(), hashCode(), kayit(), makeCode(), OTP_MAX_ATTEMPTS, OTP_MAX_SENDS, OTP_RESEND_MS (+30 more)
 
 ### Community 2 - "check-security.ts"
-Cohesion: 0.07
-Nodes (38): AuthLike, AZURE_ENDPOINT, AZURE_MAX_CHARS, azureCevabiOku(), azureCevir(), azureConfig, azureKodunuOku(), CeviriSonuc (+30 more)
+Cohesion: 0.06
+Nodes (43): AuthLike, AZURE_ENDPOINT, AZURE_MAX_CHARS, azureCevabiOku(), azureCevir(), azureConfig, azureKodunuOku(), CeviriSonuc (+35 more)
 
-### Community 3 - "etkinlik/[id].tsx"
-Cohesion: 0.13
-Nodes (21): keyboardFor(), placeholderFor(), RaffleEntryRoute(), styles, EventDetailRoute(), initials(), styles, RegistrationDoneRoute() (+13 more)
+### Community 3 - "cekilis/[id].tsx"
+Cohesion: 0.12
+Nodes (20): Agent setup, BildirimAyarlariRoute(), keyboardFor(), placeholderFor(), RaffleEntryRoute(), styles, SplashRoute(), styles (+12 more)
 
-### Community 4 - "ui.tsx"
-Cohesion: 0.09
-Nodes (48): Conventions, styles, styles, styles, styles, ArsivRoute(), styles, styles (+40 more)
+### Community 4 - "Txt"
+Cohesion: 0.10
+Nodes (29): Conventions, ArsivRoute(), styles, styles, Tab, Kurallar ve tuzaklar, Global Constraints, 4.3 `/sponsorlar` (`app/sponsorlar.tsx`) (+21 more)
 
 ### Community 5 - "server.ts"
-Cohesion: 0.06
-Nodes (35): uploadEventPhoto(), parsePort(), resolvePort(), pendingSummary(), recentPushLog(), registeredNotPresent(), app, attempts (+27 more)
+Cohesion: 0.07
+Nodes (27): pdfDurumu, ACCEPTED_TYPES, parsePort(), resolvePort(), app, attempts, db, formDateTime() (+19 more)
 
 ### Community 6 - "edge.ts"
 Cohesion: 0.16
-Nodes (12): env, getRepositories(), src_gundem_data_access_index_repository_contract_version, resetRepositories(), callEdgeFunction(), CODE_MAP, EDGE_TIMEOUT_MS, EdgeCallOptions (+4 more)
+Nodes (11): callEdgeFunction(), CODE_MAP, EDGE_TIMEOUT_MS, EdgeCallOptions, EdgeConfig, EdgeErrorEnvelope, isEnvelope(), DataErrorCode (+3 more)
 
 ### Community 7 - "mock/repositories.ts"
-Cohesion: 0.09
-Nodes (36): src_gundem_data_access_mock_mapper_isaftercursor, AddSourceOptions, DEFAULT_PAGE_SIZE, DigestRepository, DigestRepositoryV1, EnrichmentRepository, EnrichmentRepositoryV1, FeedRepository (+28 more)
+Cohesion: 0.11
+Nodes (24): compareArticles(), src_gundem_data_access_mock_mapper_isaftercursor, MOCK_NOW_ISO, AddSourceOptions, DEFAULT_PAGE_SIZE, DigestRepository, DigestRepositoryV1, EnrichmentRepository (+16 more)
 
 ### Community 8 - "mock/mapper.ts"
 Cohesion: 0.08
-Nodes (30): compareArticles(), FEED_URLS, hasNoContent(), hoursAgoFromLabel(), isoFromLabel(), MOCK_NOW_ISO, MOCK_NOW_MS, mockDigest() (+22 more)
+Nodes (38): base64ToBytes(), bytesToBase64(), cursorOf(), decodeCursor(), encodeCursor(), isAfterCursor(), utf8Bytes(), utf8FromBytes() (+30 more)
 
 ### Community 9 - "esc"
-Cohesion: 0.15
-Nodes (28): durum(), sertifikaPage(), sertifikaYokPage(), deleteAccountPage(), legalPage(), privacyPage(), termsPage(), QrTanimi (+20 more)
+Cohesion: 0.10
+Nodes (39): durum(), sertifikaPage(), sertifikaYokPage(), deleteAccountPage(), legalPage(), privacyPage(), termsPage(), ceviriSatiri() (+31 more)
 
 ### Community 10 - "expo"
 Cohesion: 0.05
@@ -178,23 +184,23 @@ Nodes (40): backgroundColor, backgroundImage, foregroundImage, adaptiveIcon, blo
 
 ### Community 11 - "package.json"
 Cohesion: 0.05
-Nodes (37): author, description, license, main, name, private, version, expo (+29 more)
+Nodes (38): author, bugs, url, description, license, main, name, overrides (+30 more)
 
-### Community 12 - "FeedView.tsx"
-Cohesion: 0.09
-Nodes (53): AI Gündem portundan — bir çalışma zamanı, bir de kendi testine saklanan hatalar, GundemAraRoute(), Bu turda **bilerek** düzeltilmeyenler, P9 — grafiğe dayalı temizlik turu (2026-09-02), asDataError(), GateCandidate, GateResult, heldLineTr() (+45 more)
+### Community 12 - "store.ts"
+Cohesion: 0.16
+Nodes (34): GundemAraRoute(), useEnabledSources(), useLoaded(), useReadArticles(), useRecentSearches(), useSavedArticles(), useUserSettings(), clearRecentSearches() (+26 more)
 
 ### Community 13 - "supabase/repositories.ts"
 Cohesion: 0.11
-Nodes (37): @supabase/supabase-js, keysetFilter(), FEED_VIEW, getSupabaseClient(), PostgrestErrorLike, requireSupabaseClient(), SEARCH_RPC, toDataError() (+29 more)
+Nodes (38): @supabase/supabase-js, keysetFilter(), FEED_VIEW, getSupabaseClient(), PostgrestErrorLike, requireSupabaseClient(), SEARCH_RPC, toDataError() (+30 more)
 
 ### Community 14 - "env.ts"
 Cohesion: 0.09
 Nodes (24): Arka plan zenginleştirmesi ve yapılandırma görünürlüğü, blank, blankKeys, bogus, dev, devEmpty, forcedMock, KEYS (+16 more)
 
-### Community 15 - "admin/certificates.ts"
-Cohesion: 0.09
-Nodes (29): deliverCertificates(), dogrulamaUrl(), TeslimGirdisi, TeslimSonucu, esc(), RENK, sertifikaMaili(), SertifikaPostasi (+21 more)
+### Community 15 - "certificateDelivery.ts"
+Cohesion: 0.13
+Nodes (20): deliverCertificates(), dogrulamaUrl(), TeslimGirdisi, TeslimSonucu, esc(), RENK, sertifikaMaili(), SertifikaPostasi (+12 more)
 
 ### Community 16 - "vitrin.ts"
 Cohesion: 0.22
@@ -205,20 +211,20 @@ Cohesion: 0.06
 Nodes (34): dependencies, expo, expo-build-properties, expo-camera, expo-constants, expo-crypto, expo-dev-client, expo-device (+26 more)
 
 ### Community 18 - "useEnrichmentWarmup.ts"
-Cohesion: 0.13
-Nodes (23): clients, mockRequestEnrichment, mount(), QUEUED, READY, NOW, TODAY, delay() (+15 more)
+Cohesion: 0.11
+Nodes (25): FeedFilter, QUERY_KEY_VERSION, queryKeys, clients, mockRequestEnrichment, mount(), QUEUED, READY (+17 more)
 
 ### Community 19 - "pdf.ts"
 Cohesion: 0.11
-Nodes (26): adSinifi(), certificateHtml(), kareSiraso(), muhur(), RENK, SertifikaVerisi, yilOf(), bas() (+18 more)
+Nodes (25): adSinifi(), certificateHtml(), kareSiraso(), muhur(), RENK, SertifikaVerisi, yilOf(), bas() (+17 more)
 
 ### Community 20 - "demo-account.ts"
 Cohesion: 0.11
-Nodes (28): bizimMi(), claimIdentity(), ClaimResult, Kimlik, PHONE_CLAIMS, releaseIdentity(), sahibiysenSil(), sahiplen() (+20 more)
+Nodes (27): bizimMi(), claimIdentity(), ClaimResult, Kimlik, PHONE_CLAIMS, releaseIdentity(), sahibiysenSil(), sahiplen() (+19 more)
 
-### Community 21 - "react-native"
-Cohesion: 0.12
-Nodes (22): styles, styles, styles, styles, styles, TabBarProps, TABS, expo-linear-gradient (+14 more)
+### Community 21 - "ui.tsx"
+Cohesion: 0.09
+Nodes (27): styles, OnboardingRoute(), styles, styles, TabBarProps, TABS, PixelArt(), PixelIcon() (+19 more)
 
 ### Community 22 - "devDependencies"
 Cohesion: 0.09
@@ -229,16 +235,16 @@ Cohesion: 0.09
 Nodes (22): 1. Verilmiş kararlar, 2. Bu tasarım neyi güvence altına alıyor, neyi almıyor, 3.1 Sign in with Apple zorunlu değil — bir şartla, 3.2 Apple girişi dayatmamızı da istemiyor, 3.3 Hesap silme — Apple, 3.4 Hesap silme — Google Play, 3.5 Bizim tarafta ayrıca değişecekler, 3. Apple ve Google gerçekte ne şart koşuyor (+14 more)
 
 ### Community 24 - "data-access/hooks.ts"
-Cohesion: 0.25
-Nodes (17): GundemArticleRoute(), DataErrorThrown, ENRICHMENT_POLL_SCHEDULE_SECONDS, ENRICHMENT_POLL_WINDOW_SECONDS, enrichmentPollDelayMs(), enrichmentStalledMessage(), retryPolicy(), unwrap() (+9 more)
+Cohesion: 0.20
+Nodes (20): Bu turda **bilerek** düzeltilmeyenler, P9 — grafiğe dayalı temizlik turu (2026-09-02), asDataError(), DataErrorThrown, ENRICHMENT_POLL_SCHEDULE_SECONDS, ENRICHMENT_POLL_WINDOW_SECONDS, enrichmentPollDelayMs(), enrichmentStalledMessage() (+12 more)
 
-### Community 25 - "qr.tsx"
-Cohesion: 0.12
-Nodes (21): Agent setup, BildirimAyarlariRoute(), styles, SplashRoute(), OnboardingRoute(), Durum, styles, styles (+13 more)
+### Community 25 - "theme.ts"
+Cohesion: 0.17
+Nodes (25): styles, styles, styles, styles, styles, Durum, styles, styles (+17 more)
 
 ### Community 26 - "Load-bearing decisions — the why log"
-Cohesion: 0.11
-Nodes (18): AI Gündem — kaybolan kayıtlar, çeviri kaynağı ve Azure, Bir turda üç yanlış sayı — ölçmeden ayar değiştirmenin maliyeti, "Bunlar uygulamaya düşmeyecek dememiş miydik?" — kapının tutmadığı yer, Doğrulama postası, teklik ve OTP, Fotoğraf yüklerken 502 — Cloudflare cevabı yutuyordu, Supabase tıkanmıştı, Geçmişi silmek — ETag tuzağı ve telefondaki ölü kimlikler, Giriş sistemi — ölçülen iki çözümleme tuzağı, Herkese açık bir deponun kimliği — LICENSE, README ve About (+10 more)
+Cohesion: 0.12
+Nodes (17): Bir turda üç yanlış sayı — ölçmeden ayar değiştirmenin maliyeti, "Bunlar uygulamaya düşmeyecek dememiş miydik?" — kapının tutmadığı yer, Fotoğraf yüklerken 502 — Cloudflare cevabı yutuyordu, Supabase tıkanmıştı, Geçmişi silmek — ETag tuzağı ve telefondaki ölü kimlikler, Giriş sistemi — ölçülen iki çözümleme tuzağı, Herkese açık bir deponun kimliği — LICENSE, README ve About, "Hesabım yok aq" — yazılmış ama bağlanmamış bir ekranın maliyeti, İşi telefon yaratıyordu, sunucu değil — ve bu defterdeki bir satır yanlıştı (+9 more)
 
 ### Community 27 - "scripts"
 Cohesion: 0.08
@@ -252,53 +258,53 @@ Nodes (22): AI Gündem — taşıma planı, Bundan sonrası için, Doğrulanmam�
 Cohesion: 0.08
 Nodes (24): 1. Eski "hayır" neden geçersiz, ve yerine ne geliyor, 2.1 Asıl risk QR değil, sertifikadaki isim, 2.2 Ad, düzenlendiği an dondurulmalı, 2.3 Sertifika adresi kişisel veri taşıyor, 2.4 Bir insan, iki hesap, 2.5 Okutma anında giriş yoksa jeton kaybolmamalı, 2.6 Etkinlik salonunun internet'i, 2.7 Doğrulanmamış e-posta (+16 more)
 
-### Community 30 - "hesap.tsx"
-Cohesion: 0.10
-Nodes (36): styles, VerifyRoute(), LoginRoute(), styles, styles, BOS, styles, ResetPasswordRoute() (+28 more)
+### Community 30 - "src/otp.ts"
+Cohesion: 0.25
+Nodes (12): VerifyRoute(), ResetPasswordRoute(), OgrenciNo(), cagir(), kodDogrula(), kodIste(), ogrenciNoDegistir(), OtpError (+4 more)
 
 ### Community 31 - "integration.test.tsx"
 Cohesion: 0.10
-Nodes (18): @tanstack/react-query, @testing-library/react-native, clients, METRICS, mount(), Repositories, CONFIG, mockRepos (+10 more)
+Nodes (29): AI Gündem portundan — bir çalışma zamanı, bir de kendi testine saklanan hatalar, @tanstack/query-async-storage-persister, @tanstack/react-query, @tanstack/react-query-persist-client, @testing-library/react-native, clients, METRICS, mount() (+21 more)
 
 ### Community 32 - "raffleSchema.ts"
-Cohesion: 0.12
-Nodes (18): bad, base, FIELDS, NOW, picked, VALID, csvColumns(), DEFAULT_FIELDS (+10 more)
+Cohesion: 0.11
+Nodes (19): bad, base, FIELDS, NOW, picked, VALID, csvColumns(), DEFAULT_FIELDS (+11 more)
 
 ### Community 33 - "kv.ts"
-Cohesion: 0.16
-Nodes (11): Captured, TEST_CONFIG, generateDeviceId, getDeviceId(), isDeviceId(), randomBytes16(), randomUuidV4(), resetDeviceIdCache() (+3 more)
+Cohesion: 0.14
+Nodes (12): expo-crypto, Captured, TEST_CONFIG, generateDeviceId, getDeviceId(), isDeviceId(), randomBytes16(), randomUuidV4() (+4 more)
 
 ### Community 34 - "check-event-schema.ts"
-Cohesion: 0.08
-Nodes (23): broken, built, capped, dayBefore, EV1, EV1_INPUT, later, mart (+15 more)
+Cohesion: 0.09
+Nodes (21): broken, built, capped, dayBefore, EV1, EV1_INPUT, later, mart (+13 more)
 
-### Community 35 - "QueryProvider.tsx"
-Cohesion: 0.16
-Nodes (17): Üç ölü parça, üç ayrı ölüm biçimi, @tanstack/query-async-storage-persister, @tanstack/react-query-persist-client, FeedFilter, QUERY_KEY_VERSION, queryKeys, EnrichmentResponse, asyncStorageFromKv() (+9 more)
+### Community 35 - "kayit-ol.tsx"
+Cohesion: 0.17
+Nodes (23): Doğum tarihi kutusu — biçimlendirmenin girdiyi kilitlemesi, BOS, DateFields(), SignupRoute(), styles, ageOn(), DateParts, digits() (+15 more)
 
 ### Community 36 - "eventSchema.ts"
-Cohesion: 0.16
-Nodes (19): ArchiveCard(), EventFact, buildEvent(), BuildResult, daysInMonth(), EVENT_CATEGORIES, MAX_PHOTOS, MonthGrid (+11 more)
+Cohesion: 0.13
+Nodes (23): ArchiveCard(), İçerik girişi, EventFact, buildEvent(), BuildResult, daysInMonth(), EVENT_CATEGORIES, EventInput (+15 more)
 
 ### Community 37 - "photos.ts"
-Cohesion: 0.20
-Nodes (17): ACCEPTED_TYPES, bucketName(), deleteEventPhotos(), deleteFolder(), FOLDERS, isBucketMissing(), keyProblem(), MAX_UPLOAD_BYTES (+9 more)
+Cohesion: 0.24
+Nodes (16): bucketName(), deleteEventPhotos(), deleteFolder(), FOLDERS, isBucketMissing(), keyProblem(), MAX_UPLOAD_BYTES, missingBucketMessage() (+8 more)
 
 ### Community 38 - "store.tsx"
 Cohesion: 0.17
 Nodes (14): Apple'ın çekiliş reddinden — 5.3.1 / 5.3.2, NOTIFICATION_CATEGORIES, REMINDER_OPTIONS, AppStore, AppStoreProvider(), Ctx, defaultNotifications, defaultState (+6 more)
 
 ### Community 39 - "qr.ts"
-Cohesion: 0.24
-Nodes (14): ensureQr(), markAttendance(), pencereAlani(), pencereyiOku(), pencereyiYaz(), QR_COLLECTION, regenerateQr(), setQrWindow() (+6 more)
+Cohesion: 0.16
+Nodes (20): ATTENDANCE_COLLECTION, attendanceRows(), ensureQr(), markAttendance(), pencereAlani(), pencereyiOku(), pencereyiYaz(), QR_COLLECTION (+12 more)
 
 ### Community 40 - "Doğrulama ve teklik — plan ve kurulum"
 Cohesion: 0.13
 Nodes (14): 1. Ne zorlanıyor, ne zorlanmıyor, 2. Doğrulama neden Firebase'in bağlantısı değil, 3. Akış, 4.1 DNS, 4.2 Gönderen hesap, 4.3 Panel ortam değişkenleri, 4.4 Gövdenin kendisi, 4. Postanın gerçekten ulaşması — operatörün işi (+6 more)
 
 ### Community 41 - "(tabs)/index.tsx"
-Cohesion: 0.11
-Nodes (16): SponsorRoute(), styles, Task 9: Slider bileşeni — `src/components/HomeSlider.tsx`, 4.2 Ana sayfa (`app/(tabs)/index.tsx`), Announcement, src_announcements_announcement, HomeSlider(), KICKER (+8 more)
+Cohesion: 0.08
+Nodes (37): EventDetailRoute(), initials(), styles, SponsorRoute(), styles, HomeRoute(), styles, GridView() (+29 more)
 
 ### Community 42 - "deploy-rules.mjs"
 Cohesion: 0.25
@@ -308,45 +314,45 @@ Nodes (6): ref_node_child_process, ref_node_url, cli, projectId, result, root
 Cohesion: 0.15
 Nodes (16): bundled, changes, compare(), deps(), install(), installed(), latestPatch(), left (+8 more)
 
-### Community 44 - "ref_node_path"
-Cohesion: 0.36
-Nodes (7): asBase64Json(), asJson(), parseServiceAccount(), ServiceAccount, loadServiceAccount(), ref_node_path, parsed()
+### Community 44 - "types.ts"
+Cohesion: 0.17
+Nodes (15): env, getRepositories(), src_gundem_data_access_index_repository_contract_version, resetRepositories(), REPOSITORY_CONTRACT_VERSION, createUnconfiguredRepositories(), Digest, DigestId (+7 more)
 
-### Community 45 - "react-native-safe-area-context"
-Cohesion: 0.19
-Nodes (15): RaffleRulesRoute(), styles, react-native-safe-area-context, RaffleNotice(), styles, APPLE_DISCLAIMER, OFFICIAL_RULES, ORGANIZER_LINE (+7 more)
+### Community 45 - "cekilis-kurallari.tsx"
+Cohesion: 0.20
+Nodes (14): RaffleRulesRoute(), styles, RaffleNotice(), styles, APPLE_DISCLAIMER, OFFICIAL_RULES, ORGANIZER_LINE, RAFFLE_CLUB (+6 more)
 
 ### Community 46 - "html.ts"
 Cohesion: 0.16
 Nodes (13): a, b, Block, BLOCK_ENDING, decodeEntities(), DROPPED, htmlToPlainText(), InlineRun (+5 more)
 
 ### Community 47 - "check-rules.mjs"
-Cohesion: 0.15
-Nodes (11): 2. Yeni testler, 5. Testin kendisinden çıkan dersler, ref_node_os, assert(), emu, izin(), JAR, KURALLAR (+3 more)
+Cohesion: 0.17
+Nodes (9): ref_node_os, assert(), emu, izin(), JAR, KURALLAR, red(), sonuc() (+1 more)
 
 ### Community 48 - "Task 6: Panel rotaları ve zamanlayıcı — `admin/vitrin.ts`"
-Cohesion: 0.20
-Nodes (17): choiceOptions(), ChoiceRow, COPY, deleteForm(), formatDay(), imageBlock(), moveForm(), positionOptions() (+9 more)
+Cohesion: 0.21
+Nodes (16): choiceOptions(), ChoiceRow, COPY, deleteForm(), formatDay(), imageBlock(), moveForm(), positionOptions() (+8 more)
 
 ### Community 49 - "make-icons.py"
 Cohesion: 0.20
 Nodes (15): Image, pathlib, pil, feature_graphic(), first_line_box(), main(), notification_icon(), play_icon() (+7 more)
 
 ### Community 50 - "accountApi.ts"
-Cohesion: 0.09
-Nodes (43): bearer(), gunlukTavan(), Kim, kimlikCoz(), kodLimiti, numaraLimiti, otpOku(), registerAccountApi() (+35 more)
+Cohesion: 0.15
+Nodes (20): bearer(), gunlukTavan(), Kim, kimlikCoz(), kodLimiti, numaraLimiti, otpOku(), registerAccountApi() (+12 more)
 
 ### Community 51 - "getDb"
-Cohesion: 0.28
-Nodes (15): Veri: kim neyi okuyor, kim yazıyor, Task 8: Veri hook'ları — `SponsorsProvider`, `useSlides`, 4.1 Okuma ve durum, Dosyalar, YoklamaHatasi, yoklamaVer(), loadProfile(), fetchContent() (+7 more)
+Cohesion: 0.20
+Nodes (18): From the 1.1.0 release, Veri: kim neyi okuyor, kim yazıyor, Bildirimler nereden çıkıyor, Dosyalar, EAS derlemelerinde, Firebase, Kurulum (tek seferlik, 3 adım), Neler bağlı (+10 more)
 
 ### Community 52 - "check-release.mjs"
 Cohesion: 0.20
 Nodes (9): Faz 1 — kimlik altyapısı, UI yok, failed, json(), pkg, read(), results, root, rulesBlock() (+1 more)
 
 ### Community 53 - "hermes-safe.test.ts"
-Cohesion: 0.21
-Nodes (13): Bildirim otomasyonu — kime, neye göre, ve neyin gitmemesi gerektiği, GundemRoute(), isTab(), Klasörler, clubCalendar(), clubHour(), ABSOLUTE_AFTER_DAYS, absoluteTr() (+5 more)
+Cohesion: 0.26
+Nodes (10): GundemRoute(), isTab(), clubCalendar(), ABSOLUTE_AFTER_DAYS, absoluteTr(), calendarDaysBetween(), MONTHS_TR, relativeTimeTr() (+2 more)
 
 ### Community 54 - "8. Fazlar"
 Cohesion: 0.33
@@ -361,40 +367,40 @@ Cohesion: 0.29
 Nodes (7): csvCell(), RFC-4180, dotenv, arg(), COLUMNS, loadServiceAccount(), main()
 
 ### Community 57 - "README.md"
-Cohesion: 0.05
-Nodes (35): Checks, Dağıtım yüzeyleri — her değişiklik bunlardan birine düşüyor, KOÜ Yazılım Kulübü — agent notes, Layout, Working rules, Arşiv paneli, Bildirimler, Bildirimler nereden çıkıyor (+27 more)
+Cohesion: 0.15
+Nodes (12): Arşiv paneli, Bildirimler, Ekranlar, Gerekenler, Katkı, Lisans, Ne yapıyor, Proje yapısı (+4 more)
 
 ### Community 58 - "useFallbackTranslation.ts"
-Cohesion: 0.27
-Nodes (6): useFallbackTranslation(), YedekCeviri, yedekGerekli(), CeviriYok, PanelCeviri, panelCevirisi()
+Cohesion: 0.13
+Nodes (14): AI Gündem — kaybolan kayıtlar, çeviri kaynağı ve Azure, GundemArticleRoute(), PANEL_BASE_URL, bodyFor(), hasSummary(), Segment, segmentState(), useFallbackTranslation() (+6 more)
 
 ### Community 59 - "announcements.tsx"
-Cohesion: 0.08
-Nodes (29): AnnouncementRoute(), AnnouncementRow(), 1. Kapsam, 3.1 `sponsors/{id}`, 3.2 `slides/{id}`, 3.3 Ayrıştırma ve doğrulama, 3.4 Sıralama, görünürlük, silinme, 3.5 Kurallar (+21 more)
+Cohesion: 0.16
+Nodes (15): 3.1 `sponsors/{id}`, 3.2 `slides/{id}`, 3.3 Ayrıştırma ve doğrulama, 3.4 Sıralama, görünürlük, silinme, 3.5 Kurallar, 3. Veri modeli, fetchAnnouncement(), fetchAnnouncements() (+7 more)
 
 ### Community 60 - "notification-sync.test.tsx"
 Cohesion: 0.40
 Nodes (4): mockGetExpoPushToken, mockUpsertDevice, { NotificationSync }, prefs
 
 ### Community 61 - "ref_node_fs"
-Cohesion: 0.22
-Nodes (7): ref_node_fs, app, OPTIONAL, ortak, panel, root, servisHesabiDosyasi
+Cohesion: 0.15
+Nodes (14): asBase64Json(), asJson(), parseServiceAccount(), ServiceAccount, loadServiceAccount(), ref_node_fs, ref_node_path, app (+6 more)
 
 ### Community 62 - "repository"
 Cohesion: 0.67
 Nodes (3): repository, type, url
 
 ### Community 63 - "firebase.ts"
-Cohesion: 0.10
-Nodes (24): SponsorsRoute(), expo-font, @expo-google-fonts/plus-jakarta-sans, @expo-google-fonts/press-start-2p, expo-splash-screen, expo-status-bar, ContentProvider(), ContentSource (+16 more)
+Cohesion: 0.17
+Nodes (12): expo-font, @expo-google-fonts/plus-jakarta-sans, @expo-google-fonts/press-start-2p, expo-splash-screen, expo-status-bar, RegistrationPayload, FIREBASE_SETUP_HINT, firebaseConfig (+4 more)
 
-### Community 64 - "cursor.ts"
-Cohesion: 0.24
-Nodes (12): base64ToBytes(), bytesToBase64(), cursorOf(), decodeCursor(), encodeCursor(), isAfterCursor(), utf8Bytes(), utf8FromBytes() (+4 more)
+### Community 64 - "enrichment-unavailable.test.tsx"
+Cohesion: 0.20
+Nodes (13): createMockRepositories(), mockArticles(), NO_CONTENT_ARTICLE, createMockDigestRepository(), createMockEnrichmentRepository(), createMockFeedRepository(), createMockSourceRepository(), Repositories (+5 more)
 
 ### Community 65 - "readingText.ts"
-Cohesion: 0.26
-Nodes (9): Cihazdan gelen "çeviri gelmiş ama özet oluşturamıyor" raporundan, Sekiz piksellik bir glif yolu okunarak değerlendirilemez, readingTimeTr(), toParagraphs(), wordCount(), WORDS_PER_MINUTE, ArticleBody(), rowRuns() (+1 more)
+Cohesion: 0.46
+Nodes (6): Cihazdan gelen "çeviri gelmiş ama özet oluşturamıyor" raporundan, readingTimeTr(), toParagraphs(), wordCount(), WORDS_PER_MINUTE, ArticleBody()
 
 ### Community 66 - "QrRoute"
 Cohesion: 0.27
@@ -405,84 +411,116 @@ Cohesion: 0.29
 Nodes (6): expo/tsconfig.base, compilerOptions, strict, types, extends, include
 
 ### Community 68 - "Güvenlik testlerinin değerlendirmesi — 2026-09-24"
-Cohesion: 0.17
-Nodes (10): panelKoku(), 1. Mevcut testler ne ölçüyordu, 3. Karşılaştırma: aynı testler eski koda karşı, 4. Bulgular, 6. Copilot incelemesinden (PR #74) — üç bulgu, üçü de doğru çıktı, 7. Dağıtım yüzeyleri — bu tur neye dokundu, Güvenlik testlerinin değerlendirmesi — 2026-09-24, Kapatılmayan, bilerek (+2 more)
+Cohesion: 0.20
+Nodes (8): 1. Mevcut testler ne ölçüyordu, 2. Yeni testler, 3. Karşılaştırma: aynı testler eski koda karşı, 5. Testin kendisinden çıkan dersler, 6. Copilot incelemesinden (PR #74) — üç bulgu, üçü de doğru çıktı, 7. Dağıtım yüzeyleri — bu tur neye dokundu, Güvenlik testlerinin değerlendirmesi — 2026-09-24, safeNext()
 
 ### Community 69 - "qrSchema.ts"
-Cohesion: 0.21
-Nodes (11): QR penceresi hiç açılmadı — bir tip uyuşmazlığı, sıfır hata mesajı, joinLocal(), LOCAL_OFFSET, defaultWindow(), pad(), QR_ACILIS_SAAT, QR_ALPHABET, QR_TOKEN_LENGTH (+3 more)
+Cohesion: 0.16
+Nodes (14): QR penceresi hiç açılmadı — bir tip uyuşmazlığı, sıfır hata mesajı, Klasörler, clubHour(), joinLocal(), LOCAL_OFFSET, defaultWindow(), pad(), Pencere (+6 more)
 
 ### Community 70 - "allowScripts"
 Cohesion: 0.40
 Nodes (5): allowScripts, esbuild, @firebase/util, fsevents, protobufjs
 
-### Community 71 - "notificationPlan.ts"
-Cohesion: 0.27
-Nodes (8): DIGEST_HOURS, applyQuietHours(), DIGEST_CATEGORY, isDigestHour(), PlannedNotification, planNotifications(), REMINDER_CATEGORY, reminderOffsetMs()
+### Community 71 - "ClubEvent"
+Cohesion: 0.25
+Nodes (10): ClubEvent, applyQuietHours(), DIGEST_CATEGORY, isDigestHour(), PlannedNotification, planNotifications(), REMINDER_CATEGORY, reminderOffsetMs() (+2 more)
 
-### Community 72 - "mock/index.ts"
-Cohesion: 0.19
-Nodes (16): RFC-3986, Task 1: Ortak şema — `src/vitrinSchema.ts`, createMockRepositories(), mockArticles(), createMockDigestRepository(), createMockEnrichmentRepository(), createMockFeedRepository(), createMockSourceRepository() (+8 more)
+### Community 72 - "parseSourceUrl"
+Cohesion: 0.29
+Nodes (8): RFC-3986, Task 1: Ortak şema — `src/vitrinSchema.ts`, asciiLower(), hasForbiddenHostChar(), invalid(), ParsedSourceUrl, parseSourceUrl(), SourceUrlProblem
 
 ### Community 74 - "Dosya haritası"
-Cohesion: 0.19
-Nodes (14): HomeRoute(), Dosya haritası, Review Focus, Sponsorlar ve ana sayfa slider'ı — uygulama planı, Task 10: Ana sayfa — slider, Sponsorlarımız, yenileme, Task 11: Sponsor ekranları — `/sponsorlar`, `/sponsor/[id]`, Task 12: "Ödülü sağlayan" — `PrizeProviders`, Task 14: `check:release` kapsamı, belgeler, tam doğrulama (+6 more)
+Cohesion: 0.22
+Nodes (17): Dosya haritası, Review Focus, Sponsorlar ve ana sayfa slider'ı — uygulama planı, Task 14: `check:release` kapsamı, belgeler, tam doğrulama, Task 2: Firestore — kurallar, `check:rules`, okuma fonksiyonları, Task 3: Panel sıralaması — `admin/ordering.ts`, Task 7: Tema, `PhotoSlot`, iletişim adresi, Task 8: Veri hook'ları — `SponsorsProvider`, `useSlides` (+9 more)
 
 ### Community 75 - "article-summary.test.tsx"
 Cohesion: 0.29
 Nodes (9): clients, enrichedRow(), fakePostgrest(), LONG_BODY, memoryKv(), METRICS, mount(), stubEdge() (+1 more)
 
 ### Community 78 - "vitrinSchema.ts"
-Cohesion: 0.19
-Nodes (24): Task 2: Firestore — kurallar, `check:rules`, okuma fonksiyonları, 2. Kaynak metinden ayrıldığımız yerler, 5.4 Sunucu, 7. Test ve kontroller, Build, buildSlide(), buildSponsor(), byOrder() (+16 more)
+Cohesion: 0.23
+Nodes (19): 5.4 Sunucu, 7. Test ve kontroller, Build, buildSlide(), buildSponsor(), expiredSlideIds(), https(), idList() (+11 more)
+
+### Community 79 - "auth.ts"
+Cohesion: 0.26
+Nodes (14): LoginRoute(), HesapSilRoute(), normalizeEmail(), toProfile(), authErrorMessage(), deletionDone(), finishAccountDeletion(), getAuthClient() (+6 more)
+
+### Community 80 - "admin/certificates.ts"
+Cohesion: 0.16
+Nodes (12): BELGE_NO_UZUNLUK, BulunanSertifika, findCertificate(), makeBelgeNo(), publishCertificates(), revokeCertificate(), SertifikaKaydi, YayinGirdisi (+4 more)
 
 ### Community 81 - "data.ts"
-Cohesion: 0.15
-Nodes (11): ACCOUNT_DELETE_URL, ARCHIVE_CATEGORIES, DEPARTMENTS, LEGAL_BASE, NotificationCategory, ONBOARDING, OnboardingPage, PANEL_BASE_URL (+3 more)
+Cohesion: 0.08
+Nodes (26): RegistrationRoute(), styles, HesapRoute(), styles, src_auth_user, AuthState, Ctx, useAuth() (+18 more)
 
-### Community 82 - "summary-state.test.ts"
+### Community 82 - "react"
+Cohesion: 0.19
+Nodes (8): SponsorsRoute(), styles, react, styles, SPONSOR_CONTACT_EMAIL, ./firebase, mockPush, METRICS
+
+### Community 83 - "FeedView"
 Cohesion: 0.27
-Nodes (6): bodyFor(), hasSummary(), Segment, segmentState(), CONFIG, ArticleSummary
-
-### Community 83 - "notificationsView.ts"
-Cohesion: 0.29
-Nodes (9): ceviriSatiri(), DeviceSummary, LogRow, MailStatus, notificationsPage(), num(), PendingRow, when() (+1 more)
+Nodes (9): GateCandidate, GateResult, heldLineTr(), HOLD_WINDOW_MINUTES, holdUnenriched(), article(), minutesAgo(), NOW (+1 more)
 
 ### Community 84 - "notifications.tsx"
-Cohesion: 0.31
-Nodes (8): Bildirim gelmedi, nereye bakılır, ClubEvent, ensureAndroidChannel(), NotificationSync(), requestPushToken(), rescheduleReminders(), NotificationPrefs, Registration
+Cohesion: 0.24
+Nodes (10): Bildirim gelmedi, nereye bakılır, expo-constants, expo-device, expo-notifications, DeviceRecord, ensureAndroidChannel(), lazyUpsertDevice(), NotificationSync() (+2 more)
 
 ### Community 85 - "4. Uygulama"
-Cohesion: 0.25
-Nodes (8): SatirLink(), Task 13: Hesabım — KULÜP grubu, 4.5 Etkinlik detayı — "Ödülü sağlayan", 4.6 Hesabım (`app/(tabs)/hesap.tsx`), 4.7 Rotalar, 4.8 Tema ve ortak bileşenler, 4.9 Yenileme göstergesi, 4. Uygulama
+Cohesion: 0.10
+Nodes (19): SatirLink(), Task 13: Hesabım — KULÜP grubu, 1. Kapsam, 2. Kaynak metinden ayrıldığımız yerler, 4.5 Etkinlik detayı — "Ödülü sağlayan", 4.6 Hesabım (`app/(tabs)/hesap.tsx`), 4.8 Tema ve ortak bileşenler, 4.9 Yenileme göstergesi (+11 more)
 
 ### Community 86 - "KOÜ Yazılım Kulübü — mobil uygulama (KOU SENG)"
-Cohesion: 0.25
-Nodes (7): Dağıtım yüzeyleri, Git, İçerik girişi, Komutlar, KOÜ Yazılım Kulübü — mobil uygulama (KOU SENG), Stack, Yasaklar
+Cohesion: 0.29
+Nodes (6): Dağıtım yüzeyleri, Git, Komutlar, KOÜ Yazılım Kulübü — mobil uygulama (KOU SENG), Stack, Yasaklar
 
-### Community 87 - "auth.ts"
-Cohesion: 0.13
-Nodes (23): HesapSilRoute(), CertificatesRoute(), firebase, yoklamaMesaji(), YoklamaSonucu, yoklamaVarMi(), currentUser(), deletionDone() (+15 more)
+### Community 87 - "attendance.ts"
+Cohesion: 0.15
+Nodes (16): CertificatesRoute(), firebase, YoklamaHatasi, yoklamaMesaji(), YoklamaSonucu, yoklamaVarMi(), yoklamaVer(), currentUser() (+8 more)
+
+### Community 88 - "duyuru/[id].tsx"
+Cohesion: 0.24
+Nodes (8): AnnouncementRoute(), styles, AnnouncementRow(), Announcement, src_announcements_announcement, src_announcements_fetchannouncement, formatAnnouncementDate(), RichText()
+
+### Community 89 - "KOÜ Yazılım Kulübü — agent notes"
+Cohesion: 0.33
+Nodes (5): Checks, Dağıtım yüzeyleri — her değişiklik bunlardan birine düşüyor, KOÜ Yazılım Kulübü — agent notes, Layout, Working rules
+
+### Community 90 - "Mağazaya çıkarma"
+Cohesion: 0.33
+Nodes (6): Build'e hangi değerler giriyor, İkonlar ve mağaza görselleri, Mağazaya çıkarma, "Otomatik artsın" isteniyorsa, Sürüm ne zaman elle artırılır, Sürüm numaraları
+
+### Community 91 - "icons.test.ts"
+Cohesion: 0.67
+Nodes (3): Sekiz piksellik bir glif yolu okunarak değerlendirilemez, rowRuns(), rowWidths()
+
+### Community 92 - "Yönetim paneli"
+Cohesion: 0.50
+Nodes (4): Neden var, Panelin ortam değişkenleri, Sunucuya koyarken, Yönetim paneli
+
+### Community 93 - "Görseller"
+Cohesion: 0.67
+Nodes (3): Görseller, Kurulum, Neden Firebase Storage değil
 
 ## Knowledge Gaps
-- **621 isolated node(s):** `session-start.sh script`, `PATH`, `kodLimiti`, `sifreGonderLimiti`, `sifreDegistirLimiti` (+616 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 768 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **623 isolated node(s):** `session-start.sh script`, `PATH`, `kodLimiti`, `sifreGonderLimiti`, `sifreDegistirLimiti` (+618 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 771 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `ui.tsx` to `etkinlik/[id].tsx`, `QueryProvider.tsx`, `store.tsx`, `(tabs)/index.tsx`, `package.json`, `FeedView.tsx`, `react-native-safe-area-context`, `article-summary.test.tsx`, `notification-sync.test.tsx`, `useEnrichmentWarmup.ts`, `notifications.tsx`, `react-native`, `data-access/hooks.ts`, `qr.tsx`, `announcements.tsx`, `integration.test.tsx`, `hesap.tsx`, `firebase.ts`?**
-  _High betweenness centrality (0.135) - this node is a cross-community bridge._
-- **Why does `err()` connect `supabase/repositories.ts` to `push.ts`, `check-panel.ts`, `server.ts`, `edge.ts`, `mock/repositories.ts`, `mock/index.ts`, `demo-account.ts`, `export-registrations.ts`?**
-  _High betweenness centrality (0.084) - this node is a cross-community bridge._
-- **Why does `ClubEvent` connect `notifications.tsx` to `push.ts`, `check-event-schema.ts`, `ui.tsx`, `server.ts`, `eventSchema.ts`, `notificationPlan.ts`, `mock/index.ts`, `(tabs)/index.tsx`, `vitrinSchema.ts`, `vitrin.ts`, `data.ts`, `firebase.ts`, `qr.tsx`, `2. Fikrin değerlendirmesi — zayıf noktalar`, `README.md`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `cekilis/[id].tsx`, `Txt`, `package.json`, `store.ts`, `useEnrichmentWarmup.ts`, `ui.tsx`, `data-access/hooks.ts`, `theme.ts`, `integration.test.tsx`, `kayit-ol.tsx`, `store.tsx`, `(tabs)/index.tsx`, `cekilis-kurallari.tsx`, `announcements.tsx`, `notification-sync.test.tsx`, `firebase.ts`, `enrichment-unavailable.test.tsx`, `Dosya haritası`, `article-summary.test.tsx`, `data.ts`, `notifications.tsx`, `duyuru/[id].tsx`?**
+  _High betweenness centrality (0.126) - this node is a cross-community bridge._
+- **Why does `err()` connect `supabase/repositories.ts` to `push.ts`, `check-panel.ts`, `enrichment-unavailable.test.tsx`, `server.ts`, `edge.ts`, `mock/repositories.ts`, `types.ts`, `demo-account.ts`, `export-registrations.ts`?**
+  _High betweenness centrality (0.083) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `dependencies` to `package.json`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `Txt()` (e.g. with `Conventions` and `Klasörler`) actually correct?**
   _`Txt()` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `session-start.sh script`, `PATH`, `kodLimiti` to the rest of the system?**
-  _621 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _623 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `push.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0859538784067086 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07894736842105263 - nodes in this community are weakly interconnected._
 - **Should `check-panel.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.045739348370927316 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.047519217330538085 - nodes in this community are weakly interconnected._

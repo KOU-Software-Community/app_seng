@@ -387,6 +387,8 @@ function SatirLink({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      // Etiket verilince RN çocuk metinleri okumayı bırakıyor; ipucu ayrıca verilmezse kaybolur.
+      accessibilityHint={hint}
       style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
     >
       <View style={styles.linkIcon}>
