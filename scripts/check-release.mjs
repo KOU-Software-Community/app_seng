@@ -1814,6 +1814,58 @@ check(
 );
 
 check(
+  'vitrin paneli bağlı ve yetim dosya bırakmıyor',
+  'Slayt ve sponsor sayfaları panelin giriş duvarının arkasında olmalı; önüne ' +
+    'düşerlerse kulübün ana sayfasını herkes değiştirebilir. Süresi dolan slaytı ' +
+    'silen zamanlayıcı başlamazsa bitiş tarihi uygulamada çalışır ama slayt ' +
+    'veritabanında ve görseli bucket’ta sonsuza kadar kalır — ikisi de sessiz.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (!existsSync(join(root, 'admin/vitrin.ts'))) return 'admin/vitrin.ts yok';
+    const server = strip(read('admin/server.ts'));
+    const guard = server.indexOf('app.use(requireAuth)');
+    const at = server.indexOf('registerVitrin(app');
+    if (at < 0) return 'admin/server.ts vitrin rotalarını kurmuyor';
+    if (guard < 0 || at < guard) return 'vitrin rotaları requireAuth’tan ÖNCE kurulmuş — giriş istemez';
+    if (!/startSlideSweeper\(db\)/.test(server)) return 'süresi dolan slaytları silen zamanlayıcı başlamıyor';
+
+    const vitrin = strip(read('admin/vitrin.ts'));
+    if (!/deleteFolder\(kind\.col, /.test(vitrin)) return 'silinen öğenin görsel klasörü silinmiyor';
+    if (!/deleteFolder\('slides', /.test(vitrin)) return 'zamanlayıcı sildiği slaytın görselini bırakıyor';
+    if (!/deletePhotos\(\[uploaded\]\)/.test(vitrin)) return 'kayıt düşünce yüklenen görsel geri alınmıyor';
+    return null;
+  },
+);
+
+check(
+  'sponsor ekranları bağlı',
+  'Ekranın var olması ona gidilebildiği anlamına gelmiyor — bu depo aynı hatayı ' +
+    'giriş ekranlarında ve sertifikalarda yaşadı. Kopan halkanın belirtisi bir hata ' +
+    'değil, görünmeyen bir bölüm: panelden veri girilir, uygulamada hiçbir şey çıkmaz.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    for (const f of ['app/sponsorlar.tsx', 'app/sponsor/[id].tsx']) {
+      if (!existsSync(join(root, f))) return `${f} yok`;
+    }
+    const layout = strip(read('app/_layout.tsx'));
+    if (!/name="sponsorlar"/.test(layout)) return 'sponsorlar rotası kök yığına kayıtlı değil';
+    if (!/name="sponsor\/\[id\]"/.test(layout)) return 'sponsor/[id] rotası kök yığına kayıtlı değil';
+    if (!/<SponsorsProvider\b/.test(layout)) return 'SponsorsProvider mount edilmiyor';
+
+    const hesap = strip(read('app/(tabs)/hesap.tsx'));
+    if (!/['"`]\/sponsorlar['"`]/.test(hesap)) return 'Hesabım sponsorlar ekranına bağlanmıyor';
+
+    const ana = strip(read('app/(tabs)/index.tsx'));
+    if (!/<HomeSlider\b/.test(ana)) return 'ana sayfa slider’ı çizmiyor';
+    if (!/['"`]\/sponsorlar['"`]/.test(ana)) return 'ana sayfa sponsorlar ekranına bağlanmıyor';
+
+    const etkinlik = strip(read('app/etkinlik/[id].tsx'));
+    if (!/<PrizeProviders\b/.test(etkinlik)) return 'etkinlik detayı "Ödülü sağlayan" etiketini çizmiyor';
+    return null;
+  },
+);
+
+check(
   'panel 502/504 dönmüyor',
   'Panel Cloudflare arkasında ve Cloudflare origin\u2019in 502/504 cevabını kendi ' +
     '"Bad gateway" sayfasıyla değiştiriyor, gövdeyi atıyor. Görsel yükleme hatası bu ' +

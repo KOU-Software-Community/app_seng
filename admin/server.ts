@@ -75,6 +75,7 @@ import {
   pushLogId,
 } from '../src/pushPolicy';
 import { startDeletionSweeper } from './deletion';
+import { registerVitrin, startSlideSweeper } from './vitrin';
 import { registerAccountApi } from './accountApi';
 import { ceviriDurumSatiri, ceviriSagligi, registerTranslateApi } from './translateApi';
 import { certificateHtml } from './certificate';
@@ -491,6 +492,10 @@ registerAccountApi(app, db);
 registerTranslateApi(app);
 
 app.use(requireAuth);
+
+// Vitrin: slider ve sponsorlar. Giriş duvarının ARKASINDA — kulübün ana
+// sayfasını değiştiren sayfalar (check:release tutuyor).
+registerVitrin(app, db, upload);
 
 // ------------------------------------------------------------- etkinlikler
 
@@ -1655,6 +1660,9 @@ app.listen(PORT, () => {
   // Hesap silme temizliği. Cloud Functions olmadığı için (Blaze istiyor) bu
   // iş panelin üçüncü yoklayıcısı; Apple silmenin tamamlanmasını istiyor.
   startDeletionSweeper(db);
+  // Süresi dolan slaytları ve görsellerini silen dördüncü yoklayıcı. Uygulama
+  // bitiş tarihini kendisi de süzüyor; bu, veritabanını ve bucket'ı temizliyor.
+  startSlideSweeper(db);
 
   // SERTİFİKA PDF'İ AÇILIŞTA BİR KEZ BASILIYOR, ve bu satırın varlık sebebi
   // şu: Chromium'lu bir panel boot'ta ÖLMÜYOR. Süreç açılıyor, sağlık

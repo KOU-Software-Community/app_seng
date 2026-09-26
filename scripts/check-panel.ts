@@ -28,7 +28,9 @@ import {
   sameOrigin,
   verifyToken,
 } from '../admin/session';
-import { isBucketMissing, keyProblem } from '../admin/photos';
+import { isBucketMissing, keyProblem, pathFromUrl } from '../admin/photos';
+import { moveBy, placeAt, sameMembers } from '../admin/ordering';
+import { formatDay, slideForm, sponsorForm, vitrinList } from '../admin/vitrinView';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
 import { ceviriSagligi, registerTranslateApi } from '../admin/translateApi';
@@ -435,6 +437,79 @@ const fakeFetch = (status: string) =>
     }) as unknown as Response) as unknown as typeof fetch;
 
 const NOW = new Date('2026-09-10T12:00:00+03:00');
+
+// ------------------------------------------------------------- vitrin sırası
+// Sıra 1…n ve boşluksuz. "Yeni bir şeyi 1 numara yaparsak diğerleri kaysın" —
+// kullanıcının tarifi; yerleştirme, taşıma ve sürükle-bırakın kabulü burada.
+{
+  const j = (ids: string[]) => ids.join(',');
+  assert('yeni öğe 1. sıraya konunca diğerleri kayıyor', j(placeAt(['a', 'b', 'c'], 'd', 1)) === 'd,a,b,c');
+  assert('var olan öğe başa alınınca diğerleri kayıyor', j(placeAt(['a', 'b', 'c'], 'c', 1)) === 'c,a,b');
+  assert('öğe ortaya konabiliyor', j(placeAt(['a', 'b', 'c'], 'a', 2)) === 'b,a,c');
+  assert('aralık dışı büyük sıra sona sıkışıyor', j(placeAt(['a', 'b'], 'c', 99)) === 'a,b,c');
+  assert('sıfır ve eksi sıra başa sıkışıyor', j(placeAt(['a', 'b'], 'c', 0)) === 'c,a,b');
+  assert('yukarı taşıma komşuyla yer değiştiriyor', j(moveBy(['a', 'b', 'c'], 'b', -1)) === 'b,a,c');
+  assert('aşağı taşıma komşuyla yer değiştiriyor', j(moveBy(['a', 'b', 'c'], 'b', 1)) === 'a,c,b');
+  assert('en üstteki yukarı gitmiyor', j(moveBy(['a', 'b', 'c'], 'a', -1)) === 'a,b,c');
+  assert('en alttaki aşağı gitmiyor', j(moveBy(['a', 'b', 'c'], 'c', 1)) === 'a,b,c');
+  assert('bilinmeyen kimlik listeyi değiştirmiyor', j(moveBy(['a', 'b'], 'x', 1)) === 'a,b');
+  assert('sürükle-bırak aynı kümeyi kabul ediyor', sameMembers(['a', 'b', 'c'], ['c', 'a', 'b']));
+  assert('eksik kimlikli sıra reddediliyor', !sameMembers(['a', 'b', 'c'], ['a', 'b']));
+  assert('yabancı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'x']));
+  assert('tekrarlı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'a']));
+}
+
+// ------------------------------------------------------------- vitrin görselleri
+// Silme yalnız panelin yazdığı klasörlere dokunuyor; sponsor logosu ve slayt
+// görseli de o listede olmalı, yoksa silinen öğenin dosyası bucket'ta kalır.
+{
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'event-photos';
+  const u = (p: string) => `https://ref.supabase.co/storage/v1/object/public/${bucket}/${p}`;
+  assert('sponsor logosu silinebilir yol', pathFromUrl(u('sponsors/s1/a.png')) === 'sponsors/s1/a.png');
+  assert('slayt görseli silinebilir yol', pathFromUrl(u('slides/x/b.jpg')) === 'slides/x/b.jpg');
+  assert('etkinlik görseli hâlâ silinebilir', pathFromUrl(u('events/e/c.jpg')) === 'events/e/c.jpg');
+  assert('panelin olmayan klasörü silinemez', pathFromUrl(u('baska/d.jpg')) === null);
+  assert(
+    'başka bucket silinemez',
+    pathFromUrl('https://ref.supabase.co/storage/v1/object/public/diger/events/e/c.jpg') === null,
+  );
+}
+
+// ------------------------------------------------------------- vitrin sayfaları
+{
+  const liste = vitrinList('slider', [
+    { id: 'x1', title: '<b>Hack</b>', sub: 'DUYURU · bağlantı', image: '', active: true },
+    { id: 'x2', title: 'İki', sub: '', image: '', active: false },
+  ]);
+  assert('liste başlıkları kaçırıyor', liste.includes('&lt;b&gt;Hack&lt;/b&gt;') && !liste.includes('<b>Hack</b>'));
+  assert('liste durumları yazıyor', liste.includes('Yayında') && liste.includes('Pasif'));
+  assert('uçtaki taşıma düğmeleri kapalı (ilk ↑, son ↓)', (liste.match(/ disabled>/g) ?? []).length === 2);
+  assert('sürükle-bırak betiği ve sıra formu sayfada', liste.includes('id="sirala"') && liste.includes("addEventListener('dragend'"));
+  assert('boş liste betik taşımıyor', !vitrinList('sponsorlar', []).includes('<script>'));
+  assert('menüde slider ve sponsorlar var', liste.includes('href="/slider"') && liste.includes('href="/sponsorlar"'));
+  assert('tarih okunur yazılıyor', formatDay('2026-10-12') === '12 Ekim 2026');
+
+  const yeni = slideForm(
+    { title: 'A', targetType: 'url', targetUrl: 'https://ornek.com', position: 2, active: true },
+    { target: 'Hedef seçin.' },
+    { editing: false, positions: 3, events: [], announcements: null },
+  );
+  assert('slayt formu hatayı gösteriyor', yeni.includes('Hedef seçin.'));
+  assert('slayt formunda seçilen sıra işaretli', yeni.includes('<option value="2" selected>2</option>'));
+  assert('duyurular alınamayınca form bunu söylüyor', yeni.includes('Duyurular kulüp sitesinden alınamadı'));
+  assert('yeni slayt formunda sil düğmesi yok', !yeni.includes('/sil"'));
+  assert('bitiş tarihi tarih seçicisi', yeni.includes('<input type="date" name="endsAt"'));
+
+  const sponsor = sponsorForm(
+    { name: 'A', eventIds: ['e2'], position: 1, active: true },
+    {},
+    { editing: true, id: 's1', positions: 2, events: [{ id: 'e1', label: 'Bir' }, { id: 'e2', label: 'İki', raffle: true }] },
+  );
+  assert('sponsor formu seçili etkinliği işaretliyor', /value="e2" checked/.test(sponsor) && !/value="e1" checked/.test(sponsor));
+  assert('sponsor formu çekilişi "Ödülü sağlayan" diye işaretliyor', sponsor.includes('Ödülü sağlayan'));
+  assert('düzenleme formunda sil düğmesi var', sponsor.includes('action="/sponsorlar/s1/sil"'));
+  assert('sil onayı enterpolasyon taşımıyor', !/onsubmit="return confirm\('\$\{/.test(sponsor));
+}
 
 void (async () => {
   // 1. Kayıtlı cihaz yok → kimseye ulaşmadı → kilit geri veriliyor.

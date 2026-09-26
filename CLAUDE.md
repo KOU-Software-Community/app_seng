@@ -107,6 +107,8 @@ Duyurular Firestore'da değil, kulüp sitesinin API'sinde (`https://api.kouseng.
 | `deletionRequests` | yazar ve okur — `hesap-sil` | işler: `admin/deletion.ts` |
 | `attendance` | yazar — `qr` (`yoklamaVer`); okur — `sertifikalarim` (sertifika, satırdaki `certificate` alanı) | yazar: elle yoklama, sertifika yayını |
 | `devices` | yazar — `app/_layout.tsx` → `NotificationSync` → `upsertDevice`; kimlik Expo push jetonu | okur: push gönderimi |
+| `sponsors` | okur — `useSponsors` (`src/sponsors.tsx` → `fetchSponsors`, yalnız `active`): Ana Sayfa, `sponsorlar`, `sponsor/[id]`, `etkinlik/[id]` ("Ödülü sağlayan") | yazar: `/sponsorlar` (`admin/vitrin.ts`) |
+| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi doleni `startSlideSweeper` siliyor |
 | `eventQr`, `emailOtp`, `passwordReset`, `phoneClaims`, `studentClaims`, `pushLog`, `pendingPushes`, `pushState` | kapalı | yalnız panel |
 
 ## İçerik girişi
@@ -116,7 +118,9 @@ Kodda içerik panelden giriliyor: etkinlik ve arşiv (fotoğraflar Supabase Stor
 rotalarından yazılıyor; etkinlik `buildEvent` ile doğrulanıyor. "Yeni etkinlik / iptal /
 çekiliş sonucu" push'ları yalnız bu rotalardan (`announce()`) çıkıyor — Firebase
 Console'dan elle girilen içerik doğrulamayı, fotoğraf yüklemeyi ve bildirimi atlar.
-Duyurular kulüp sitesinde yazılıyor; panel onları yoklayıp bildirim gönderiyor.
+Duyurular kulüp sitesinde yazılıyor; panel onları yoklayıp bildirim gönderiyor. Slider ve sponsorlar
+panelin `/slider` ve `/sponsorlar` sayfalarından giriliyor; görseller aynı Supabase
+bucket'ında `slides/` ve `sponsors/` klasörlerinde.
 
 ## Dağıtım yüzeyleri
 

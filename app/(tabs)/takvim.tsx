@@ -35,7 +35,7 @@ export default function TakvimRoute() {
       contentContainerStyle={{ paddingBottom: 20 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} />
+        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} colors={[colors.blue500]} />
       }
     >
       <GradientHeader gradient={gradients.calendar}>

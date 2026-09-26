@@ -106,10 +106,23 @@ function storage() {
   return client.storage.from(bucketName());
 }
 
-/** `events/{eventId}/` altındaki dosya yolu. Ad rastgele: aynı ada yazıp eskisini ezmiyoruz. */
-function objectPath(eventId: string): string {
-  return `events/${eventId}/${randomBytes(8).toString('hex')}.jpg`;
-}
+/**
+ * Panelin yazdığı klasörler. Silme yalnız bunlara dokunuyor: bu panelden
+ * çıkmamış bir dosya silinmez.
+ */
+const FOLDERS = ['events', 'sponsors', 'slides'] as const;
+export type PhotoFolder = (typeof FOLDERS)[number];
+
+/**
+ * Klasör başına biçim. Logo en büyük 88 px çiziliyor ve çoğu şeffaf zeminli
+ * PNG: JPEG'e çevirmek zemini siyaha boyardı. Slayt görseli etkinlik kapağı
+ * gibi tam genişlikte, 1600 px yetiyor.
+ */
+const VARIANT: Record<PhotoFolder, { maxEdge: number; format: 'jpeg' | 'png' }> = {
+  events: { maxEdge: MAX_EDGE, format: 'jpeg' },
+  slides: { maxEdge: MAX_EDGE, format: 'jpeg' },
+  sponsors: { maxEdge: 512, format: 'png' },
+};
 
 /**
  * Bucket bulunamadı hatası mı?
@@ -140,25 +153,29 @@ function missingBucketMessage(): PhotoUploadError {
 }
 
 /**
- * Bir görseli küçültüp yükler ve herkese açık adresini döndürür.
+ * Bir görseli küçültüp `folder/ownerId/` altına yükler ve herkese açık adresini
+ * döndürür. Ad rastgele: aynı ada yazıp eskisini ezmiyoruz.
  *
  * Bucket public olduğu için adres kalıcı ve imzasız:
  * `https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<yol>`
  */
-export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<string> {
+export async function uploadPhoto(folder: PhotoFolder, ownerId: string, input: Buffer): Promise<string> {
   const bucket = storage();
-  const path = objectPath(eventId);
+  const { maxEdge, format } = VARIANT[folder];
+  const path = `${folder}/${ownerId}/${randomBytes(8).toString('hex')}.${format === 'png' ? 'png' : 'jpg'}`;
 
-  const body = await sharp(input)
+  const image = sharp(input)
     .rotate() // EXIF yönü — telefon fotoğrafları yan yatmasın.
-    .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
-    .toBuffer();
+    .resize({ width: maxEdge, height: maxEdge, fit: 'inside', withoutEnlargement: true });
+  const body = await (format === 'png'
+    ? image.png()
+    : image.jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+  ).toBuffer();
 
   // supabase-js hata fırlatmıyor, `error` alanı döndürüyor. `throw` beklemek
   // sessizce başarılı sanmak olurdu.
   const { error } = await bucket.upload(path, body, {
-    contentType: 'image/jpeg',
+    contentType: `image/${format}`,
     // Bir yıl: görseller değişmiyor, değişirse yeni bir ad alıyorlar.
     cacheControl: '31536000',
     upsert: false,
@@ -172,17 +189,22 @@ export async function uploadEventPhoto(eventId: string, input: Buffer): Promise<
   return bucket.getPublicUrl(path).data.publicUrl;
 }
 
+/** Etkinlik görseli — `check:release` bu adla arıyor. */
+export function uploadEventPhoto(eventId: string, input: Buffer): Promise<string> {
+  return uploadPhoto('events', eventId, input);
+}
+
 /**
  * Adresten dosya yolunu geri çıkarır. Bizim üretmediğimiz bir adres için null.
  *
- * Silme yalnızca bizim yüklediklerimize dokunsun diye: `events/` ile
- * başlamayan bir yol bu panelden çıkmamıştır.
+ * Silme yalnızca bizim yüklediklerimize dokunsun diye: panelin klasörlerinden
+ * biriyle başlamayan bir yol bu panelden çıkmamıştır.
  */
-function pathFromUrl(url: string): string | null {
+export function pathFromUrl(url: string): string | null {
   const m = new RegExp(`/object/public/${bucketName()}/(.+)$`).exec(url);
   if (!m) return null;
   const path = decodeURIComponent(m[1].split('?')[0]);
-  return path.startsWith('events/') ? path : null;
+  return FOLDERS.some((f) => path.startsWith(`${f}/`)) ? path : null;
 }
 
 /**
@@ -204,24 +226,26 @@ export async function deletePhotos(urls: string[]): Promise<void> {
   }
 }
 
-/** Etkinlik silinince altındaki her şey gider. */
-export async function deleteEventPhotos(eventId: string): Promise<void> {
+/** Bir öğe silinince klasöründeki her şey gider. Hata yutuluyor: kalan şey bir yetim dosya. */
+export async function deleteFolder(folder: PhotoFolder, ownerId: string): Promise<void> {
+  const dir = `${folder}/${ownerId}`;
   try {
     const bucket = storage();
-    const { data, error } = await bucket.list(`events/${eventId}`);
+    const { data, error } = await bucket.list(dir);
     if (error) {
-      console.error(`[panel] ${eventId} görselleri listelenemedi:`, error.message);
+      console.error(`[panel] ${dir} görselleri listelenemedi:`, error.message);
       return;
     }
     if (!data?.length) return;
 
-    const { error: removeError } = await bucket.remove(
-      data.map((f) => `events/${eventId}/${f.name}`),
-    );
-    if (removeError) {
-      console.error(`[panel] ${eventId} görselleri silinemedi:`, removeError.message);
-    }
+    const { error: removeError } = await bucket.remove(data.map((f) => `${dir}/${f.name}`));
+    if (removeError) console.error(`[panel] ${dir} görselleri silinemedi:`, removeError.message);
   } catch (err) {
-    console.error(`[panel] ${eventId} görselleri silinemedi:`, err);
+    console.error(`[panel] ${dir} görselleri silinemedi:`, err);
   }
+}
+
+/** Etkinlik silinince altındaki her şey gider — `check:release` bu adla arıyor. */
+export function deleteEventPhotos(eventId: string): Promise<void> {
+  return deleteFolder('events', eventId);
 }

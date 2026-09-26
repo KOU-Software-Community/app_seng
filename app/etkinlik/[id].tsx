@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoGallery } from '../../src/components/PhotoGallery';
+import { PrizeProviders } from '../../src/components/PrizeProviders';
 import { RaffleNotice } from '../../src/components/RaffleNotice';
 import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
@@ -20,6 +21,7 @@ import {
 import { useContent, useEvent } from '../../src/content';
 import { isFull, isPast, seatsLabel, todayLocal } from '../../src/eventSchema';
 import { entriesOpen } from '../../src/raffleSchema';
+import { useSponsors } from '../../src/sponsors';
 import { useAppStore } from '../../src/store';
 import { colors, gradients, radius } from '../../src/theme';
 
@@ -30,6 +32,7 @@ export default function EventDetailRoute() {
   const event = useEvent(id);
   const { getRaffle, registeredCount } = useContent();
   const { registrationFor, raffleEntryFor, syncPending } = useAppStore();
+  const { sponsors } = useSponsors();
 
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
@@ -126,6 +129,12 @@ export default function EventDetailRoute() {
               <Tag key={t} label={t} />
             ))}
           </View>
+
+          {/* Çekilişte ödülü sağlayan kurum. Çekiliş kuralları "böyle bir taraf
+              varsa etkinliğin açıklamasında belirtilir" diyor — burası orası. */}
+          {raffle ? (
+            <PrizeProviders providers={sponsors.filter((s) => s.eventIds.includes(event.id))} />
+          ) : null}
         </View>
 
         <View style={styles.block}>

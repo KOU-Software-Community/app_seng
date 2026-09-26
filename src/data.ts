@@ -159,6 +159,9 @@ export const PANEL_BASE_URL = LEGAL_BASE;
 /** Play'in şart koştuğu web'den hesap silme adresi. */
 export const ACCOUNT_DELETE_URL = LEGAL_BASE ? `${LEGAL_BASE}/hesap-sil` : '';
 
+/** Sponsorlar ekranındaki "İletişime geç" — kulübün adresi, çalışıyor (2026-09-26 teyit). */
+export const SPONSOR_CONTACT_EMAIL = 'info@kouseng.com';
+
 export type OnboardingPage = {
   kicker: string;
   title: string;
