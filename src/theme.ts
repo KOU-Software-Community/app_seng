@@ -40,6 +40,8 @@ export const colors = {
   dangerBorder: '#E2A6A2',
 
   onNavy: '#D2E7EC',
+  /** Koyu zemin üstünde yazı ve beyaz dolgulu düğme. Mevcut `'#fff'`'ler yerinde duruyor. */
+  white: '#FFFFFF',
 } as const;
 
 /**
@@ -79,6 +81,12 @@ export const gradients = {
   /** 135deg · primary CTA + avatar chips */
   cta: ['#014576', '#0389BC'],
   masterCard: ['#001B4A', '#0389BC'],
+
+  /**
+   * Slider kartının karartması: `navy900` alttan yukarı. `HomeSlider`
+   * `locations={[0.35, 1]}` veriyor — üst üçte bir tamamen şeffaf.
+   */
+  slideShade: ['rgba(0,27,74,0)', 'rgba(0,27,74,0.85)'],
 } as const;
 
 /**

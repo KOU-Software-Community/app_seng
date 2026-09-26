@@ -12,12 +12,15 @@ import { PixelTxt } from './ui';
  * The design left these slots empty so real photos could be dropped in later, so
  * this renders a branded gradient placeholder until a `uri` is supplied. Once the
  * archive is wired to a backend, pass the photo URL and the placeholder drops out.
+ *
+ * Logolar `contain` kullanıyor: kırpılan bir logo başka bir marka gibi okunur.
  */
 export function PhotoSlot({
   uri,
   label,
   gradient = gradients.photo,
   showLabel = true,
+  resizeMode = 'cover',
   style,
   children,
 }: {
@@ -25,13 +28,14 @@ export function PhotoSlot({
   label?: string;
   gradient?: GradientStops;
   showLabel?: boolean;
+  resizeMode?: 'cover' | 'contain';
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
   return (
     <View style={[styles.root, style]}>
       {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={resizeMode} />
       ) : (
         <LinearGradient
           colors={gradient}
