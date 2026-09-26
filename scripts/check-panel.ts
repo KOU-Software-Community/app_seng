@@ -28,7 +28,7 @@ import {
   sameOrigin,
   verifyToken,
 } from '../admin/session';
-import { isBucketMissing, keyProblem } from '../admin/photos';
+import { isBucketMissing, keyProblem, pathFromUrl } from '../admin/photos';
 import { moveBy, placeAt, sameMembers } from '../admin/ordering';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
@@ -456,6 +456,22 @@ const NOW = new Date('2026-09-10T12:00:00+03:00');
   assert('eksik kimlikli sıra reddediliyor', !sameMembers(['a', 'b', 'c'], ['a', 'b']));
   assert('yabancı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'x']));
   assert('tekrarlı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'a']));
+}
+
+// ------------------------------------------------------------- vitrin görselleri
+// Silme yalnız panelin yazdığı klasörlere dokunuyor; sponsor logosu ve slayt
+// görseli de o listede olmalı, yoksa silinen öğenin dosyası bucket'ta kalır.
+{
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'event-photos';
+  const u = (p: string) => `https://ref.supabase.co/storage/v1/object/public/${bucket}/${p}`;
+  assert('sponsor logosu silinebilir yol', pathFromUrl(u('sponsors/s1/a.png')) === 'sponsors/s1/a.png');
+  assert('slayt görseli silinebilir yol', pathFromUrl(u('slides/x/b.jpg')) === 'slides/x/b.jpg');
+  assert('etkinlik görseli hâlâ silinebilir', pathFromUrl(u('events/e/c.jpg')) === 'events/e/c.jpg');
+  assert('panelin olmayan klasörü silinemez', pathFromUrl(u('baska/d.jpg')) === null);
+  assert(
+    'başka bucket silinemez',
+    pathFromUrl('https://ref.supabase.co/storage/v1/object/public/diger/events/e/c.jpg') === null,
+  );
 }
 
 void (async () => {
