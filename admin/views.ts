@@ -98,6 +98,44 @@ tr:last-child td { border-bottom: none; }
 .row > * { flex: 1; min-width: 190px; }
 .actions { display: flex; gap: 10px; margin-top: 8px; }
 .empty { color: var(--muted); padding: 20px 0; }
+/* Vitrin: slider ve sponsor listeleri. Yalnız yeni sayfalar kullanıyor. */
+.vlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vitem {
+  display: flex; align-items: center; gap: 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+  box-shadow: 0 4px 14px rgba(0,27,74,.06);
+}
+.vitem.dragging { opacity: .45; }
+.handle { cursor: grab; color: var(--muted); font-size: 18px; user-select: none; }
+.vno { font-weight: 800; color: var(--navy700); width: 20px; text-align: center; }
+.vthumb {
+  width: 96px; height: 54px; border-radius: 8px; object-fit: cover;
+  background: var(--blue100); flex: none; display: block;
+}
+.vthumb.logo { width: 72px; object-fit: contain; background: var(--bg); }
+.vbody { flex: 1; min-width: 0; }
+.vbody strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vmeta { color: var(--muted); font-size: 12.5px; }
+.pill { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.pill.on { background: #E8F5EC; color: #1E6B36; }
+.pill.off { background: var(--blue100); color: var(--navy700); }
+.vact { display: flex; gap: 6px; align-items: center; }
+.vact form { margin: 0; }
+.icon-btn {
+  padding: 6px 10px; font-size: 13px; background: transparent; color: var(--navy700);
+  border: 1.5px solid var(--border);
+}
+.icon-btn:disabled { opacity: .35; cursor: default; }
+fieldset { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px 2px; margin: 0 0 16px; }
+legend { font-weight: 700; font-size: 13.5px; padding: 0 6px; }
+.radios { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 12px; }
+.radios label, .checks label { font-weight: 500; margin: 0; display: flex; gap: 8px; align-items: flex-start; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 16px; margin-bottom: 12px; }
+@media (max-width: 560px) {
+  .vitem { flex-wrap: wrap; }
+  .handle { display: none; }
+  .vthumb { width: 72px; height: 40px; }
+}
 `;
 
 export function page(title: string, body: string, opts: { nav?: boolean } = {}): string {
@@ -107,6 +145,8 @@ export function page(title: string, body: string, opts: { nav?: boolean } = {}):
          <a href="/">Etkinlikler</a>
          <a href="/arsiv">Arşiv</a>
          <a href="/raffles">Çekilişler</a>
+         <a href="/slider">Slider</a>
+         <a href="/sponsorlar">Sponsorlar</a>
          <a href="/registrations">Kayıtlar</a>
          <a href="/bildirimler">Bildirimler</a>
          <form method="post" action="/logout" style="margin:0">

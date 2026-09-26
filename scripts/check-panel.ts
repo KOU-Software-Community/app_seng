@@ -30,6 +30,7 @@ import {
 } from '../admin/session';
 import { isBucketMissing, keyProblem, pathFromUrl } from '../admin/photos';
 import { moveBy, placeAt, sameMembers } from '../admin/ordering';
+import { formatDay, slideForm, sponsorForm, vitrinList } from '../admin/vitrinView';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
 import { ceviriSagligi, registerTranslateApi } from '../admin/translateApi';
@@ -472,6 +473,42 @@ const NOW = new Date('2026-09-10T12:00:00+03:00');
     'başka bucket silinemez',
     pathFromUrl('https://ref.supabase.co/storage/v1/object/public/diger/events/e/c.jpg') === null,
   );
+}
+
+// ------------------------------------------------------------- vitrin sayfaları
+{
+  const liste = vitrinList('slider', [
+    { id: 'x1', title: '<b>Hack</b>', sub: 'DUYURU · bağlantı', image: '', active: true },
+    { id: 'x2', title: 'İki', sub: '', image: '', active: false },
+  ]);
+  assert('liste başlıkları kaçırıyor', liste.includes('&lt;b&gt;Hack&lt;/b&gt;') && !liste.includes('<b>Hack</b>'));
+  assert('liste durumları yazıyor', liste.includes('Yayında') && liste.includes('Pasif'));
+  assert('uçtaki taşıma düğmeleri kapalı (ilk ↑, son ↓)', (liste.match(/ disabled>/g) ?? []).length === 2);
+  assert('sürükle-bırak betiği ve sıra formu sayfada', liste.includes('id="sirala"') && liste.includes("addEventListener('dragend'"));
+  assert('boş liste betik taşımıyor', !vitrinList('sponsorlar', []).includes('<script>'));
+  assert('menüde slider ve sponsorlar var', liste.includes('href="/slider"') && liste.includes('href="/sponsorlar"'));
+  assert('tarih okunur yazılıyor', formatDay('2026-10-12') === '12 Ekim 2026');
+
+  const yeni = slideForm(
+    { title: 'A', targetType: 'url', targetUrl: 'https://ornek.com', position: 2, active: true },
+    { target: 'Hedef seçin.' },
+    { editing: false, positions: 3, events: [], announcements: null },
+  );
+  assert('slayt formu hatayı gösteriyor', yeni.includes('Hedef seçin.'));
+  assert('slayt formunda seçilen sıra işaretli', yeni.includes('<option value="2" selected>2</option>'));
+  assert('duyurular alınamayınca form bunu söylüyor', yeni.includes('Duyurular kulüp sitesinden alınamadı'));
+  assert('yeni slayt formunda sil düğmesi yok', !yeni.includes('/sil"'));
+  assert('bitiş tarihi tarih seçicisi', yeni.includes('<input type="date" name="endsAt"'));
+
+  const sponsor = sponsorForm(
+    { name: 'A', eventIds: ['e2'], position: 1, active: true },
+    {},
+    { editing: true, id: 's1', positions: 2, events: [{ id: 'e1', label: 'Bir' }, { id: 'e2', label: 'İki', raffle: true }] },
+  );
+  assert('sponsor formu seçili etkinliği işaretliyor', /value="e2" checked/.test(sponsor) && !/value="e1" checked/.test(sponsor));
+  assert('sponsor formu çekilişi "Ödülü sağlayan" diye işaretliyor', sponsor.includes('Ödülü sağlayan'));
+  assert('düzenleme formunda sil düğmesi var', sponsor.includes('action="/sponsorlar/s1/sil"'));
+  assert('sil onayı enterpolasyon taşımıyor', !/onsubmit="return confirm\('\$\{/.test(sponsor));
 }
 
 void (async () => {
