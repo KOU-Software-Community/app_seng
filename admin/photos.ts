@@ -189,11 +189,6 @@ export async function uploadPhoto(folder: PhotoFolder, ownerId: string, input: B
   return bucket.getPublicUrl(path).data.publicUrl;
 }
 
-/** Etkinlik görseli — `check:release` bu adla arıyor. */
-export function uploadEventPhoto(eventId: string, input: Buffer): Promise<string> {
-  return uploadPhoto('events', eventId, input);
-}
-
 /**
  * Adresten dosya yolunu geri çıkarır. Bizim üretmediğimiz bir adres için null.
  *
@@ -243,9 +238,4 @@ export async function deleteFolder(folder: PhotoFolder, ownerId: string): Promis
   } catch (err) {
     console.error(`[panel] ${dir} görselleri silinemedi:`, err);
   }
-}
-
-/** Etkinlik silinince altındaki her şey gider — `check:release` bu adla arıyor. */
-export function deleteEventPhotos(eventId: string): Promise<void> {
-  return deleteFolder('events', eventId);
 }

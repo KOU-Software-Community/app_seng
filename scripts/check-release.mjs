@@ -1420,13 +1420,13 @@ check(
     // Doğrulama yüklemeden önce olmalı: `checked` başarısızsa hiçbir dosya
     // Storage’a gitmemiş oluyor.
     const validateAt = server.indexOf('const checked = buildEvent(input)');
-    const uploadAt = server.indexOf('uploadEventPhoto(');
+    const uploadAt = server.indexOf("uploadPhoto('events',");
     if (validateAt < 0 || uploadAt < 0) return 'kaydetme yolu beklenen sırayı taşımıyor';
     if (validateAt > uploadAt) return 'doğrulama yüklemeden sonra yapılıyor';
 
     if (!/deletePhotos\(uploaded\)/.test(server)) return 'başarısız kayıtta yüklenenler geri alınmıyor';
     if (!/deletePhotos\(removed\)/.test(server)) return 'formdan çıkarılan görseller silinmiyor';
-    if (!/deleteEventPhotos\(/.test(server)) return 'etkinlik silinince görselleri kalıyor';
+    if (!/deleteFolder\('events',/.test(server)) return 'etkinlik silinince görselleri kalıyor';
     return null;
   },
 );
