@@ -1838,6 +1838,34 @@ check(
 );
 
 check(
+  'sponsor ekranları bağlı',
+  'Ekranın var olması ona gidilebildiği anlamına gelmiyor — bu depo aynı hatayı ' +
+    'giriş ekranlarında ve sertifikalarda yaşadı. Kopan halkanın belirtisi bir hata ' +
+    'değil, görünmeyen bir bölüm: panelden veri girilir, uygulamada hiçbir şey çıkmaz.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    for (const f of ['app/sponsorlar.tsx', 'app/sponsor/[id].tsx']) {
+      if (!existsSync(join(root, f))) return `${f} yok`;
+    }
+    const layout = strip(read('app/_layout.tsx'));
+    if (!/name="sponsorlar"/.test(layout)) return 'sponsorlar rotası kök yığına kayıtlı değil';
+    if (!/name="sponsor\/\[id\]"/.test(layout)) return 'sponsor/[id] rotası kök yığına kayıtlı değil';
+    if (!/<SponsorsProvider\b/.test(layout)) return 'SponsorsProvider mount edilmiyor';
+
+    const hesap = strip(read('app/(tabs)/hesap.tsx'));
+    if (!/['"`]\/sponsorlar['"`]/.test(hesap)) return 'Hesabım sponsorlar ekranına bağlanmıyor';
+
+    const ana = strip(read('app/(tabs)/index.tsx'));
+    if (!/<HomeSlider\b/.test(ana)) return 'ana sayfa slider’ı çizmiyor';
+    if (!/['"`]\/sponsorlar['"`]/.test(ana)) return 'ana sayfa sponsorlar ekranına bağlanmıyor';
+
+    const etkinlik = strip(read('app/etkinlik/[id].tsx'));
+    if (!/<PrizeProviders\b/.test(etkinlik)) return 'etkinlik detayı "Ödülü sağlayan" etiketini çizmiyor';
+    return null;
+  },
+);
+
+check(
   'panel 502/504 dönmüyor',
   'Panel Cloudflare arkasında ve Cloudflare origin\u2019in 502/504 cevabını kendi ' +
     '"Bad gateway" sayfasıyla değiştiriyor, gövdeyi atıyor. Görsel yükleme hatası bu ' +
