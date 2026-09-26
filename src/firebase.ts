@@ -10,11 +10,13 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 
 import type { ClubEvent } from './data';
 import { isRaffle, type Raffle } from './raffleSchema';
+import { byOrder, toSlide, toSponsor, type Slide, type Sponsor } from './vitrinSchema';
 
 import { FIREBASE_SETUP_HINT, firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 
@@ -82,6 +84,13 @@ export const COLLECTIONS = {
    * Sahibi kendi satırını okuyabiliyor; başkasınınki kapalı.
    */
   attendance: 'attendance',
+  /**
+   * Vitrin: ana sayfanın slaytları ve sponsorlar. Panel yazıyor; istemci
+   * yalnız `active == true` olanları okuyabiliyor, sorgu da bunu söylemek
+   * zorunda.
+   */
+  sponsors: 'sponsors',
+  slides: 'slides',
 } as const;
 
 /** Firestore retries an unreachable backend forever, so reads get a deadline. */
@@ -150,6 +159,36 @@ export async function fetchContent(): Promise<{
     raffles: rafflesSnap.docs.map((d) => ({ ...d.data(), eventId: d.id })).filter(isRaffle),
     registered,
   };
+}
+
+/**
+ * Sponsorlar — yalnız yayındakiler, sıralı.
+ *
+ * `fetchContent`'in `Promise.all`'ına girmiyor, bilerek: bu okuma düşerse
+ * (kural henüz yayınlanmadıysa) etkinlikler düşmemeli. `where` kuralın şartı;
+ * sıralama istemcide, çünkü `where` + `orderBy` birleşik indeks isterdi.
+ */
+export async function fetchSponsors(): Promise<Sponsor[]> {
+  const snap = await withTimeout(
+    getDocs(query(collection(getDb(), COLLECTIONS.sponsors), where('active', '==', true))),
+    'sponsors',
+  );
+  return snap.docs
+    .map((d) => toSponsor(d.id, d.data()))
+    .filter((s): s is Sponsor => s !== null)
+    .sort(byOrder);
+}
+
+/** Slaytlar — yalnız yayındakiler. Bitiş tarihi süzmesi `visibleSlides`'ta. */
+export async function fetchSlides(): Promise<Slide[]> {
+  const snap = await withTimeout(
+    getDocs(query(collection(getDb(), COLLECTIONS.slides), where('active', '==', true))),
+    'slides',
+  );
+  return snap.docs
+    .map((d) => toSlide(d.id, d.data()))
+    .filter((s): s is Slide => s !== null)
+    .sort(byOrder);
 }
 
 /**
