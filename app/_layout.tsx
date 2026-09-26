@@ -108,6 +108,8 @@ function RootStack() {
         <Stack.Screen name="duyuru/[id]" />
         <Stack.Screen name="cekilis/[id]" />
         <Stack.Screen name="cekilis-kurallari" />
+        <Stack.Screen name="sponsorlar" />
+        <Stack.Screen name="sponsor/[id]" />
         <Stack.Screen name="gundem/[id]" />
         <Stack.Screen name="gundem/ara" />
         <Stack.Screen
