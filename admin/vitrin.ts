@@ -235,7 +235,9 @@ export function registerVitrin(app: Express, db: Firestore, upload: multer.Multe
     const kept = body.dropImage ? '' : before;
     const position = Number(body.position);
     const targetType = String(body.targetType ?? '');
-    const values = { ...body, image: kept, position, active: body.active === '1' };
+    // Hatalı form eski görseli ve "kaldır" kutusunu geri çizsin: kutu kaybolursa
+    // hatayı düzeltip kaydeden kişinin görseli sessizce yerinde kalır.
+    const values = { ...body, image: before, position, active: body.active === '1' };
     const opts = () => slideOpts(editingId ? docs.length : docs.length + 1, !!editingId, editingId ?? undefined);
 
     const checked = buildSlide(
@@ -363,7 +365,7 @@ export function registerVitrin(app: Express, db: Firestore, upload: multer.Multe
     const kept = body.dropLogo ? '' : before;
     const position = Number(body.position);
     const eventIds = list(body.eventIds);
-    const values = { ...body, logo: kept, eventIds, position, active: body.active === '1' };
+    const values = { ...body, logo: before, eventIds, position, active: body.active === '1' };
     const opts = () => sponsorOpts(editingId ? docs.length : docs.length + 1, !!editingId, editingId ?? undefined);
 
     const checked = buildSponsor({

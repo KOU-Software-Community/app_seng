@@ -159,11 +159,11 @@ function deleteForm(action: string): string {
 }
 
 /** Mevcut görselin önizlemesi ve kaldırma kutusu. Sunucu mevcut görseli dokümandan okuyor. */
-function imageBlock(url: unknown, drop: 'dropImage' | 'dropLogo', label: string): string {
+function imageBlock(url: unknown, drop: 'dropImage' | 'dropLogo', label: string, checked: unknown): string {
   if (!url) return '';
   return `<div class="photos"><div class="photo">
       <img src="${esc(url)}" alt="">
-      <label class="photo-drop"><input type="checkbox" name="${drop}" value="1" style="width:auto"> ${label}</label>
+      <label class="photo-drop"><input type="checkbox" name="${drop}" value="1"${checked ? ' checked' : ''} style="width:auto"> ${label}</label>
     </div></div>`;
 }
 
@@ -206,7 +206,7 @@ export function slideForm(
           <input type="file" name="image" accept="image/*">
         </label>
         ${e('image')}
-        ${imageBlock(values.image, 'dropImage', 'Görseli kaldır')}
+        ${imageBlock(values.image, 'dropImage', 'Görseli kaldır', values.dropImage)}
 
         <fieldset>
           <legend>Dokununca açılacak yer</legend>
@@ -291,7 +291,7 @@ export function sponsorForm(
           <input type="file" name="logo" accept="image/*">
         </label>
         ${e('logo')}
-        ${imageBlock(values.logo, 'dropLogo', 'Logoyu kaldır')}
+        ${imageBlock(values.logo, 'dropLogo', 'Logoyu kaldır', values.dropLogo)}
 
         <fieldset>
           <legend>Desteklediği etkinlikler</legend>

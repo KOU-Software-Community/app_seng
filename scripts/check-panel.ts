@@ -2177,6 +2177,44 @@ void (async () => {
 
       r = await get('/sponsorlar/yok');
       assert('vitrin: olmayan sponsor 404', r.status === 404);
+
+      // "Görseli kaldır" başka bir alanın hatasıyla dönen formda kaybolursa, hatayı
+      // düzeltip kaydeden kişinin görseli sessizce yerinde kalıyor.
+      const box = (page: string, name: string) => new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(page)?.[0] ?? '';
+      const aId = idOf('slides', 'title', 'A');
+      const img = `https://p.supabase.co/storage/v1/object/public/event-photos/slides/${aId}/a.jpg`;
+      col('slides').set(aId, { ...col('slides').get(aId), image: img });
+      const editA = (title: string, extra: Record<string, string> = {}) =>
+        post(`/slider/${aId}`, { title, targetType: 'url', targetUrl: 'https://ornek.com/x', position: '1', active: '1', ...extra });
+
+      html = await (await editA('')).text();
+      assert(
+        'vitrin: işaretsiz "Görseli kaldır" hatalı formda işaretsiz dönüyor',
+        html.includes(img) && box(html, 'dropImage') !== '' && !box(html, 'dropImage').includes(' checked'),
+      );
+      html = await (await editA('', { dropImage: '1' })).text();
+      assert(
+        'vitrin: işaretli "Görseli kaldır" hatalı formda işaretli kalıyor',
+        html.includes(img) && box(html, 'dropImage').includes(' checked'),
+        box(html, 'dropImage') || 'kutu formda yok',
+      );
+      // Tarayıcı gibi: hatayı düzelt, formdaki kutuyla yeniden gönder.
+      r = await editA('A', box(html, 'dropImage').includes(' checked') ? { dropImage: '1' } : {});
+      assert(
+        'vitrin: düzeltilip yeniden gönderilince görsel kaldırılıyor',
+        r.status === 302 && col('slides').get(aId)?.image === '',
+        String(col('slides').get(aId)?.image),
+      );
+
+      const bigId = idOf('sponsors', 'name', 'Büyük A.Ş.');
+      const logo = `https://p.supabase.co/storage/v1/object/public/event-photos/sponsors/${bigId}/logo.png`;
+      col('sponsors').set(bigId, { ...col('sponsors').get(bigId), logo });
+      html = await (await post(`/sponsorlar/${bigId}`, { name: '', position: '2', active: '1', dropLogo: '1' })).text();
+      assert(
+        'vitrin: işaretli "Logoyu kaldır" hatalı formda işaretli kalıyor',
+        html.includes(logo) && box(html, 'dropLogo').includes(' checked'),
+        box(html, 'dropLogo') || 'kutu formda yok',
+      );
     } finally {
       server.close();
       globalThis.fetch = realFetch;
