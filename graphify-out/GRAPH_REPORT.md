@@ -1,7 +1,7 @@
 # Graph Report - app_seng  (2026-09-26)
 
 ## Corpus Check
-- 225 files · ~290,225 words
+- 225 files · ~290,251 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 4, .ttf 4, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `383b105b`
+- Built from commit: `8a025609`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -449,9 +449,9 @@ Nodes (36): From the 1.1.0 release, HesapSilRoute(), CertificatesRoute(), Veri: 
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `etkinlik/[id].tsx`, `ui.tsx`, `package.json`, `FeedView.tsx`, `useEnrichmentWarmup.ts`, `cekilis/[id].tsx`, `data-access/hooks.ts`, `theme.ts`, `QueryProvider.tsx`, `hesap.tsx`, `data.ts`, `cekilis-kurallari.tsx`, `announcements.tsx`, `Firebase`, `firebase.ts`, `notifications.tsx`, `article-summary.test.tsx`, `vitrinSchema.ts`, `integration.test.tsx`?**
-  _High betweenness centrality (0.134) - this node is a cross-community bridge._
+  _High betweenness centrality (0.135) - this node is a cross-community bridge._
 - **Why does `err()` connect `client.ts` to `push.ts`, `check-panel.ts`, `server.ts`, `types.ts`, `supabase/repositories.ts`, `demo-account.ts`, `export-registrations.ts`, `mock/repositories.ts`?**
-  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+  _High betweenness centrality (0.084) - this node is a cross-community bridge._
 - **Why does `ClubEvent` connect `notifications.tsx` to `push.ts`, `eventSchema.ts`, `ui.tsx`, `server.ts`, `Yönetim paneli`, `data.ts`, `parseSourceUrl`, `react`, `vitrinSchema.ts`, `vitrin.ts`, `2. Fikrin değerlendirmesi — zayıf noktalar`, `firebase.ts`?**
   _High betweenness centrality (0.037) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `Txt()` (e.g. with `Conventions` and `Klasörler`) actually correct?**
