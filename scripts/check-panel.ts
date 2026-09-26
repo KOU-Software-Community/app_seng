@@ -2080,8 +2080,10 @@ void (async () => {
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     const get = (path: string) => realFetch(base + path);
+    // Tarayıcıdaki gibi: kaydetme formları multipart (dosya alanı var), sıralama,
+    // taşıma ve silme formları urlencoded. Her istek kendi ayrıştırıcısından geçsin.
     const post = (path: string, form: Record<string, string | string[]>) => {
-      const body = new URLSearchParams();
+      const body = /\/(sirala|tasi|sil)$/.test(path) ? new URLSearchParams() : new FormData();
       for (const [k, v] of Object.entries(form)) for (const x of [v].flat()) body.append(k, x);
       return realFetch(base + path, { method: 'POST', body, redirect: 'manual' });
     };
