@@ -11,7 +11,9 @@
  */
 import { createHash } from 'node:crypto';
 
+import express from 'express';
 import { Timestamp } from 'firebase-admin/firestore';
+import multer from 'multer';
 
 import { ensureQr, regenerateQr, setQrWindow } from '../admin/qr';
 import { parseServiceAccount } from '../admin/credentials';
@@ -31,6 +33,7 @@ import {
 import { isBucketMissing, keyProblem, pathFromUrl } from '../admin/photos';
 import { moveBy, placeAt, sameMembers } from '../admin/ordering';
 import { formatDay, slideForm, sponsorForm, vitrinList } from '../admin/vitrinView';
+import { registerVitrin, runSlideSweep } from '../admin/vitrin';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
 import { ceviriSagligi, registerTranslateApi } from '../admin/translateApi';
@@ -2010,7 +2013,175 @@ void (async () => {
     );
   }
 
+  // Vitrin rotaları uçtan uca: gerçek Express ve multer; Firestore, rotaların
+  // dokunduğu yüzeyi taklit eden bellek içi bir sürüm. Sıralamanın, formun hata
+  // yollarının ve süpürücünün birlikte çalıştığı yer — tek tek fonksiyonları
+  // yukarıdaki saf kontroller sınıyor.
+  {
+    type Data = Record<string, unknown>;
+    type Ref = { id: string; col: string };
+    const store = new Map<string, Map<string, Data>>();
+    const col = (name: string) => {
+      if (!store.has(name)) store.set(name, new Map());
+      return store.get(name)!;
+    };
+    let seq = 0;
+    const db = {
+      collection: (name: string) => ({
+        async get() {
+          return {
+            docs: [...col(name).entries()].map(([id, data]) => ({
+              id,
+              ref: { id, col: name },
+              get: (field: string) => data[field],
+              data: () => data,
+            })),
+          };
+        },
+        doc: (id?: string): Ref => ({ id: id ?? `auto${++seq}`, col: name }),
+      }),
+      batch() {
+        const ops: (() => void)[] = [];
+        return {
+          set(r: Ref, d: Data) {
+            ops.push(() => col(r.col).set(r.id, { ...d }));
+          },
+          update(r: Ref, d: Data) {
+            ops.push(() => {
+              const cur = col(r.col).get(r.id);
+              // Gerçek Firestore da olmayan dokümanı güncellemeyi reddediyor.
+              if (!cur) throw new Error(`NOT_FOUND ${r.col}/${r.id}`);
+              col(r.col).set(r.id, { ...cur, ...d });
+            });
+          },
+          delete(r: Ref) {
+            ops.push(() => col(r.col).delete(r.id));
+          },
+          async commit() {
+            ops.forEach((op) => op());
+          },
+        };
+      },
+    };
 
+    // Duyuru seçenekleri kulüp sitesinden, görsel silme Supabase'ten geçiyor:
+    // ikisi de ağa çıkmasın. Sunucuya giden istekler gerçek fetch ile.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new Error('çevrimdışı'))) as typeof fetch;
+
+    col('events').set('git', { title: 'Git Atölyesi', startsAt: '2099-01-10T18:00:00+03:00', day: '10', mon: 'OCA' });
+    col('events').set('eski', { title: 'Eski Atölye', startsAt: '2020-01-10T18:00:00+03:00', day: '10', mon: 'OCA' });
+    col('raffles').set('git', { winnerCount: 1 });
+
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    registerVitrin(app, db as never, multer({ storage: multer.memoryStorage() }));
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    const get = (path: string) => realFetch(base + path);
+    const post = (path: string, form: Record<string, string | string[]>) => {
+      const body = new URLSearchParams();
+      for (const [k, v] of Object.entries(form)) for (const x of [v].flat()) body.append(k, x);
+      return realFetch(base + path, { method: 'POST', body, redirect: 'manual' });
+    };
+    const orders = (name: string) =>
+      [...col(name).values()]
+        .sort((a, b) => Number(a.order) - Number(b.order))
+        .map((d) => `${String(d.title ?? d.name)}:${String(d.order)}`)
+        .join(' ');
+    const idOf = (name: string, field: string, value: string) =>
+      [...col(name).entries()].find(([, d]) => d[field] === value)?.[0] ?? '';
+    const slide = (title: string, position: string, extra: Record<string, string> = {}) =>
+      post('/slider/yeni', { title, targetType: 'url', targetUrl: 'https://ornek.com/x', position, active: '1', ...extra });
+
+    try {
+      let r = await get('/slider');
+      assert('vitrin: boş slider listesi', r.status === 200 && (await r.text()).includes('Henüz slayt yok'));
+
+      r = await slide('A', '1');
+      assert('vitrin: yeni slayt kaydediliyor, listeye dönüyor', r.status === 302 && r.headers.get('location') === '/slider');
+      await slide('B', '1');
+      await slide('C', '2');
+      assert('vitrin: 1. sıraya konan öne geçiyor, diğerleri kayıyor', orders('slides') === 'B:1 C:2 A:3', orders('slides'));
+
+      r = await post(`/slider/${idOf('slides', 'title', 'A')}/tasi`, { yon: 'yukari' });
+      assert('vitrin: ↑ komşuyla yer değiştiriyor', r.status === 302 && orders('slides') === 'B:1 A:2 C:3', orders('slides'));
+
+      const ids = (...titles: string[]) => titles.map((t) => idOf('slides', 'title', t)).join(',');
+      r = await post('/slider/sirala', { ids: ids('C', 'A', 'B') });
+      assert('vitrin: sürükle-bırak sırası yazılıyor', r.status === 302 && orders('slides') === 'C:1 A:2 B:3', orders('slides'));
+      r = await post('/slider/sirala', { ids: ids('C', 'A') });
+      assert('vitrin: eksik kümeli sıra 409 ve yazılmıyor', r.status === 409 && orders('slides') === 'C:1 A:2 B:3', orders('slides'));
+
+      r = await post('/slider/yeni', { title: '', targetType: 'url', targetUrl: 'https://a.com', position: '1' });
+      let html = await r.text();
+      assert('vitrin: başlıksız slayt 400 ve hata metni', r.status === 400 && html.includes('Başlık boş olamaz.'));
+      assert('vitrin: hata formu duyuruların alınamadığını söylüyor', html.includes('Duyurular kulüp sitesinden alınamadı'));
+
+      r = await slide('Geçmiş', '1', { endsAt: '2020-01-01' });
+      assert('vitrin: geçmiş bitiş tarihi 400', r.status === 400 && (await r.text()).includes('Bitiş tarihi bugünden önce olamaz.'));
+
+      r = await post(`/slider/${idOf('slides', 'title', 'C')}`, {
+        title: 'C2',
+        targetType: 'event',
+        eventId: 'git',
+        position: '3',
+        active: '1',
+      });
+      assert('vitrin: düzenleme sırayı ve hedefi değiştiriyor', r.status === 302 && orders('slides') === 'A:1 B:2 C2:3', orders('slides'));
+      const target = JSON.stringify(col('slides').get(idOf('slides', 'title', 'C2'))?.target);
+      assert('vitrin: etkinlik hedefi yazıldı', target === '{"type":"event","id":"git"}', target);
+
+      r = await get(`/slider/${idOf('slides', 'title', 'C2')}`);
+      html = await r.text();
+      assert('vitrin: düzenleme formu etkinliği seçili açıyor', r.status === 200 && html.includes('value="git" selected'));
+
+      r = await post(`/slider/${idOf('slides', 'title', 'B')}/sil`, {});
+      assert('vitrin: silme yeniden numaralıyor', r.status === 302 && orders('slides') === 'A:1 C2:2', orders('slides'));
+
+      html = await (await get('/slider')).text();
+      assert(
+        'vitrin: liste sırayla ve etkinlik başlığıyla',
+        html.indexOf('>A<') < html.indexOf('>C2<') && html.includes('etkinlik: Git Atölyesi'),
+      );
+
+      // Kulüp takviminde bugün: panel geçmiş bitişi reddediyor, bugünü kabul ediyor.
+      await slide('Bugün biten', '1', { endsAt: new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) });
+      const gone = await runSlideSweep(db as never, '2999-01-01');
+      assert(
+        'vitrin: süpürücü süresi dolanı siliyor, kalıcıları bırakıyor',
+        gone.length === 1 && orders('slides') === 'A:1 C2:2',
+        `${gone.join(',')} ${orders('slides')}`,
+      );
+
+      await post('/sponsorlar/yeni', { name: 'Büyük A.Ş.', url: 'https://buyuk.com', eventIds: ['git', 'eski'], position: '1', active: '1' });
+      await post('/sponsorlar/yeni', { name: 'Küçük Ltd.', position: '2', active: '1' });
+      await post('/sponsorlar/yeni', { name: 'Yeni', position: '1', active: '1' });
+      assert('vitrin: sponsorlar sıraya yerleşiyor', orders('sponsors') === 'Yeni:1 Büyük A.Ş.:2 Küçük Ltd.:3', orders('sponsors'));
+      const big = col('sponsors').get(idOf('sponsors', 'name', 'Büyük A.Ş.'));
+      assert(
+        'vitrin: çoklu etkinlik ve adres yazıldı',
+        JSON.stringify(big?.eventIds) === '["git","eski"]' && big?.url === 'https://buyuk.com/',
+        JSON.stringify(big),
+      );
+
+      r = await post('/sponsorlar/yeni', { name: 'X', url: 'http://x.com', position: '1' });
+      assert('vitrin: http web sitesi 400', r.status === 400 && (await r.text()).includes('https://'));
+
+      html = await (await get('/sponsorlar/yeni')).text();
+      assert(
+        'vitrin: sponsor formu etkinlikleri ve çekiliş notunu gösteriyor',
+        html.includes('Git Atölyesi') && html.includes('(geçmiş)') && html.includes('Ödülü sağlayan'),
+      );
+
+      r = await get('/sponsorlar/yok');
+      assert('vitrin: olmayan sponsor 404', r.status === 404);
+    } finally {
+      server.close();
+      globalThis.fetch = realFetch;
+    }
+  }
 })().then(() => {
   // Çıkış burada: yukarıdaki blok asenkron, dosyanın sonunda çağrılsaydı
   // iddialar sayılmadan önce koşardı.
