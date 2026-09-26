@@ -108,7 +108,7 @@ Duyurular Firestore'da değil, kulüp sitesinin API'sinde (`https://api.kouseng.
 | `attendance` | yazar — `qr` (`yoklamaVer`); okur — `sertifikalarim` (sertifika, satırdaki `certificate` alanı) | yazar: elle yoklama, sertifika yayını |
 | `devices` | yazar — `app/_layout.tsx` → `NotificationSync` → `upsertDevice`; kimlik Expo push jetonu | okur: push gönderimi |
 | `sponsors` | okur — `useSponsors` (`src/sponsors.tsx` → `fetchSponsors`, yalnız `active`): Ana Sayfa, `sponsorlar`, `sponsor/[id]`, `etkinlik/[id]` ("Ödülü sağlayan") | yazar: `/sponsorlar` (`admin/vitrin.ts`) |
-| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi doleni `startSlideSweeper` siliyor |
+| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi dolanı `startSlideSweeper` siliyor |
 | `eventQr`, `emailOtp`, `passwordReset`, `phoneClaims`, `studentClaims`, `pushLog`, `pendingPushes`, `pushState` | kapalı | yalnız panel |
 
 ## İçerik girişi
