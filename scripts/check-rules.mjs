@@ -80,9 +80,11 @@ async function tohum(yol, alanlar) {
       ? { timestampValue: v.toISOString() }
       : Array.isArray(v)
       ? { arrayValue: { values: v.map(deger) } }
-      : typeof v === 'number'
-        ? { integerValue: String(v) }
-        : { stringValue: String(v) };
+      : typeof v === 'boolean'
+        ? { booleanValue: v }
+        : typeof v === 'number'
+          ? { integerValue: String(v) }
+          : { stringValue: String(v) };
   const res = await fetch(`${TABAN}/v1/projects/${PROJE}/databases/(default)/documents/${yol}`, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
@@ -310,6 +312,32 @@ try {
     setDoc(doc(u1, 'studentClaims', '210000003'), { uid: 'u1' }),
   );
   await red('telefon istemciden sahiplenilemiyor', () => setDoc(doc(u1, 'phoneClaims', '+905551112255'), { uid: 'u1' }));
+
+  // --- vitrin: sponsorlar ve slaytlar. Yayındakiler herkese açık, taslak
+  //     kapalı, yazan yalnız panel. Liste sorgusu `where('active','==',true)`
+  //     taşımak zorunda: kural filtresiz listeyi reddediyor, yoksa taslaklar
+  //     da gelirdi.
+  await tohum('sponsors/s1', { name: 'Örnek A.Ş.', order: 1, active: true });
+  await tohum('sponsors/s2', { name: 'Taslak Ltd.', order: 2, active: false });
+  await tohum('slides/sl1', { title: 'Hackathon', order: 1, active: true });
+  await tohum('slides/sl2', { title: 'Taslak', order: 2, active: false });
+  for (const [kol, acik, taslak] of [
+    ['sponsors', 's1', 's2'],
+    ['slides', 'sl1', 'sl2'],
+  ]) {
+    await izin(`${kol}: yayındakiler listelenebiliyor`, () =>
+      getDocs(query(collection(anon, kol), where('active', '==', true))),
+    );
+    await red(`${kol}: filtresiz liste okunamıyor`, () => getDocs(collection(anon, kol)));
+    await izin(`${kol}: yayındaki doküman okunuyor`, () => getDoc(doc(anon, kol, acik)));
+    await red(`${kol}: taslak okunamıyor`, () => getDoc(doc(anon, kol, taslak)));
+    await red(`${kol}: istemci yazamıyor`, () =>
+      setDoc(doc(u1, kol, 'sahte'), { name: 'Sahte', title: 'Sahte', order: 1, active: true }),
+    );
+    await red(`${kol}: istemci taslağı yayına alamıyor`, () =>
+      setDoc(doc(u1, kol, taslak), { active: true }, { merge: true }),
+    );
+  }
   await red('OTP sayacı istemciden sıfırlanamıyor', () =>
     setDoc(doc(u1, 'emailOtp', 'u1'), { attempts: 0 }, { merge: true }),
   );

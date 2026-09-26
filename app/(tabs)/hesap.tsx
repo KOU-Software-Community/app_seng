@@ -196,6 +196,17 @@ export default function HesapRoute() {
           </>
         ) : null}
 
+        {/* Oturumsuz da görünüyor: sponsorlar hesaba bağlı değil (5.1.1(v)). */}
+        <GroupLabel style={styles.groupLabel}>KULÜP</GroupLabel>
+        <View style={styles.card}>
+          <SatirLink
+            icon="grid"
+            label="Sponsorlarımız"
+            hint="Kulübü destekleyen kurumlar"
+            onPress={() => router.push('/sponsorlar')}
+          />
+        </View>
+
         <GroupLabel style={styles.groupLabel}>AYARLAR</GroupLabel>
         <View style={styles.card}>
           <SatirLink
@@ -375,6 +386,9 @@ function SatirLink({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
+      // Etiket verilince RN çocuk metinleri okumayı bırakıyor; ipucu ayrıca verilmezse kaybolur.
+      accessibilityHint={hint}
       style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
     >
       <View style={styles.linkIcon}>

@@ -209,6 +209,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Vitrin: ana sayfanın slaytları ve sponsorlar. Yazan yalnız panel (Admin
+    // SDK, bu kuralları görmez). Okuma yalnız yayındakiler: pasif doküman
+    // (taslak) istemciye hiç gitmiyor. Liste sorgusu da bu yüzden
+    // `where('active', '==', true)` taşımak zorunda — filtresiz liste reddediliyor.
+    match /sponsors/{id} {
+      allow read: if resource.data.active == true;
+      allow write: if false;
+    }
+    match /slides/{id} {
+      allow read: if resource.data.active == true;
+      allow write: if false;
+    }
+
     // Çekiliş katılımları. Kayıtlarla aynı mantık: öğrenci kendi katılımını
     // oluşturabilir, kimse kimseninkini okuyamaz veya değiştiremez. Kulüp
     // katılımları panelden CSV olarak indirir.

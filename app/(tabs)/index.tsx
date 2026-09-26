@@ -4,8 +4,11 @@ import React from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HomeSlider } from '../../src/components/HomeSlider';
+import { PhotoSlot } from '../../src/components/PhotoSlot';
 import { PixelIcon } from '../../src/components/Pixel';
 import {
+  Card,
   ContentNotice,
   DottedRule,
   PixelBadge,
@@ -19,6 +22,8 @@ import {
 } from '../../src/announcements';
 import { useContent } from '../../src/content';
 import { ClubEvent } from '../../src/data';
+import { useSlides } from '../../src/slides';
+import { useSponsors } from '../../src/sponsors';
 import { useAppStore } from '../../src/store';
 import { colors, gradientDirection, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
@@ -37,7 +42,19 @@ export default function HomeRoute() {
     announcements,
     error: announcementsError,
     loading: announcementsLoading,
+    refresh: refreshAnnouncements,
   } = useAnnouncements();
+  const { slides, error: slidesError, refresh: refreshSlides } = useSlides();
+  const { sponsors, error: sponsorsError, refresh: refreshSponsors } = useSponsors();
+
+  // Aşağı çekmek ana sayfadaki her şeyi yeniler. Duyurular daha önce burada
+  // yenilenmiyordu; çeken kişi hepsinin tazelendiğini sanıyordu.
+  const onRefresh = () => {
+    refresh();
+    refreshSlides();
+    refreshSponsors();
+    refreshAnnouncements();
+  };
 
   const upcoming = events.slice(0, EVENT_COUNT);
 
@@ -47,7 +64,13 @@ export default function HomeRoute() {
       contentContainerStyle={{ paddingBottom: 24 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue200} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={onRefresh}
+          // blue200 açık zeminde görünmüyordu. `tintColor` yalnız iOS; Android `colors` okuyor.
+          tintColor={colors.blue500}
+          colors={[colors.blue500]}
+        />
       }
     >
       <LinearGradient
@@ -111,6 +134,62 @@ export default function HomeRoute() {
       </LinearGradient>
 
       {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
+
+      {/* Hata ya da boşken hiç çizilmiyor: bir süs, ana sayfayı bekletmemeli. */}
+      {!slidesError ? <HomeSlider slides={slides} /> : null}
+
+      {!sponsorsError && sponsors.length ? (
+        <>
+          <SectionTitle
+            icon="grid"
+            style={{ paddingTop: 20 }}
+            trailing={
+              <Pressable
+                onPress={() => router.push('/sponsorlar')}
+                accessibilityRole="button"
+                accessibilityLabel="Tüm sponsorlar"
+              >
+                <Txt weight="semibold" size={12} color={colors.blue500}>
+                  Tümü →
+                </Txt>
+              </Pressable>
+            }
+          >
+            Sponsorlarımız
+          </SectionTitle>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sponsorRail}>
+            {sponsors.map((s) => (
+              <Pressable
+                key={s.id}
+                onPress={() => router.push(`/sponsor/${s.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={s.name}
+              >
+                <Card style={styles.sponsorCard}>
+                  <PhotoSlot uri={s.logo} resizeMode="contain" showLabel={false} style={styles.sponsorLogo} />
+                  <Txt weight="bold" size={12} numberOfLines={1} style={{ marginTop: 8 }}>
+                    {s.name}
+                  </Txt>
+                </Card>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => router.push('/sponsorlar')}
+              accessibilityRole="button"
+              accessibilityLabel="Sponsor ol"
+              style={({ pressed }) => [styles.sponsorJoin, pressed && { opacity: 0.7 }]}
+            >
+              <Txt weight="bold" size={18} color={colors.blue500}>
+                +
+              </Txt>
+              <Txt weight="bold" size={12} color={colors.blue500}>
+                Sponsor ol
+              </Txt>
+            </Pressable>
+          </ScrollView>
+        </>
+      ) : null}
 
       <SectionTitle
         icon="lines"
@@ -304,6 +383,23 @@ const styles = StyleSheet.create({
   },
 
   sectionEmpty: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10 },
+
+  sponsorRail: { paddingHorizontal: 20, gap: 10 },
+  // 112 − 2 kenarlık − 2×10 boşluk = 90: logo tam oturuyor.
+  sponsorCard: { width: 112, borderRadius: radius.lg, padding: 10 },
+  sponsorLogo: { width: 90, height: 56, borderRadius: 9, backgroundColor: colors.bg },
+  // Satırın çapraz ekseni `stretch`: kart diğerleriyle aynı boyda.
+  sponsorJoin: {
+    width: 112,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.blue200,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
 
   feed: { paddingHorizontal: 20, gap: 10 },
   feedRow: {

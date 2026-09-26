@@ -50,7 +50,7 @@ export default function ArsivRoute() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} colors={[colors.blue500]} />
         }
       >
         <GradientHeader gradient={gradients.section} style={{ paddingBottom: 16 }}>
