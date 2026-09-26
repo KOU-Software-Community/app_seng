@@ -1,21 +1,23 @@
 # Sponsorlar ve ana sayfa slider'ı — tasarım
 
-Durum: **tasarım, onay bekliyor.** §3 ve §4.1–4.2 sohbette onaylandı; §4.3 ve
-sonrası bu belgede ilk kez yazılıyor.
+Durum: **onaylandı.** Uygulama planı `docs/sponsorlar-ve-slider-plani.md`.
 
 Karar özeti:
 
 - Ana sayfanın yeni sırası: header → slider → Sponsorlarımız → Yaklaşan
   Etkinlikler → Duyurular.
-- İki yeni Firestore koleksiyonu: `slides` (sosyal medya ekibinin elle girdiği
+- İki yeni Firestore koleksiyonu: `slides` (sosyal medya ekibinin girdiği
   slaytlar) ve `sponsors`. İkisi de istemciye yalnız `active` olanları veriyor ve
-  `order`'a göre sıralanıyor. Slaytlarda isteğe bağlı bir bitiş tarihi (`endsAt`)
-  var.
-- İki yeni ekran: `/sponsorlar` ve `/sponsor/[id]`. Hesabım'da oturumsuz da
-  görünen bir KULÜP grubu. Çekiliş etkinliğinin detayında sponsor sayfasına giden
-  bir "Ödülü sağlayan" etiketi.
-- Görsel, uygulama için yalnızca bir https adresi; nerede barındığı uygulamanın
-  işi değil. Panelden yükleme ayrı bir iş (§8).
+  zorunlu `order` alanına göre sıralanıyor.
+- Slaytlarda isteğe bağlı bir bitiş tarihi (`endsAt`) var. Tarihi geçen slaytı
+  panelin zamanlayıcısı **siliyor** (görseliyle birlikte); bitiş tarihi olmayan
+  slayt kalıcı.
+- İçerik panelden giriliyor. Sıra sürükle-bırak ya da ↑/↓ ile değiştiriliyor;
+  bir öğe bir sıraya konunca diğerleri kayıyor.
+- Uygulamada iki yeni ekran: `/sponsorlar` ve `/sponsor/[id]`. Hesabım'da
+  oturumsuz da görünen bir KULÜP grubu. Çekiliş etkinliğinin detayında sponsor
+  sayfasına giden bir "Ödülü sağlayan" etiketi.
+- Ana sayfada aşağı çekince çıkan yükleniyor göstergesi tema mavisinde.
 
 ---
 
@@ -23,34 +25,37 @@ Karar özeti:
 
 Bu işte:
 
-- Ana sayfaya slider ve Sponsorlarımız bölümü, yeni sıralama.
-- `app/sponsorlar.tsx`, `app/sponsor/[id].tsx`.
-- Etkinlik detayında çekiliş için "Ödülü sağlayan" etiketi.
-- Hesabım → KULÜP → Sponsorlarımız.
-- `sponsors` ve `slides` için okuma, ayrıştırma, kurallar, `check:rules` ve
-  `check:release` kapsamı, testler.
+- Uygulama: slider, Sponsorlarımız bölümü, yeni sıralama, iki yeni ekran,
+  "Ödülü sağlayan" etiketi, Hesabım → KULÜP, yenileme göstergesinin rengi.
+- Panel: Slider ve Sponsorlar sayfaları (liste, sıralama, form, görsel
+  yükleme, silme) ve süresi dolan slaytları silen zamanlayıcı.
+- Veri: `sponsors` ve `slides` için ortak şema modülleri, kurallar,
+  `check:rules`, `check:panel`, `check:release` kapsamı, testler.
 
 Bu işte değil:
 
-- Panelde sponsor ve slayt ekranı, görsel yükleme (§8).
 - Sponsorlara bitiş tarihi. Kullanıcı kararı: yalnız slaytlarda.
 - Sponsor listesinde "{n} etkinliği destekledi" sayacı. Kullanıcı kararı:
   kaldırıldı.
 - Çekiliş olmayan etkinliklerde "destekleyen" etiketi.
 - Firebase Storage (§2).
+- Mevcut panel sayfalarının görünümü.
 
 ## 2. Kaynak metinden ayrıldığımız yerler
 
 | Kaynak metin | Bu tasarım | Neden |
 |---|---|---|
-| Logo ve slider görselleri Firebase Storage'da | Uygulama bir https adresi okur; panel işi Supabase Storage'a yükler | Cloud Storage 2024 sonrası açılan projelerde Blaze planı istiyor; `admin/photos.ts` bu yüzden Supabase kullanıyor. `PhotoSlot` adresin nerede durduğunu bilmiyor. |
-| Slayt şemasında bitiş tarihi yok | İsteğe bağlı `endsAt: "YYYY-AA-GG"` | Kullanıcı kararı: tarih gelince kendiliğinden kalksın. |
-| "Eskimiş ya da uydurma içerik gösterme" | Uygulama slaytın iddiasını ("BUGUN" gibi) doğrulamıyor, güncellik ekibin sorumluluğu. Uydurma içerik yok: yerel yedek slayt ya da sponsor yok, veri yoksa bölüm çizilmiyor. | Kullanıcı kararı. |
+| Logo ve slider görselleri Firebase Storage'da | Panel Supabase Storage'a yüklüyor, uygulama bir https adresi okuyor | Cloud Storage 2024 sonrası açılan projelerde Blaze planı istiyor; `admin/photos.ts` bu yüzden Supabase kullanıyor. `PhotoSlot` adresin nerede durduğunu bilmiyor. |
+| Panel ayrı iş | Bu işte | Kullanıcı kararı: sıra kaydırma ve sürükle-bırak panelde olmalı. |
+| `order` sıralama için | `order` zorunlu; panel her değişiklikte 1…n yeniden yazıyor | Kullanıcı kararı: bir öğe 1 numaraya konunca diğerleri kaymalı. |
+| Slayt şemasında bitiş yok | İsteğe bağlı `endsAt: "YYYY-AA-GG"`; tarihi geçince panel siliyor | Kullanıcı kararı. |
+| "Eskimiş ya da uydurma içerik gösterme" | Uygulama slaytın iddiasını ("BUGUN" gibi) doğrulamıyor; güncellik ekibin işi. Uydurma içerik yok: yerel yedek slayt ya da sponsor yok, veri yoksa bölüm çizilmiyor. | Kullanıcı kararı. |
 | Listede "{n} etkinliği destekledi" | Kaldırıldı | Kullanıcı kararı. |
 | "Ödülü sağlayan" yalnız sponsor detayında | Ayrıca çekiliş etkinliğinin detayında, sponsor sayfasına giden etiket | Kullanıcı kararı. Çekiliş kuralları zaten "ödülü sağlayan taraf varsa ilgili etkinliğin açıklamasında belirtilir" diyor. |
 | `src/sponsors.ts` | `src/sponsors.tsx` | Provider JSX taşıyor. |
 | `useSlides`, useContent'e benzer | Provider'sız hook | Tek tüketicisi ana sayfa. |
-| Kicker serbest metin | `BUGUN` / `CEKILIS` / `DUYURU`; ikon bundan türüyor | Pixel fontunda Türkçe harf yok (mevcut rozet de "SON GUN"), ve ikonu seçmek için bilinen bir değer gerekiyor. |
+| Kicker serbest metin | `BUGUN` / `CEKILIS` / `DUYURU`; ikon bundan türüyor | Tasarımın rozet dili ASCII ("SON GUN", "CEKILIS"). Pixel fontunda Türkçe harfler var, yani bu bir font sınırı değil. Değer sabit bir liste, çünkü ikon ondan seçiliyor. |
+| `src/sponsorSchema.ts` + `src/slideSchema.ts` | Tek modül: `src/vitrinSchema.ts` | İki koleksiyon `isOrder`, `byOrder` ve https denetimini paylaşıyor; ayrı dosyada ya birbirini içe aktarırlar ya kopyalarlardı. |
 | Otomatik geçiş her zaman | "Hareketi azalt" ya da ekran okuyucu açıkken kapalı | Onaylanan öneri: kendi kendine kayan içerik ekran okuyucuyla gezeni yerinden eder (WCAG 2.2.2). |
 | Beyaz renk | `colors.white` token'ı | "Sabit hex kullanma" kuralı. Mevcut `"#fff"`'lere dokunulmuyor. |
 
@@ -58,85 +63,65 @@ Bu işte değil:
 
 ### 3.1 `sponsors/{id}`
 
+Kimlik Firestore'un ürettiği rastgele kimlik; panel formda kimlik sormuyor.
+
 | Alan | Tip | Zorunlu | Not |
 |---|---|---|---|
-| `name` | string | evet | Boşsa doküman atlanır. |
+| `name` | string | evet | |
+| `order` | tam sayı ≥ 1 | evet | Panel 1…n yazıyor. |
+| `active` | boolean | evet | Kural ve sorgu `== true` istiyor. |
 | `sector` | string | hayır | |
 | `description` | string | hayır | |
-| `logo` | string, https | hayır | https değilse yok sayılır ve yer tutucu çizilir. |
-| `url` | string, https | hayır | https değilse yok sayılır; "Web sitesine git" çizilmez. |
-| `eventIds` | string[] | hayır | Dizi değilse `[]`; dize olmayan öğeler atlanır. |
-| `order` | number | hayır | Küçük önce; yoksa sona. |
-| `active` | boolean | kural için | Kural ve sorgu `== true` istiyor. |
+| `logo` | string, https | hayır | Panelin yüklediği adres. |
+| `url` | string, https | hayır | Web sitesi. |
+| `eventIds` | string[] | hayır | Panelde etkinlik listesinden seçiliyor. |
 
 ### 3.2 `slides/{id}`
 
 | Alan | Tip | Zorunlu | Not |
 |---|---|---|---|
-| `title` | string | evet | Boşsa doküman atlanır. |
-| `target` | map | evet | `{type:'event', id}`, `{type:'announcement', id}` ya da `{type:'url', url}`. Bozuksa ya da url https değilse doküman atlanır. |
-| `image` | string, https | hayır | https değilse yok sayılır ve gradyan yer tutucu çizilir. |
-| `kicker` | `BUGUN` \| `CEKILIS` \| `DUYURU` | hayır | Başka bir değerde rozet çizilmez, slayt yine görünür. |
+| `title` | string | evet | |
+| `target` | map | evet | `{type:'event', id}`, `{type:'announcement', id}` ya da `{type:'url', url}` (https). |
+| `order` | tam sayı ≥ 1 | evet | |
+| `active` | boolean | evet | |
+| `image` | string, https | hayır | Panelin yüklediği adres. |
+| `kicker` | `BUGUN` \| `CEKILIS` \| `DUYURU` | hayır | Yoksa rozet çizilmiyor. |
 | `meta` | string | hayır | |
-| `order` | number | hayır | Küçük önce; yoksa sona. |
-| `endsAt` | string, `YYYY-AA-GG` | hayır | O gün dahil görünür. Biçimi bozuksa slayt gizlenir: yanlış yazılmış bir bitiş tarihi, slaytın sonsuza kadar kalmasına dönüşmesin. |
-| `active` | boolean | kural için | |
+| `endsAt` | string, `YYYY-AA-GG` | hayır | Yoksa kalıcı. Varsa o gün dahil görünür, ertesi gün panel siler. |
 
-### 3.3 Console'dan giriş (panel gelene kadar)
+### 3.3 Ayrıştırma ve doğrulama
 
-Panel desteği ayrı iş olduğu için ilk veri Firebase Console'dan giriliyor.
-Console doğrulamayı atlıyor; o yüzden §3.4'teki ayrıştırma katı.
-
-`slides/hackathon-2026` örneği:
-
-```
-title:   "Hackathon kayıtları açıldı"        (string)
-meta:    "48 saat · 12 Ekim · Mühendislik B"  (string)
-kicker:  "DUYURU"                             (string)
-image:   "https://…/hackathon.jpg"            (string)
-target:  { type: "url", url: "https://kouseng.com/hackathon" }  (map)
-order:   1                                    (number)
-endsAt:  "2026-10-12"                         (string)
-active:  true                                 (boolean)
-```
-
-`sponsors/ornek-firma` örneği:
-
-```
-name:        "Örnek Yazılım A.Ş."   sector: "Yazılım"
-description: "…"                    logo:   "https://…/logo.png"
-url:         "https://ornek.com"    eventIds: ["git-atolyesi", "bahar-cekilisi"]
-order:       1                      active: true
-```
-
-### 3.4 Ayrıştırma
-
-- `src/sponsorSchema.ts`: `toSponsor(id, raw) → Sponsor | null`, sıralama ve
-  `sponsorEvents(sponsor, events, archive, hasRaffle)` (sponsor detayındaki
-  satırlar; `hasRaffle` = `useContent().getRaffle` üzerinden
-  `(eventId) => boolean`). Saf modül; `firebase.ts` onu içe aktarıyor,
-  `raffleSchema` ile aynı düzen.
-- `src/slideSchema.ts`: `toSlide(id, raw) → Slide | null` ve
-  `visibleSlides(slides, today)` (bitiş tarihi ve sıralama).
+- `src/vitrinSchema.ts` saf bir modül. Hem uygulama hem panel kullanıyor,
+  `announcementApi.ts`'in panelle paylaşılması gibi.
+  - `buildSponsor(input)` / `buildSlide(input)`: panel formunun doğrulaması,
+    `buildEvent` gibi `{ ok, value } | { ok: false, errors }` döndürüyor.
+  - `toSponsor(id, raw)` / `toSlide(id, raw)`: uygulamanın okuması. Zorunlu
+    alanı eksik ya da bozuk doküman atlanıyor; listeyi düşürmüyor
+    (`toAnnouncement` ile aynı ilke). İsteğe bağlı alanlar bozuksa yok
+    sayılıyor: https olmayan görsel yer tutucuya, tanınmayan kicker rozetsiz
+    slayta dönüyor.
+  - `sponsorEvents(sponsor, events, archive, hasRaffle)`: sponsor detayındaki
+    satırlar. `hasRaffle`, `useContent().getRaffle` üzerinden
+    `(eventId) => boolean`.
 - https denetimi elle yazılmıyor: `src/gundem/data-access/sourceUrl.ts`'teki
   `parseSourceUrl`. React Native'in `URL`'i adres ayrıştırmıyor, bu yardımcı
   ayrıştırıyor. Döndürdüğü `host` sponsor detayındaki alan adı satırı.
-- Bozuk bir doküman listeyi düşürmüyor, atlanıyor: `announcementApi.ts`'teki
-  `toAnnouncement` ile aynı ilke.
 
-### 3.5 Sıralama ve görünürlük
+### 3.4 Sıralama, görünürlük, silinme
 
-- `order` artan; `order`'ı olmayanlar sonda. Eşitlikte sponsorlar ada göre
-  (`localeCompare(…, 'tr')`), slaytlar kimliğe göre, yani her açılışta aynı sıra.
-  Ad sıralaması yalnız görüntü için; sayfalama olmadığından Hermes'in platform
-  harmanlayıcısının küçük farkları bir şey bozmuyor.
-- Slayt `endsAt >= todayLocal(new Date())` iken görünür. İkisi de `YYYY-AA-GG`
-  olduğu için metin karşılaştırması yetiyor. Karar okuma ve yenileme anında
-  veriliyor: uygulama gece yarısını açık geçirirse slayt yenilemeye kadar kalır.
-  Takvimdeki `splitByDate` ile aynı davranış.
-- `active=false` bir slaytı ya da sponsoru bir sonraki okumada kaldırır.
+- `order` artan. Panel her değişiklikte 1…n yazdığı için eşitlik olmuyor;
+  Console'dan elle girilmiş bir eşitlikte kimlik karar veriyor (her açılışta
+  aynı sıra).
+- Uygulama slaytı `endsAt` yoksa ya da `endsAt >= todayLocal(new Date())`
+  iken gösteriyor. İkisi de `YYYY-AA-GG` olduğu için metin karşılaştırması
+  yetiyor. Biçimi bozuk bir `endsAt` (yalnız Console'dan elle yazılabilir)
+  slaytı gizliyor.
+- Panelin zamanlayıcısı `endsAt`'i geçmiş slaytları siliyor (§5.5). Uygulamanın
+  kendi süzmesi de duruyor: gece yarısıyla zamanlayıcının bir sonraki turu
+  arasında ya da panel kapalıyken süresi dolan slayt görünmesin diye.
+- `active=false` bir slaytı ya da sponsoru bir sonraki okumada kaldırıyor.
 
-### 3.6 Kurallar
+### 3.5 Kurallar
 
 ```
 match /sponsors/{id} {
@@ -149,8 +134,8 @@ match /slides/{id} {
 }
 ```
 
-- İstemci sorgusu `where('active', '==', true)`, sıralama istemcide yapılıyor;
-  birleşik indeks gerekmiyor.
+- İstemci sorgusu `where('active', '==', true)`, sıralama istemcide; birleşik
+  indeks gerekmiyor. Panel Admin SDK ile yazıyor, kurala takılmıyor.
 - Pasif doküman (taslak) istemciye hiç gelmiyor.
 - `check:rules` senaryoları, iki koleksiyon için de: aktif liste okunur,
   filtresiz liste reddedilir, aktif doküman `getDoc` ile okunur, pasif doküman
@@ -264,8 +249,8 @@ tutarsızlığı da kapatıyor.
     `archive` listelerinden kimlikle eşleniyor, eşleşmeyenler düşüyor. Önce
     yaklaşanlar (takvim sırası), sonra geçmişler (arşiv sırası). Her satırda
     solda 4px dikey çizgi (yaklaşan blue500, geçmiş blue200), başlık ve `short`,
-    sağda "›". Etkinlik bir çekilişse (`getRaffle(id)`) satırda "Ödülü sağlayan"
-    `Tag`'i var. Dokununca `useOpenEvent`. Hiç satır yoksa başlık da çizilmiyor.
+    sağda "›". Etkinlik bir çekilişse satırda "Ödülü sağlayan" `Tag`'i var.
+    Dokununca `useOpenEvent`. Hiç satır yoksa başlık da çizilmiyor.
   - `url` varsa en altta `PrimaryButton` "Web sitesine git"
     (`Linking.openURL`), altında alan adı (Txt 12, faint).
 - Sponsor bulunamadıysa:
@@ -290,7 +275,7 @@ için çiziliyor. Bu yüzden çekilişten bu sayfaya geçiş §4.5'teki kuralı 
 - Kural: bu bileşenin ekrana yazdığı hiçbir metin "sponsor" kelimesini
   taşımıyor. Apple 5.3.2 çekilişin sponsorunun geliştirici olmasını istiyor ve
   `raffleLegal.ts` ödülü sağlayanın sponsor olmadığını söylüyor. Bu iddia bir
-  render testiyle korunuyor (§6).
+  render testiyle korunuyor (§7).
 
 ### 4.6 Hesabım (`app/(tabs)/hesap.tsx`)
 
@@ -313,7 +298,109 @@ için çiziliyor. Bu yüzden çekilişten bu sayfaya geçiş §4.5'teki kuralı 
 - Dokunulabilir her yeni öğe `accessibilityRole` ve `accessibilityLabel`
   taşıyor.
 
-## 5. Durum tablosu
+### 4.9 Yenileme göstergesi
+
+- Ana sayfanın `RefreshControl`'ü `tintColor={colors.blue200}` taşıyordu: açık
+  zeminde görünmüyor. `blue500` oluyor (takvim ve arşiv zaten `blue500`).
+- Android için hiçbir ekranda renk verilmemiş (`tintColor` yalnız iOS). Ana
+  sayfa, takvim ve arşive `colors={[colors.blue500]}`. AI Gündem'e
+  dokunulmuyor.
+
+## 5. Panel
+
+### 5.1 Menü
+
+`page()` menüsüne **Slider** (`/slider`) ve **Sponsorlar** (`/sponsorlar`).
+
+### 5.2 Liste sayfası
+
+```
+┌ Slider ──────────────────────────────────── [+ Yeni slayt] ┐
+│ Uygulamada ana sayfanın üstünde bu sırayla döner.            │
+│ ⠿ 1 [görsel] Hackathon kayıtları açıldı      ● Yayında  ↑ ↓ │
+│              DUYURU · bağlantı · 12 Eki'ye kadar    Düzenle │
+│ ⠿ 2 [görsel] Git atölyesi bugün              ○ Pasif    ↑ ↓ │
+│              BUGUN · etkinlik · süresiz             Düzenle │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- Satırlar `order` sırasında. Her satırda tutamaç, sıra numarası, küçük görsel
+  (logo ya da slayt), başlık ve alt satır, durum etiketi (Yayında / Pasif), ↑ ↓
+  ve Düzenle.
+- **Sürükle-bırak:** masaüstünde HTML5 sürükle-bırak, sayfanın içinde küçük bir
+  script; kütüphane yok. Bırakınca yeni sıra gizli bir formla gönderiliyor,
+  sunucu 1…n yazıyor.
+- **↑ / ↓:** JavaScript'siz küçük formlar; telefonda ve klavyede de çalışıyor
+  (iPhone'da tarayıcının sürükle-bırakı güvenilir değil).
+- Pasif öğeler listede yerini koruyor, uygulamada görünmüyor.
+
+### 5.3 Formlar
+
+Slayt formu:
+
+- Başlık*, meta.
+- Rozet: Yok / BUGUN / CEKILIS / DUYURU.
+- Görsel: yükleme, mevcut görselin önizlemesi, "Görseli kaldır".
+- Hedef, üçünden biri: etkinlik (yaklaşan ve geçmiş etkinlik listesinden),
+  duyuru (kulüp sitesinin listesinden, `fetchAnnouncements`), bağlantı (https).
+- Bitiş tarihi (`<input type="date">`): boş bırakılırsa kalıcı; doluysa o gün
+  bitince silinir.
+- Sıra: 1…n; seçilen sıraya yerleşiyor, diğerleri kayıyor. Yeni slaytta
+  varsayılan 1.
+- Yayında kutusu.
+
+Sponsor formu:
+
+- Ad*, sektör, tanıtım, web sitesi (https).
+- Logo: yükleme, önizleme, kaldırma. PNG önerilir; şeffaf zemin korunuyor.
+- Desteklediği etkinlikler: yaklaşan ve geçmiş etkinliklerin listesinden işaret
+  kutusuyla. Çekiliş olanların yanında "uygulamada 'Ödülü sağlayan' olarak
+  görünür" notu.
+- Sıra: 1…n; yeni sponsorda varsayılan en son.
+- Yayında kutusu.
+
+Ortak: hatalı alan formu hatasıyla yeniden çiziyor (etkinlik formu gibi);
+"Sil" onay isteyen bir düğme.
+
+### 5.4 Sunucu
+
+- Rotalar `admin/vitrin.ts`'te, `registerVitrin(app, db)` ile ve
+  `app.use(requireAuth)`'tan **sonra** kuruluyor. HTML `admin/vitrinView.ts`'te,
+  her metin `esc()`'ten geçiyor. Mevcut CSRF denetimi (`sameOrigin`) yeni
+  formları da kapsıyor.
+- Her iki koleksiyon için: liste, yeni, düzenle, sil, `tasi` (↑/↓) ve `sirala`
+  (sürükle-bırak).
+- Sıra mantığı saf fonksiyonlarda, `admin/ordering.ts`: yerleştir (bir öğeyi k.
+  sıraya koy, diğerleri kaysın), bir adım taşı, 1…n numarala. `sirala`,
+  gönderilen kimlik kümesi mevcut kümeyle birebir aynı değilse reddediyor.
+  Kayıt ve sıra kayması tek bir Firestore batch'inde yazılıyor.
+- Doğrulama `buildSponsor` / `buildSlide` ile; sıra etkinlik formundakiyle
+  aynı: doğrula → görseli yükle → yaz → eski görseli sil. Yükleme başarısızsa
+  yüklenen geri alınıyor ve form 503 ile yeniden çiziliyor (Cloudflare 502/504
+  gövdesini yutuyor).
+- `admin/photos.ts` genelleşiyor: `sponsors/{id}/…png` (logo, uzun kenar
+  512 px, PNG: şeffaflık), `slides/{id}/…jpg` (uzun kenar 1600 px, JPEG).
+  Silme izin listesine bu iki klasör ekleniyor. Öğe silinince klasörü de
+  siliniyor. Aynı bucket, yeni ortam değişkeni yok.
+
+### 5.5 Süresi dolan slaytları silen zamanlayıcı
+
+- `startSlideSweeper(db)`: panelin mevcut yoklayıcıları gibi açılışta bir kez,
+  sonra saatte bir çalışıyor (`unref`'li). `endsAt < todayLocal(new Date())`
+  olan slaytları ve görsel klasörlerini siliyor, kalanları 1…n yeniden
+  numaralıyor.
+- Silinecek slaytları seçen kısım saf bir fonksiyon (`expiredSlideIds(slides,
+  today)`, `src/vitrinSchema.ts`), Jest'te sınanıyor.
+- Hata paneli düşürmüyor; `console.error` ile yazılıyor, bir sonraki tur
+  yeniden deniyor.
+
+### 5.6 Görünüm
+
+Mevcut panel CSS değişkenleri (navy/blue) ve kart yapısı korunuyor. Yeni
+sınıflar yalnız yeni sayfalarda kullanılıyor: gölgeli satır kartları, yuvarlak
+durum etiketleri, tutamaç, küçük önizlemeler, mobilde tek sütun.
+
+## 6. Durum tablosu (uygulama)
 
 | | İlk yükleme | Hata | Veri yok |
 |---|---|---|---|
@@ -326,60 +413,65 @@ için çiziliyor. Bu yüzden çekilişten bu sayfaya geçiş §4.5'teki kuralı 
 Kurallar yayınlanmadan çıkan bir sürümde okuma reddedilir ve her satır "Hata"
 sütunundaki gibi davranır; mevcut hiçbir akış etkilenmez.
 
-## 6. Test ve kontroller
+## 7. Test ve kontroller
 
-- `src/__tests__/sponsor-schema.test.ts`: `toSponsor` (ad zorunlu, https dışı
-  logo ve url düşüyor, `eventIds` temizleniyor), sıralama (`order`, `order`'sızlar
-  sonda, eşitlikte ad), `sponsorEvents` (eşleşmeyen düşüyor, yaklaşan önce,
-  geçmiş ve çekiliş işaretli).
-- `src/__tests__/slide-schema.test.ts`: `toSlide` (başlıksız ya da hedefsiz
-  düşüyor, https olmayan url hedefi düşüyor, bilinmeyen kicker rozetsiz),
-  `visibleSlides` (`endsAt` dün → gizli, bugün → görünür, bozuk → gizli,
-  sıralama).
+- `src/__tests__/vitrin-schema.test.ts`:
+  - `buildSponsor` (ad zorunlu, sıra ≥ 1, https dışı web sitesi reddediliyor),
+    `toSponsor` (zorunlu alanı eksik doküman düşüyor, https dışı logo yok
+    sayılıyor, `eventIds` temizleniyor), sıralama, `sponsorEvents` (eşleşmeyen
+    düşüyor, yaklaşan önce, geçmiş ve çekiliş işaretli).
+  - `buildSlide` (başlık ve hedef zorunlu, https dışı bağlantı reddediliyor,
+    tarih biçimi, geçmiş bitiş tarihi reddediliyor), `toSlide` (bozuk doküman
+    düşüyor, tanınmayan kicker rozetsiz), `visibleSlides` (`endsAt` dün →
+    gizli, bugün → görünür, yok → görünür, bozuk → gizli, sıralama),
+    `expiredSlideIds`.
+- `src/__tests__/sponsors-screen.test.tsx`: okuma düşünce Sponsorlarımız
+  ekranı hata şeridini ve "Sponsor ol" kartını gösteriyor, "Henüz sponsor yok"
+  demiyor.
 - `src/__tests__/prize-providers.test.tsx`: "Ödülü sağlayan" çiziliyor,
   ekrandaki hiçbir metin `/sponsor/i` ile eşleşmiyor, dokununca
   `/sponsor/{id}`.
 - `src/__tests__/home-slider.test.tsx`: tek slaytta nokta yok; iki slaytta
   sahte zamanlayıcıyla 4,5 saniye sonra ikinci nokta seçili, bir 4,5 saniye daha
   sonra başa dönüyor; "hareketi azalt" açıkken ilerlemiyor.
-- `check:rules`: §3.6'daki senaryolar.
-- `check:release`, yeni kontrol "sponsor ekranları bağlı": iki dosya var, iki
-  rota kök yığında kayıtlı, `SponsorsProvider` mount ediliyor, Hesabım ve ana
-  sayfa `/sponsorlar`'a bağlanıyor, ana sayfa `HomeSlider`'ı, etkinlik detayı
-  `PrizeProviders`'ı çiziyor. Her iddia, koruduğu şey kırılınca kırmızı verdiği
-  görülerek ekleniyor. Yorumlar `strip()` ile atılıyor.
+- `check:panel`: `admin/ordering.ts` (yerleştir, taşı, `sirala` kümesi),
+  görsel yolu izin listesi, vitrin sayfalarının HTML'i.
+- `check:rules`: §3.5'teki senaryolar.
+- `check:release`, yeni kontroller:
+  - "sponsor ekranları bağlı": iki dosya var, iki rota kök yığında kayıtlı,
+    `SponsorsProvider` mount ediliyor, Hesabım ve ana sayfa `/sponsorlar`'a
+    bağlanıyor, ana sayfa `HomeSlider`'ı, etkinlik detayı `PrizeProviders`'ı
+    çiziyor.
+  - "vitrin paneli bağlı": `registerVitrin` `requireAuth`'tan sonra kuruluyor,
+    `startSlideSweeper` açılışta başlıyor, silme yolları görsel klasörünü de
+    siliyor.
+  - Her iddia, koruduğu şey kırılınca kırmızı verdiği görülerek ekleniyor.
+    Yorumlar `strip()` ile atılıyor.
 - Mevcut kontroller kendiliğinden kapsıyor: "her koleksiyonun bir kuralı var"
   (`COLLECTIONS`), "yığın ekranlarında geri düğmesi var" (`label="‹"`),
   "içerik durumu ekranlara bağlı" (ana sayfada `ContentNotice` ve
   `RefreshControl` kalmalı), "QR yoklama zinciri bağlı" (ana sayfada
-  `push('/qr')` kalmalı).
+  `push('/qr')` kalmalı), "yükleme yetim dosya bırakmıyor" (etkinlik yolu
+  `uploadEventPhoto` adıyla kalmalı).
 - Bitiş ölçütü: `npm run check:all`, `npm run check:rules`,
   `npx expo export --platform ios` ve `npm run check:bundle` yeşil.
 
-## 7. Dağıtım yüzeyleri ve sıra
+## 8. Dağıtım yüzeyleri ve sıra
 
 | Yüzey | Dokunuluyor mu | Canlıya nasıl gider |
 |---|---|---|
-| Mobil uygulama | evet (`app/`, `src/`) | EAS build ya da OTA, operatör çalıştırır. Yeni native bağımlılık yok (FlatList, AccessibilityInfo ve Linking çekirdekte), yani OTA'ya uygun. |
-| Firestore kuralları | evet | `npm run rules:deploy`, operatör çalıştırır, **uygulama sürümünden önce**. |
-| Panel | hayır | gerekmiyor (§8 ayrı iş) |
+| Firestore kuralları | evet | `npm run rules:deploy`, operatör çalıştırır. **İlk adım.** |
+| Panel | evet (`admin/`) | Coolify redeploy. Yeni ortam değişkeni yok. İkinci adım; ardından ekip içeriği girer. |
+| Mobil uygulama | evet (`app/`, `src/`) | EAS build ya da OTA, operatör çalıştırır. Yeni native bağımlılık yok (FlatList, AccessibilityInfo ve Linking çekirdekte), yani OTA'ya uygun. Son adım. |
 | AI Gündem veritabanı | hayır | gerekmiyor |
 | Yalnız depo | evet | belgeler, testler, `scripts/check-*`, `graphify-out/` |
 
-## 8. Ayrı iş: panel
-
-- `admin/`'e sponsor ve slayt listesi ile formu. Görsel yükleme
-  `admin/photos.ts` üzerinden Supabase Storage'a; logo için daha küçük bir
-  boyut sınırı.
-- Doğrulama uygulamayla aynı modüllerden (`sponsorSchema.ts`, `slideSchema.ts`),
-  `announcementApi.ts`'in panelle paylaşılması gibi.
-- İsteğe bağlı temizlik: `endsAt`'i geçmiş slaytları ve dosyalarını silmek.
-  Etkinlik fotoğraflarındaki "yükleme yetim dosya bırakmıyor" kuralının bu
-  koleksiyonlardaki karşılığı.
-- O güne kadar giriş Console'dan, §3.3'teki biçimle.
+Bu sırayla uygulama çıktığında slider ve sponsorlar dolu oluyor.
 
 ## 9. Varsayımlar
 
-- `info@kouseng.com` çalışan ve okunan bir posta kutusu.
-- Sponsor ve slayt sayısı onlarla sınırlı: tek sorgu, sayfalama yok.
+- Sponsor ve slayt sayısı onlarla sınırlı: tek sorgu, sayfalama yok; sıra
+  değişikliği bütün listeyi yeniden yazıyor.
+- Panelde aynı anda tek kişi sıralama yapıyor; iki eşzamanlı sıralamada son
+  yazan kazanıyor.
 - Görsel adresleri kalıcı, herkese açık https adresleri (Supabase public URL).
