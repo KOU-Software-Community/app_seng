@@ -1814,6 +1814,30 @@ check(
 );
 
 check(
+  'vitrin paneli bağlı ve yetim dosya bırakmıyor',
+  'Slayt ve sponsor sayfaları panelin giriş duvarının arkasında olmalı; önüne ' +
+    'düşerlerse kulübün ana sayfasını herkes değiştirebilir. Süresi dolan slaytı ' +
+    'silen zamanlayıcı başlamazsa bitiş tarihi uygulamada çalışır ama slayt ' +
+    'veritabanında ve görseli bucket’ta sonsuza kadar kalır — ikisi de sessiz.',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (!existsSync(join(root, 'admin/vitrin.ts'))) return 'admin/vitrin.ts yok';
+    const server = strip(read('admin/server.ts'));
+    const guard = server.indexOf('app.use(requireAuth)');
+    const at = server.indexOf('registerVitrin(app');
+    if (at < 0) return 'admin/server.ts vitrin rotalarını kurmuyor';
+    if (guard < 0 || at < guard) return 'vitrin rotaları requireAuth’tan ÖNCE kurulmuş — giriş istemez';
+    if (!/startSlideSweeper\(db\)/.test(server)) return 'süresi dolan slaytları silen zamanlayıcı başlamıyor';
+
+    const vitrin = strip(read('admin/vitrin.ts'));
+    if (!/deleteFolder\(kind\.col, /.test(vitrin)) return 'silinen öğenin görsel klasörü silinmiyor';
+    if (!/deleteFolder\('slides', /.test(vitrin)) return 'zamanlayıcı sildiği slaytın görselini bırakıyor';
+    if (!/deletePhotos\(\[uploaded\]\)/.test(vitrin)) return 'kayıt düşünce yüklenen görsel geri alınmıyor';
+    return null;
+  },
+);
+
+check(
   'panel 502/504 dönmüyor',
   'Panel Cloudflare arkasında ve Cloudflare origin\u2019in 502/504 cevabını kendi ' +
     '"Bad gateway" sayfasıyla değiştiriyor, gövdeyi atıyor. Görsel yükleme hatası bu ' +
