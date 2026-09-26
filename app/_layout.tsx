@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnnouncementsProvider } from '../src/announcements';
 import { ContentProvider } from '../src/content';
+import { SponsorsProvider } from '../src/sponsors';
 import { FIREBASE_SETUP_HINT, isFirebaseConfigured } from '../src/firebaseConfig';
 import { NotificationSync } from '../src/notifications';
 import { QueryProvider } from '../src/gundem/providers/QueryProvider';
@@ -59,6 +60,9 @@ export default function RootLayout() {
         <AppStoreProvider>
         <ContentProvider>
           <AnnouncementsProvider>
+          {/* Sponsorlar kökte: ana sayfa, liste, detay ve etkinlik detayındaki
+              "Ödülü sağlayan" aynı listeyi okuyor. */}
+          <SponsorsProvider>
             {/* AI Gündem'in sunucu durumu. Kulüp tarafı buna dokunmuyor; burada
                 duruyor çünkü hem sekme hem makale rotası aynı önbelleği
                 paylaşıyor ve kalıcı önbellek açılışta bir kez geri yükleniyor. */}
@@ -69,6 +73,7 @@ export default function RootLayout() {
             <QueryProvider>
               <RootStack />
             </QueryProvider>
+          </SponsorsProvider>
           </AnnouncementsProvider>
         </ContentProvider>
         </AppStoreProvider>
