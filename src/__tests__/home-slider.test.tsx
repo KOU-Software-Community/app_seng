@@ -89,8 +89,10 @@ it('slayt sayısı azalınca dizin taşmıyor', async () => {
   }
   expect(dot(3, true)).toBeTruthy();
 
+  // Liste kısalınca kaydırma son sayfaya dayanıyor; nokta da orada yanmalı.
+  // `index % count` başa sarıp ekranda olmayan slaytı işaretliyordu.
   await rerender(<HomeSlider slides={[slide('a'), slide('b')]} />);
-  expect(dot(1, true) ?? dot(2, true)).toBeTruthy();
+  expect(dot(2, true)).toBeTruthy();
   expect(dot(3, true)).toBeNull();
 });
 
