@@ -29,6 +29,7 @@ import {
   verifyToken,
 } from '../admin/session';
 import { isBucketMissing, keyProblem } from '../admin/photos';
+import { moveBy, placeAt, sameMembers } from '../admin/ordering';
 import { resolvePort } from '../admin/port';
 import { announce, flushPending } from '../admin/push';
 import { ceviriSagligi, registerTranslateApi } from '../admin/translateApi';
@@ -435,6 +436,27 @@ const fakeFetch = (status: string) =>
     }) as unknown as Response) as unknown as typeof fetch;
 
 const NOW = new Date('2026-09-10T12:00:00+03:00');
+
+// ------------------------------------------------------------- vitrin sırası
+// Sıra 1…n ve boşluksuz. "Yeni bir şeyi 1 numara yaparsak diğerleri kaysın" —
+// kullanıcının tarifi; yerleştirme, taşıma ve sürükle-bırakın kabulü burada.
+{
+  const j = (ids: string[]) => ids.join(',');
+  assert('yeni öğe 1. sıraya konunca diğerleri kayıyor', j(placeAt(['a', 'b', 'c'], 'd', 1)) === 'd,a,b,c');
+  assert('var olan öğe başa alınınca diğerleri kayıyor', j(placeAt(['a', 'b', 'c'], 'c', 1)) === 'c,a,b');
+  assert('öğe ortaya konabiliyor', j(placeAt(['a', 'b', 'c'], 'a', 2)) === 'b,a,c');
+  assert('aralık dışı büyük sıra sona sıkışıyor', j(placeAt(['a', 'b'], 'c', 99)) === 'a,b,c');
+  assert('sıfır ve eksi sıra başa sıkışıyor', j(placeAt(['a', 'b'], 'c', 0)) === 'c,a,b');
+  assert('yukarı taşıma komşuyla yer değiştiriyor', j(moveBy(['a', 'b', 'c'], 'b', -1)) === 'b,a,c');
+  assert('aşağı taşıma komşuyla yer değiştiriyor', j(moveBy(['a', 'b', 'c'], 'b', 1)) === 'a,c,b');
+  assert('en üstteki yukarı gitmiyor', j(moveBy(['a', 'b', 'c'], 'a', -1)) === 'a,b,c');
+  assert('en alttaki aşağı gitmiyor', j(moveBy(['a', 'b', 'c'], 'c', 1)) === 'a,b,c');
+  assert('bilinmeyen kimlik listeyi değiştirmiyor', j(moveBy(['a', 'b'], 'x', 1)) === 'a,b');
+  assert('sürükle-bırak aynı kümeyi kabul ediyor', sameMembers(['a', 'b', 'c'], ['c', 'a', 'b']));
+  assert('eksik kimlikli sıra reddediliyor', !sameMembers(['a', 'b', 'c'], ['a', 'b']));
+  assert('yabancı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'x']));
+  assert('tekrarlı kimlikli sıra reddediliyor', !sameMembers(['a', 'b'], ['a', 'a']));
+}
 
 void (async () => {
   // 1. Kayıtlı cihaz yok → kimseye ulaşmadı → kilit geri veriliyor.
