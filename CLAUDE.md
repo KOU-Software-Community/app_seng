@@ -2,7 +2,7 @@
 
 Kocaeli Üniversitesi Yazılım Kulübü'nün etkinlik uygulaması: takvim, arşiv, etkinlik
 kaydı, çekiliş, QR yoklama, sertifika, AI Gündem. Google Play ve App Store'da yayında
-(`com.akadirr1.sengkou`, sürüm 1.1.4) — yapılan her değişiklik gerçek kullanıcıya gider.
+(`com.akadirr1.sengkou`, sürüm 1.1.5) — yapılan her değişiklik gerçek kullanıcıya gider.
 
 Bu dosya 2026-09-25'te koda karşı doğrulandı. `AGENTS.md` yüklenmiyor; oradaki "why log"
 geçmiş hataların gerekçesini taşıyor, bir alana dokunmadan önce ilgili başlığı `grep` ile
@@ -108,7 +108,7 @@ Duyurular Firestore'da değil, kulüp sitesinin API'sinde (`https://api.kouseng.
 | `attendance` | yazar — `qr` (`yoklamaVer`); okur — `sertifikalarim` (sertifika, satırdaki `certificate` alanı) | yazar: elle yoklama, sertifika yayını |
 | `devices` | yazar — `app/_layout.tsx` → `NotificationSync` → `upsertDevice`; kimlik Expo push jetonu | okur: push gönderimi |
 | `sponsors` | okur — `useSponsors` (`src/sponsors.tsx` → `fetchSponsors`, yalnız `active`): Ana Sayfa, `sponsorlar`, `sponsor/[id]`, `etkinlik/[id]` ("Ödülü sağlayan") | yazar: `/sponsorlar` (`admin/vitrin.ts`) |
-| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi doleni `startSlideSweeper` siliyor |
+| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi dolanı `startSlideSweeper` siliyor |
 | `eventQr`, `emailOtp`, `passwordReset`, `phoneClaims`, `studentClaims`, `pushLog`, `pendingPushes`, `pushState` | kapalı | yalnız panel |
 
 ## İçerik girişi

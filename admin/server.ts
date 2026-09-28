@@ -41,9 +41,9 @@ import {
   ACCEPTED_TYPES,
   MAX_UPLOAD_BYTES,
   PhotoUploadError,
-  deleteEventPhotos,
+  deleteFolder,
   deletePhotos,
-  uploadEventPhoto,
+  uploadPhoto,
 } from './photos';
 import {
   csvColumns,
@@ -721,7 +721,7 @@ async function saveEventWithPhotos(
   const uploaded: string[] = [];
   try {
     for (const file of files) {
-      uploaded.push(await uploadEventPhoto(checked.event.id, file.buffer));
+      uploaded.push(await uploadPhoto('events', checked.event.id, file.buffer));
     }
   } catch (err) {
     // Yükleme yarıda kaldı: etkinlik henüz kaydedilmedi, dolayısıyla ortada
@@ -816,7 +816,7 @@ app.post('/events/:id/delete', async (req, res) => {
     db.collection('events').doc(req.params.id).delete(),
     // Görseller de gitsin, yoksa bucket'ta kimsenin işaret etmediği dosyalar
     // birikir ve kota onlara da ödeniyor.
-    deleteEventPhotos(req.params.id),
+    deleteFolder('events', req.params.id),
     // Sahipsiz koltuk dokümanı bırakmıyoruz: aynı kimlikle yeni bir etkinlik
     // açılırsa eski kayıtların koltuklarıyla dolu başlardı.
     db.collection('eventSeats').doc(req.params.id).delete(),

@@ -82,8 +82,8 @@ export function HomeSlider({ slides }: { slides: Slide[] }) {
   );
 
   const count = slides.length;
-  // Yenileme listeyi kısaltırsa dizin dışarıda kalmasın.
-  const current = count ? index % count : 0;
+  // Yenileme listeyi kısaltırsa kaydırma son sayfaya dayanıyor; nokta da orada.
+  const current = count ? Math.min(index, count - 1) : 0;
 
   const go = useCallback(
     (next: number) => {

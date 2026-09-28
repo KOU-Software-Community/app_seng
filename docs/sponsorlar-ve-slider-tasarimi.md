@@ -452,7 +452,7 @@ sütunundaki gibi davranır; mevcut hiçbir akış etkilenmez.
   "içerik durumu ekranlara bağlı" (ana sayfada `ContentNotice` ve
   `RefreshControl` kalmalı), "QR yoklama zinciri bağlı" (ana sayfada
   `push('/qr')` kalmalı), "yükleme yetim dosya bırakmıyor" (etkinlik yolu
-  `uploadEventPhoto` adıyla kalmalı).
+  `uploadPhoto('events', …)` ve `deleteFolder('events', …)` çağrılarıyla aranıyor).
 - Bitiş ölçütü: `npm run check:all`, `npm run check:rules`,
   `npx expo export --platform ios` ve `npm run check:bundle` yeşil.
 
