@@ -2,7 +2,7 @@
 
 Kocaeli Üniversitesi Yazılım Kulübü'nün etkinlik uygulaması: takvim, arşiv, etkinlik
 kaydı, çekiliş, QR yoklama, sertifika, AI Gündem. Google Play ve App Store'da yayında
-(`com.akadirr1.sengkou`, sürüm 1.1.4) — yapılan her değişiklik gerçek kullanıcıya gider.
+(`com.akadirr1.sengkou`, sürüm 1.1.5) — yapılan her değişiklik gerçek kullanıcıya gider.
 
 Bu dosya 2026-09-25'te koda karşı doğrulandı. `AGENTS.md` yüklenmiyor; oradaki "why log"
 geçmiş hataların gerekçesini taşıyor, bir alana dokunmadan önce ilgili başlığı `grep` ile
