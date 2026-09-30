@@ -3,7 +3,30 @@ import React from 'react';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
-import { clampOffset, isBackdropTap, ZoomableImage } from '../components/ZoomableImage';
+import { BACKDROP_MARGIN, clampOffset, isBackdropTap, ZoomableImage } from '../components/ZoomableImage';
+
+type Worklet = ((...args: unknown[]) => unknown) & {
+  __initData?: { code: string };
+  __closure?: Record<string, unknown>;
+};
+
+/**
+ * Worklet'i UI iş parçacığındaki gibi kuruyor: kod metninden, genel kapsamda; dış değerler
+ * yalnız `__closure`'dan, içindeki worklet'ler de aynı yolla. Worklet olmayan (taklit
+ * `scheduleOnRN`, paylaşılan değer) olduğu gibi geçiyor.
+ */
+function onUiThread(fn: unknown): (...args: unknown[]) => unknown {
+  const worklet = fn as Worklet;
+  if (!worklet.__initData) return worklet;
+  const closure = Object.fromEntries(
+    Object.entries(worklet.__closure ?? {}).map(([key, value]) => [
+      key,
+      typeof value === 'function' ? onUiThread(value) : value,
+    ]),
+  );
+  const made = new Function(`return (${worklet.__initData.code})`)() as Worklet;
+  return (...args) => made.apply({ __closure: closure }, args);
+}
 
 it.each([
   [200, 2, 300, 150],
@@ -57,7 +80,7 @@ it.each([
   [195, 400, false], // fotoğrafın üstünde
   [195, 600, true],
 ])('yatay fotoğrafta isBackdropTap(%p, %p) → %p', (x, y, want) => {
-  expect(isBackdropTap(x, y, 390, 844, 390, 260)).toBe(want);
+  expect(isBackdropTap(x, y, 390, 844, 390, 260, BACKDROP_MARGIN)).toBe(want);
 });
 
 // Dikey fotoğraf kadrajda 300×844 → yanlarda 45'er pt soluk alan.
@@ -66,7 +89,7 @@ it.each([
   [30, 400, false], // pay içinde
   [380, 400, true],
 ])('dikey fotoğrafta isBackdropTap(%p, %p) → %p', (x, y, want) => {
-  expect(isBackdropTap(x, y, 390, 844, 300, 844)).toBe(want);
+  expect(isBackdropTap(x, y, 390, 844, 300, 844, BACKDROP_MARGIN)).toBe(want);
 });
 
 describe('soluk alana dokunuş', () => {
@@ -127,6 +150,19 @@ describe('soluk alana dokunuş', () => {
     tap(195, 100);
     await act(async () => {});
     expect(onBackdropPress).not.toHaveBeenCalled();
+  });
+
+  // Cihazda hareket geri çağrısı UI iş parçacığında kendi kod metninden kuruluyor: modülün
+  // değişkenlerini görmüyor, dış değerler yalnız `__closure`'dan. Jest onu modülün içinde
+  // koşturuyor; fark ancak aynı kurulumla görünüyor. `isBackdropTap`'in varsayılan
+  // parametresindeki sabit cihazda tanımsızdı ve uygulama kapanıyordu.
+  it('UI iş parçacığındaki gibi kurulunca da kapatıyor, fırlatmıyor', async () => {
+    const onBackdropPress = jest.fn();
+    await landscape(onBackdropPress);
+    const onEnd = onUiThread(getByGestureTestId('foto-0-tap').handlers.onEnd);
+    onEnd({ x: 195, y: 100 }, true);
+    await act(async () => {});
+    expect(onBackdropPress).toHaveBeenCalledTimes(1);
   });
 
   it('yakınlaşma ekrana yansımadan gelen dokunuş da kapatmıyor', async () => {

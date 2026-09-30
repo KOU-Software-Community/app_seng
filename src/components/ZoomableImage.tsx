@@ -31,6 +31,9 @@ export const BACKDROP_MARGIN = 24;
 /**
  * Dokunuş fotoğrafın görünen dikdörtgeninin (kadrajda ortalanmış `content`) en az
  * `margin` kadar dışında mı — soluk alanda mı.
+ *
+ * `margin`'in varsayılanı yok: worklet'in varsayılan parametresi UI iş parçacığında
+ * modülün sabitini görmüyor (`__closure` gövdede açılıyor), dokunuş uygulamayı kapatıyordu.
  */
 export function isBackdropTap(
   x: number,
@@ -39,7 +42,7 @@ export function isBackdropTap(
   frameH: number,
   contentW: number,
   contentH: number,
-  margin = BACKDROP_MARGIN,
+  margin: number,
 ): boolean {
   'worklet';
   const left = (frameW - contentW) / 2 - margin;
@@ -156,7 +159,7 @@ export function ZoomableImage({
     .enabled(onBackdropPress !== undefined && !zoomed)
     .maxDistance(10)
     .onEnd((e, success) => {
-      if (success && saved.value <= 1 && isBackdropTap(e.x, e.y, width, height, cw, ch)) {
+      if (success && saved.value <= 1 && isBackdropTap(e.x, e.y, width, height, cw, ch, BACKDROP_MARGIN)) {
         scheduleOnRN(backdrop);
       }
     });

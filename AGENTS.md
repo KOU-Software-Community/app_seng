@@ -2480,3 +2480,24 @@ yeni testler `check:security` (panel) ve `check:rules`'un ikinci yarısı.
   (`RefreshControl.componentDidUpdate`) native'i hemen false'a eşitliyor; yükleme
   `PixelRefresh`'te. `check:release`, `app/` ve `src/`'de `refreshing=` alan ya da
   `hiddenSpinner` yaymayan bir `RefreshControl` bırakmıyor.
+
+### Galeride boşluğa dokununca uygulama kapanıyordu — worklet'in varsayılan parametresi
+
+- **Belirti (cihazdan, #82 dalı).** Tam ekran galeride fotoğrafın dışındaki soluk alana
+  dokununca uygulama kapanıyor. Mağazadaki sürümde yok: dokunuşla kapatma bu dalda geldi.
+- **Sebep (release derlemesinin kod metninden; Node'da aynı hatayla yeniden üretildi).**
+  `isBackdropTap(…, margin = BACKDROP_MARGIN)` bir worklet. Worklets eklentisi dış
+  değerleri gövdenin ilk satırında `this.__closure`'dan açıyor; varsayılan parametre
+  gövdeden önce, kendi kapsamında değerlendiriliyor ve orada `BACKDROP_MARGIN` yok → UI
+  iş parçacığında `ReferenceError` → release'te ölümcül hata. 1×'teki her tek dokunuşta
+  çıkıyordu, fotoğrafın üstünde de. Jest worklet'i modülün içinde koşturduğu için sabit
+  görünüyordu; testler yeşildi.
+- **Çözüm.** Varsayılan kalktı, pay çağrı yerinde açıkça veriliyor (`BACKDROP_MARGIN`
+  geri çağrının `__closure`'ına giriyor). `zoomable-image.test.tsx`'teki `onUiThread`
+  geri çağrıyı cihazdaki gibi kuruyor — kod metninden, genel kapsamda, dış değerler
+  yalnız `__closure`'dan — ve eski kodda cihazdaki hatayla kırmızıydı. Kodun 12
+  worklet'i release ön ayarıyla derlenip tarandı; başka varsayılan parametre dış değere
+  başvurmuyor.
+- **Kural.** Worklet'te (`'worklet'`, hareket geri çağrıları, `useAnimatedStyle`)
+  varsayılan parametre yalnız başka bir parametreye başvurabilir; modül sabiti çağrı
+  yerinden verilir.

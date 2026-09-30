@@ -153,7 +153,9 @@ Gerekçeleri `AGENTS.md`'nin why log'unda.
   kurulmaz.
 - **Hermes, Node değil:** `btoa` / `atob` / `Buffer` yok; RN'nin `URL`'i ayrıştırmıyor ve
   hiç fırlatmıyor (`src/gundem/data-access/sourceUrl.ts`); rastgelelik `expo-crypto`'dan.
-  Jest Node'da koştuğu için testler bunları göstermez.
+  Jest Node'da koştuğu için testler bunları göstermez. Worklet'in varsayılan parametresi
+  modül değişkenine başvurmaz: UI iş parçacığında tanımsız, release'te uygulama kapanır
+  (`zoomable-image.test.tsx` → `onUiThread`).
 - **Türkçe:** UI metni Türkçe; büyük/küçük harf `toLocaleUpperCase('tr')` /
   `toLocaleLowerCase('tr')`. `[^a-z0-9]` gibi sınıflar Türkçe harfleri siler.
 - **UI:** ham `Text` yerine `Txt` / `PixelTxt` (RN font ağırlığı sentezlemiyor, her ağırlık
