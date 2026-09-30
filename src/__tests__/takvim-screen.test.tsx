@@ -65,3 +65,10 @@ it('etkinlik varken takvim ve altında listedeki satırı', async () => {
   expect(screen.getByText('Hackathon')).toBeTruthy();
   expect(screen.queryByText('Liste')).toBeNull();
 }, 30000);
+
+it('iki etkinlikli günde ikisi de takvimin altındaki listede', async () => {
+  const atolye = { ...HACKATHON, id: 'e2', title: 'Atölye', time: '20.00' } as ClubEvent;
+  await show({ events: [HACKATHON, atolye] });
+  expect(screen.getByText('Hackathon')).toBeTruthy();
+  expect(screen.getByText('Atölye')).toBeTruthy();
+}, 30000);

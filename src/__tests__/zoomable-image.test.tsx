@@ -111,7 +111,10 @@ describe('soluk alana dokunuş', () => {
     expect(onBackdropPress).not.toHaveBeenCalled();
   });
 
-  it('yakınken dokunuş kapatmıyor', async () => {
+  // Yakınken kapatmamanın iki koruması var, ikisi de ayrı sınanıyor: yakınlık React'e
+  // ulaşınca hareket kapanıyor (`enabled(!zoomed)`; `fireGestureHandler` kapalı hareketi
+  // atlıyor) ve ondan önce gelen dokunuşu `saved.value <= 1` durduruyor.
+  it('yakınken dokunuş kapatmıyor, dokunma hareketi kapalı', async () => {
     const onBackdropPress = jest.fn();
     await landscape(onBackdropPress);
     fireGestureHandler(getByGestureTestId('foto-0-pinch'), [
@@ -120,6 +123,21 @@ describe('soluk alana dokunuş', () => {
       { state: State.END, scale: 2 },
     ]);
     await act(async () => {});
+    expect(getByGestureTestId('foto-0-tap').config.enabled).toBe(false);
+    tap(195, 100);
+    await act(async () => {});
+    expect(onBackdropPress).not.toHaveBeenCalled();
+  });
+
+  it('yakınlaşma ekrana yansımadan gelen dokunuş da kapatmıyor', async () => {
+    // Cihazdaki yarış: dokunuş UI iş parçacığında, React yeniden çizmeden önce geliyor.
+    const onBackdropPress = jest.fn();
+    await landscape(onBackdropPress);
+    fireGestureHandler(getByGestureTestId('foto-0-pinch'), [
+      { state: State.BEGAN, scale: 1 },
+      { state: State.ACTIVE, scale: 2 },
+      { state: State.END, scale: 2 },
+    ]);
     tap(195, 100);
     await act(async () => {});
     expect(onBackdropPress).not.toHaveBeenCalled();
