@@ -1,13 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoGallery } from '../../src/components/PhotoGallery';
+import { PhotoHero } from '../../src/components/PhotoHero';
+import { PhotoViewer } from '../../src/components/PhotoViewer';
 import { PrizeProviders } from '../../src/components/PrizeProviders';
 import { RaffleNotice } from '../../src/components/RaffleNotice';
-import { PhotoSlot } from '../../src/components/PhotoSlot';
 import {
   Card,
   GlassButton,
@@ -33,6 +34,8 @@ export default function EventDetailRoute() {
   const { getRaffle, registeredCount } = useContent();
   const { registrationFor, raffleEntryFor, syncPending } = useAppStore();
   const { sponsors } = useSponsors();
+  // Tam ekranda açık fotoğraf; hero da şerit de buradan açıyor, açıkken hero kaymıyor.
+  const [viewer, setViewer] = useState<number | null>(null);
 
   if (!event) return <MissingEvent onBack={() => router.replace('/(tabs)/takvim')} />;
 
@@ -56,12 +59,11 @@ export default function EventDetailRoute() {
         contentContainerStyle={{ paddingBottom: 132 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        <PhotoSlot
-          uri={event.photos?.[0]}
-          label="Etkinlik görseli"
-          gradient={gradients.hero}
-          showLabel={false}
-          style={styles.hero}
+        <PhotoHero
+          photos={event.photos ?? []}
+          height={280}
+          onOpen={setViewer}
+          paused={viewer !== null}
         >
           {/* Scrim so the title stays legible once a real photo is dropped in. */}
           <LinearGradient
@@ -71,7 +73,7 @@ export default function EventDetailRoute() {
             pointerEvents="none"
           />
 
-          <View style={[styles.heroBack, { top: insets.top + 12 }]}>
+          <View style={[styles.heroBack, { top: insets.top + 12 }]} pointerEvents="box-none">
             <GlassButton
               label="‹"
               accessibilityLabel="Geri"
@@ -98,7 +100,7 @@ export default function EventDetailRoute() {
               {event.title}
             </Txt>
           </View>
-        </PhotoSlot>
+        </PhotoHero>
 
         <View style={styles.facts}>
           {event.facts.map((fact) => (
@@ -222,9 +224,10 @@ export default function EventDetailRoute() {
         </View>
 
         {/* Konuşmacı bloğunun dışında: şerit kenara kadar kayabilsin diye kendi
-            yatay boşluğunu kendi veriyor. Kapak hero'da çiziliyor, galeri
-            kalanları gösteriyor ve tek görsel varsa hiç çıkmıyor. */}
-        <PhotoGallery photos={event.photos ?? []} />
+            yatay boşluğunu kendi veriyor. Kapak hero'da çiziliyor, şerit
+            kalanları gösteriyor ve tek görsel varsa hiç çıkmıyor; ikisi de aynı
+            görüntüleyiciyi açıyor. */}
+        <PhotoGallery photos={event.photos ?? []} onOpen={setViewer} />
       </ScrollView>
 
       <LinearGradient
@@ -321,6 +324,8 @@ export default function EventDetailRoute() {
           />
         )}
       </LinearGradient>
+
+      <PhotoViewer photos={event.photos ?? []} index={viewer} onClose={() => setViewer(null)} />
     </View>
   );
 }
@@ -355,7 +360,6 @@ const styles = StyleSheet.create({
   },
   screen: { flex: 1, backgroundColor: colors.bg },
 
-  hero: { height: 280 },
   heroBack: { position: 'absolute', left: 16 },
   heroCaption: { position: 'absolute', left: 20, right: 20, bottom: 18 },
 
