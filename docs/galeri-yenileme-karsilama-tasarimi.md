@@ -8,7 +8,8 @@ Karar özeti:
 - Etkinlik detayının ana fotoğrafı kendiliğinden kayan bir slider; dokununca tam ekran
   görüntüleyici o fotoğrafta açılıyor ve açık kaldıkça slider duruyor. Görüntüleyici
   kendiliğinden kaymıyor: parmakla kaydırma (tuşsuz), iki parmakla ve çift dokunmayla
-  yakınlaştırma. ‹ › tuşları ve alttaki "Fotoğraflar" şeridi kalkıyor.
+  yakınlaştırma. ‹ › tuşları kalkıyor; alttaki "Fotoğraflar" şeridi kalıyor ve aynı
+  görüntüleyiciyi açıyor.
 - Aşağı çekip yenilemede RN'in göstergesi gizleniyor, ekranın üstünde ilk açılıştaki
   `PixelLoader` çıkıyor — altı ekranda aynı bileşen.
 - Giriş yapmış kişiye "Ahmet, hoş geldin 👋".
@@ -44,7 +45,9 @@ Yapı taşları uygulamada: `react-native-gesture-handler` 2.32, `react-native-r
 - Zamanlayıcı mantığı `HomeSlider`'dan `src/useAutoAdvance.ts`'e taşınıyor; iki slider
   aynı kodu kullanıyor, `HomeSlider`'ın mevcut testleri taşımanın güvencesi.
 - Görseller expo-image (`cover` hero'da, `contain` görüntüleyicide) — disk önbelleği.
-- `PhotoGallery.tsx` siliniyor: slider bütün fotoğrafları gösteriyor, şerit tekrar.
+- `PhotoGallery` şeridi kalıyor (kullanıcı kararı): kapaktan sonraki fotoğrafların
+  önizlemeleri, expo-image; dokununca kendi tam ekranı yerine `PhotoViewer` o fotoğrafta
+  açılıyor. Şeridin kendi `Modal`'ı ve ‹ › tuşları siliniyor.
 
 ## 2. Yenileme göstergesi
 
@@ -88,7 +91,8 @@ Altı ekran: Ana Sayfa, Takvim, Arşiv; AI Gündem Özet, Akış, Kaydedilenler.
   `onZoomChange`; `PhotoViewer` açılış fotoğrafı, tuş yok, kaydırınca sayaç, yakınken
   kaydırma kilidi, kapat; `PhotoHero` sayfa/nokta/dokunma, kendiliğinden ilerleme,
   `paused` iken durma, tek ve sıfır fotoğraf; etkinlik ekranında görüntüleyici açıkken
-  hero'nun durup kapanınca devam etmesi.
+  hero'nun durup kapanınca devam etmesi, şeritteki önizlemenin aynı görüntüleyiciyi
+  o fotoğrafta açması.
 - Hareketler Jest'te RNGH'nin `jest-utils`'iyle sınanıyor; cihazdaki his (hız, sınır)
   elle denenir.
 

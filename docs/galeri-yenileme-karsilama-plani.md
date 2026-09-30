@@ -11,7 +11,8 @@ giriş yapmış kişiye "Ahmet, hoş geldin 👋".
 
 **Architecture:** `ZoomableImage` (RNGH + Reanimated) tek fotoğrafın yakınlaştırmasını,
 `PhotoViewer` tam ekran sayfalı listeyi, `PhotoHero` etkinlik detayındaki slider'ı
-taşıyor; `PhotoGallery` şeridi siliniyor. Otomatik kaydırma `HomeSlider`'dan
+taşıyor; `PhotoGallery` şeridi kalıyor ve kendi tam ekranı yerine `PhotoViewer`'ı
+açıyor. Otomatik kaydırma `HomeSlider`'dan
 `useAutoAdvance`'e (`src/useAutoAdvance.ts`) taşınıyor, iki slider onu kullanıyor. `PixelRefresh` + `hiddenSpinner`
 (`src/components/Pixel.tsx`) altı ekranın yenileme göstergesi. `firstName`
 (`src/accountSchema.ts`) karşılamanın adı.
@@ -464,12 +465,14 @@ git commit -m "refactor(slider): otomatik kaydırma useAutoAdvance'e; durdurulab
 
 **Files:**
 - Create: `src/components/PhotoHero.tsx`
-- Modify: `app/etkinlik/[id].tsx` (hero, görüntüleyici durumu, `PhotoGallery` çıkıyor)
-- Delete: `src/components/PhotoGallery.tsx`
+- Modify: `app/etkinlik/[id].tsx` (hero, görüntüleyici durumu)
+- Modify: `src/components/PhotoGallery.tsx` (yalnız şerit; kendi `Modal`'ı ve tuşları çıkıyor)
 - Test: Create `src/__tests__/photo-hero.test.tsx`, `src/__tests__/event-photos.test.tsx`
 
 **Interfaces:**
 - Consumes: Task 4 `PhotoViewer`; Task 5 `useAutoAdvance`, `SLIDE_INTERVAL_MS`.
+- Produces (değişen): `PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (index: number) => void })`
+  — önizleme etiketi bugünkü `` `Fotoğraf ${i + 2}` ``, dokununca `onOpen(i + 1)`.
 - Produces: `PhotoHero({ photos, height, onOpen, paused, children }: { photos: string[]; height: number; onOpen: (index: number) => void; paused: boolean; children?: React.ReactNode })`
   — sayfa `accessibilityLabel={`Fotoğraf ${i + 1} / ${n}, büyüt`}`; nokta `Pressable`,
   `accessibilityLabel={`${i + 1}. fotoğrafa git`}`, `accessibilityState={{ selected }}`.
@@ -572,7 +575,7 @@ const selectedDot = (n: number) => screen.getByRole('button', { name: `${n}. fot
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
 
-it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkken hero durur, kapanınca devam eder; şerit yok', async () => {
+it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkken hero durur, kapanınca devam eder; şerit de aynı görüntüleyiciyi açıyor', async () => {
   const Detail = (require('../../app/etkinlik/[id]') as typeof import('../../app/etkinlik/[id]')).default;
   await render(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -580,7 +583,7 @@ it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkk
     </SafeAreaProvider>,
   );
   await act(async () => {});
-  expect(screen.queryByText('Fotoğraflar')).toBeNull();
+  expect(screen.getByText('Fotoğraflar')).toBeTruthy();
 
   fireEvent.press(screen.getByLabelText('Fotoğraf 2 / 3, büyüt'));
   expect(screen.getByText('2 / 3')).toBeTruthy();
@@ -594,6 +597,9 @@ it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkk
     jest.advanceTimersByTime(SLIDE_INTERVAL_MS);
   });
   expect(selectedDot(2)).toBeTruthy();
+
+  fireEvent.press(screen.getByLabelText('Fotoğraf 3'));
+  expect(screen.getByText('3 / 3')).toBeTruthy();
 }, 30000);
 ```
 
@@ -603,8 +609,8 @@ Ekran başka bir sağlayıcı isterse aynı biçimde mock eklenir; eklenen her m
 - [ ] **Step 3: Kırmızıyı gör**
 
 Run: `npx jest src/__tests__/photo-hero.test.tsx src/__tests__/event-photos.test.tsx`
-Expected: `photo-hero` modül bulunamıyor; `event-photos` "Fotoğraflar" başlığı hâlâ var
-ya da `Fotoğraf 2 / 3, büyüt` bulunamıyor.
+Expected: `photo-hero` modül bulunamıyor; `event-photos` `Fotoğraf 2 / 3, büyüt`
+bulunamıyor.
 
 - [ ] **Step 4: `PhotoHero`**
 
@@ -624,7 +630,9 @@ expo-image `cover`. Birden fazla fotoğrafta noktalar (`HomeSlider` biçimi,
 `const [viewer, setViewer] = useState<number | null>(null)` erken `return`'den önce;
 ekranın sonunda
 `<PhotoViewer photos={event.photos ?? []} index={viewer} onClose={() => setViewer(null)} />`.
-`PhotoGallery` importu ve kullanımı çıkar, dosya silinir; çevresindeki yorum güncellenir.
+`<PhotoGallery photos={event.photos ?? []} onOpen={setViewer} />` kalıyor;
+`PhotoGallery`'nin kendi `Modal`'ı, `step`'i ve tuşları silinir, önizlemeler expo-image
+`cover`. Çevresindeki yorumlar güncellenir.
 
 - [ ] **Step 6: Yeşili gör**
 
@@ -636,7 +644,7 @@ Expected: PASS; typecheck 0.
 ```bash
 graphify update .
 git add src/components/PhotoHero.tsx 'app/etkinlik/[id].tsx' src/components/PhotoGallery.tsx src/__tests__/photo-hero.test.tsx src/__tests__/event-photos.test.tsx graphify-out/
-git commit -m "feat(etkinlik): ana fotoğraf kendiliğinden kayan slider, dokununca tam ekran; alttaki şerit kalktı"
+git commit -m "feat(etkinlik): ana fotoğraf kendiliğinden kayan slider, dokununca tam ekran; şerit aynı görüntüleyiciyi açıyor"
 ```
 
 ### Task 7: Kapanış
