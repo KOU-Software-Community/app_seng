@@ -1,7 +1,7 @@
 # Graph Report - app_seng  (2026-09-30)
 
 ## Corpus Check
-- 245 files · ~303,294 words
+- 245 files · ~303,353 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 4, .ttf 4, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b08a6229`
+- Built from commit: `9a12919d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -559,7 +559,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `react` connect `react` to `etkinlik/[id].tsx`, `Txt`, `store.tsx`, `data-access/hooks.ts`, `package.json`, `store.ts`, `useEnrichmentWarmup.ts`, `ui.tsx`, `kayit-ol.tsx`, `integration.test.tsx`, `kv.ts`, `takvim.tsx`, `cekilis-kurallari.tsx`, `sponsors.tsx`, `vitrin-cache.test.tsx`, `mock/repositories.ts`, `announcements.tsx`, `article-summary.test.tsx`, `vitrinSchema.ts`, `theme.ts`, `ZoomableImage.tsx`, `notifications.tsx`, `notification-sync.test.tsx`, `app/_layout.tsx`, `(tabs)/index.tsx`, `PhotoViewer.tsx`?**
   _High betweenness centrality (0.164) - this node is a cross-community bridge._
 - **Why does `err()` connect `supabase/repositories.ts` to `REPOSITORY_CONTRACT_VERSION`, `check-panel.ts`, `server.ts`, `edge.ts`, `ref_node_path`, `mock/repositories.ts`, `data-access/repositories.ts`, `demo-account.ts`, `send-push.ts`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `dependencies` to `package.json`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `Txt()` (e.g. with `Conventions` and `Klasörler`) actually correct?**

@@ -16668,7 +16668,7 @@
       "file_type": "code",
       "norm_label": "failed",
       "source_file": "scripts/check-release.mjs",
-      "source_location": "L1883"
+      "source_location": "L1892"
     },
     {
       "id": "scripts_check_release_pkg",
@@ -75448,7 +75448,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/check-release.mjs",
-      "source_location": "L1883",
+      "source_location": "L1892",
       "weight": 1.0
     },
     {
@@ -89895,5 +89895,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "b08a62290805104dc956be74715317a244652410"
+  "built_at_commit": "9a12919d21db3a0ca1e2c096250b74d4c3367dbc"
 }

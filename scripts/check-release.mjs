@@ -1382,23 +1382,32 @@ check(
     const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
 
     const gallery = strip(read('src/components/PhotoGallery.tsx'));
+    // Sayaç tam ekran görüntüleyicide; şerit ve hero onu açıyor.
+    const viewer = strip(read('src/components/PhotoViewer.tsx'));
+    const hero = strip(read('src/components/PhotoHero.tsx'));
     // Sabit bir adet, arkasında dosya olup olmadığına bakmadan sayı gösterir.
-    if (/PHOTOS_PER_ENTRY|length: 4|\{ length: \d/.test(gallery)) {
+    if (/PHOTOS_PER_ENTRY|length: 4|\{ length: \d/.test(gallery + viewer + hero)) {
       return 'galeri sabit bir görsel sayısı taşıyor';
     }
-    // Sayaç ifadesinin kendisi aranıyor. Sadece `photos.length` aramak yetmiyor:
+    // Sayaç ifadelerinin kendisi aranıyor. Sadece `photos.length` aramak yetmiyor:
     // dosyada başka yerlerde de geçiyor ve payda sabitlense bile eşleşirdi —
-    // yani kontrol tam korumak istediği şeyi kaçırıyordu.
-    if (!/\} \/ \$\{photos\.length\}/.test(gallery)) {
+    // yani kontrol tam korumak istediği şeyi kaçırıyordu. Görüntüleyicide iki
+    // sayaç var (üstteki ve sayfanın ekran okuyucu etiketi): her paydası bu.
+    const denominators = [...viewer.matchAll(/\} \/ \$\{([^}]+)\}/g)].map((m) => m[1]);
+    if (!denominators.length || denominators.some((d) => d !== 'photos.length')) {
       return 'sayacın paydası gerçek görsel sayısı değil';
     }
     // Tek görsel varsa gezilecek bir şey yok; yine de bir görüntüleyici açmak
     // eski sahte lightbox’ın aynısı olurdu.
     if (!/photos\.length < 2/.test(gallery)) return 'tek görselde galeri gizlenmiyor';
 
-    // Kapaklar gerçekten veriye bağlı mı, yoksa yine yer tutucu mu?
-    for (const f of ['app/(tabs)/arsiv.tsx', 'app/etkinlik/[id].tsx']) {
-      if (!/uri=\{event\.photos\?\.\[0\]\}/.test(read(f))) return `${f} kapağı veriden almıyor`;
+    // Kapaklar gerçekten veriye bağlı mı, yoksa yine yer tutucu mu? Detayın
+    // kapağı hero'nun ilk sayfası.
+    if (!/uri=\{event\.photos\?\.\[0\]\}/.test(read('app/(tabs)/arsiv.tsx'))) {
+      return 'app/(tabs)/arsiv.tsx kapağı veriden almıyor';
+    }
+    if (!/<PhotoHero\s+photos=\{event\.photos \?\? \[\]\}/.test(read('app/etkinlik/[id].tsx'))) {
+      return 'app/etkinlik/[id].tsx kapağı veriden almıyor';
     }
 
     // Sınırsız görsel, detay ekranını mobil veride pahalı hâle getirir.
