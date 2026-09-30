@@ -4,6 +4,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PhotoSlot } from '../src/components/PhotoSlot';
+import { PixelLoader } from '../src/components/Pixel';
 import {
   Card,
   ContentNotice,
@@ -73,7 +74,7 @@ export default function SponsorsRoute() {
             </Pressable>
           ))
         ) : loading ? (
-          <EmptyState title="Yükleniyor" body="Sponsorlar getiriliyor." />
+          <PixelLoader label="Yükleniyor" style={styles.loader} />
         ) : error ? null : (
           <EmptyState title="Henüz sponsor yok" body="Kulübü destekleyen kurumlar burada listelenecek." />
         )}
@@ -118,6 +119,8 @@ function JoinCard() {
 }
 
 const styles = StyleSheet.create({
+  // Yükleme: açılıştaki kare animasyon, ortada.
+  loader: { alignSelf: 'center', marginTop: 40 },
   screen: { flex: 1, backgroundColor: colors.bg },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   body: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },

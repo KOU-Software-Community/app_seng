@@ -9,6 +9,7 @@ import {
   formatAnnouncementDate,
   useAnnouncements,
 } from '../../src/announcements';
+import { PixelLoader } from '../../src/components/Pixel';
 import { RichText } from '../../src/components/RichText';
 import { EmptyState, GlassButton, GradientHeader, Txt } from '../../src/components/ui';
 import { colors, gradients } from '../../src/theme';
@@ -59,7 +60,7 @@ export default function AnnouncementRoute() {
             onPress={() => router.replace('/(tabs)')}
           />
         ) : (
-          <EmptyState title="Yükleniyor" body="Duyuru getiriliyor." />
+          <PixelLoader label="Yükleniyor" style={styles.loader} />
         )}
       </View>
     );
@@ -102,6 +103,8 @@ export default function AnnouncementRoute() {
 }
 
 const styles = StyleSheet.create({
+  // Yükleme: açılıştaki kare animasyon, ortada.
+  loader: { alignSelf: 'center', marginTop: 40 },
   screen: { flex: 1, backgroundColor: colors.bg },
   kicker: { marginTop: 16, marginBottom: 6 },
   body: { paddingHorizontal: 20, paddingTop: 22 },

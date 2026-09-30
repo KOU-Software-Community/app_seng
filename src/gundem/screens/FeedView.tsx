@@ -17,7 +17,7 @@ import { asDataError, useFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useEnabledSources, useReadArticles } from '../user-state/hooks';
 import { clubCalendar } from '../../eventSchema';
-import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
+import { PixelLoader, PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors } from '../../theme';
 
 /** "Tümü" artı prototipin beş kategorisi. */
@@ -175,9 +175,7 @@ export function FeedView() {
         }
         ListEmptyComponent={
           feed.isPending ? (
-            <PixelTxt size={9} style={styles.loading}>
-              YUKLENIYOR
-            </PixelTxt>
+            <PixelLoader label="Yükleniyor" style={styles.loader} />
           ) : gate.heldCount > 0 ? (
             // Liste boş değil, bekliyor. "Haber yok" demek yanlış olurdu.
             <PixelTxt size={9} style={styles.loading}>
@@ -201,6 +199,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   chips: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
   loading: { textAlign: 'center', marginTop: 40, color: colors.faint },
+  loader: { alignSelf: 'center', marginTop: 40 },
   empty: { marginTop: 28 },
   staleLine: { paddingHorizontal: 16, paddingTop: 12 },
 });

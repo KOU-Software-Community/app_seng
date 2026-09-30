@@ -3,6 +3,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PhotoSlot } from '../../src/components/PhotoSlot';
+import { PixelLoader } from '../../src/components/Pixel';
 import {
   Card,
   ContentNotice,
@@ -44,7 +45,7 @@ export default function SponsorRoute() {
       <View style={styles.screen}>
         {header}
         {loading ? (
-          <EmptyState title="Yükleniyor" body="Kurum bilgileri getiriliyor." />
+          <PixelLoader label="Yükleniyor" style={styles.loader} />
         ) : error ? (
           <ContentNotice onRetry={refresh} retrying={loading} />
         ) : (
@@ -128,6 +129,8 @@ export default function SponsorRoute() {
 }
 
 const styles = StyleSheet.create({
+  // Yükleme: açılıştaki kare animasyon, ortada.
+  loader: { alignSelf: 'center', marginTop: 40 },
   screen: { flex: 1, backgroundColor: colors.bg },
   hero: { marginTop: -48, marginHorizontal: 20, padding: 18, ...shadow.card },
   logo: { width: 88, height: 88, borderRadius: 16, backgroundColor: colors.bg },

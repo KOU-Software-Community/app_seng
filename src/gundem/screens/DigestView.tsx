@@ -3,7 +3,7 @@ import React from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Card, ContentNotice, EmptyState, PixelTxt, Txt } from '../../components/ui';
-import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
+import { PixelLoader, PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors, radius } from '../../theme';
 import { useDigest } from '../data-access/hooks';
 
@@ -50,11 +50,7 @@ export function DigestView() {
           <ContentNotice onRetry={() => void digest.refetch()} retrying={digest.isRefetching} />
         ) : null}
 
-        {digest.isPending ? (
-          <PixelTxt size={9} style={styles.loading}>
-            YUKLENIYOR
-          </PixelTxt>
-        ) : null}
+        {digest.isPending ? <PixelLoader label="Yükleniyor" style={styles.loader} /> : null}
 
         {/*
           "Hazırlanıyor" bir hata değil, birinci sınıf bir durum: bülten her sabah
@@ -114,7 +110,7 @@ export function DigestView() {
 
 const styles = StyleSheet.create({
   content: { paddingBottom: 24 },
-  loading: { textAlign: 'center', marginTop: 40, color: colors.faint },
+  loader: { alignSelf: 'center', marginTop: 40 },
   empty: { marginTop: 28 },
   dateLine: { paddingHorizontal: 16, paddingTop: 16, color: colors.blue500 },
   card: { marginHorizontal: 16, marginTop: 12 },

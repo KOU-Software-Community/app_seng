@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ContentNotice, EmptyState, PixelTxt } from '../../components/ui';
-import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
+import { PixelLoader, PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors } from '../../theme';
 import { ArticleCard } from '../components/ArticleCard';
 import { useSavedArticlesFeed } from '../data-access/hooks';
@@ -63,9 +63,7 @@ export function SavedView() {
         ) : null}
 
         {savedIds.length > 0 && feed.isPending ? (
-          <PixelTxt size={9} style={styles.loading}>
-            YUKLENIYOR
-          </PixelTxt>
+          <PixelLoader label="Yükleniyor" style={styles.loader} />
         ) : null}
 
         {(savedIds.length === 0 || !feed.isPending) && items.length === 0 ? (
@@ -105,7 +103,7 @@ export function SavedView() {
 
 const styles = StyleSheet.create({
   content: { paddingBottom: 24, paddingTop: 4 },
-  loading: { textAlign: 'center', marginTop: 40, color: colors.faint },
+  loader: { alignSelf: 'center', marginTop: 40 },
   empty: { marginTop: 28 },
   note: { textAlign: 'center', marginTop: 18, color: colors.faint },
 });
