@@ -7,6 +7,7 @@ import { SLIDE_INTERVAL_MS } from '../useAutoAdvance';
 /**
  * Etkinlik ekranında hero, alttaki şerit ve tam ekran görüntüleyici birlikte:
  * ikisi de aynı görüntüleyiciyi açıyor, görüntüleyici açıkken hero kaymıyor.
+ * Fotoğraf hiçbir yerde kırpılmıyor: hero, şerit ve arşiv kartı da kendi oranında.
  */
 
 jest.mock('expo-router', () => {
@@ -19,7 +20,14 @@ jest.mock('expo-router', () => {
 });
 jest.mock('../content', () => ({
   useEvent: () => mockEvent,
-  useContent: () => ({ getRaffle: () => undefined, registeredCount: () => 0 }),
+  useContent: () => ({
+    getRaffle: () => undefined,
+    registeredCount: () => 0,
+    archive: [mockEvent],
+    error: null,
+    loading: false,
+    refresh: jest.fn(),
+  }),
 }));
 jest.mock('../store', () => ({
   useAppStore: () => ({ registrationFor: () => undefined, raffleEntryFor: () => undefined, syncPending: jest.fn() }),
@@ -68,4 +76,28 @@ it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkk
 
   await fireEvent.press(screen.getByLabelText('Fotoğraf 3'));
   expect(screen.getByText('3 / 3')).toBeTruthy();
+}, 30000);
+
+/** Çizilen expo-image görsellerinin `contentFit`'i, sırayla. */
+const fits = (root: { queryAll: (p: (n: { type: unknown }) => boolean) => { props: { contentFit?: string } }[] }) =>
+  root.queryAll((node) => node.type === 'ViewManagerAdapter_ExpoImage').map((node) => node.props.contentFit);
+
+it('etkinlik ekranında hero ve şerit fotoğrafı kırpmıyor, kendi oranında', async () => {
+  const Detail = (require('../../app/etkinlik/[id]') as typeof import('../../app/etkinlik/[id]')).default;
+  const { root } = await render(
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <Detail />
+    </SafeAreaProvider>,
+  );
+  expect(fits(root!)).toEqual(Array(6).fill('contain')); // hero 3 + şerit 3
+}, 30000);
+
+it('arşiv kartı fotoğrafı kırpmıyor', async () => {
+  const Arsiv = (require('../../app/(tabs)/arsiv') as typeof import('../../app/(tabs)/arsiv')).default;
+  const { root } = await render(
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <Arsiv />
+    </SafeAreaProvider>,
+  );
+  expect(fits(root!)).toEqual(['contain']);
 }, 30000);

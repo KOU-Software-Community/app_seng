@@ -21,6 +21,7 @@ type Props = {
 /**
  * Etkinlik ekranının ana fotoğrafı: yüklenen fotoğraflar sayfa sayfa, kendiliğinden
  * kayıyor (kuralları `useAutoAdvance`'te). Dokunulan fotoğraf tam ekranda açılıyor.
+ * Fotoğraf kırpılmıyor, kendi oranında (`contain`); kalan kenar lacivert.
  * Fotoğraf yoksa bugünkü yer tutucu.
  */
 export function PhotoHero({ photos, height, onOpen, paused, children }: Props) {
@@ -58,7 +59,7 @@ export function PhotoHero({ photos, height, onOpen, paused, children }: Props) {
             accessibilityLabel={`Fotoğraf ${i + 1} / ${n}, büyüt`}
             style={{ width, height }}
           >
-            <Image source={{ uri: item }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri: item }} style={StyleSheet.absoluteFill} contentFit="contain" />
           </Pressable>
         )}
       />

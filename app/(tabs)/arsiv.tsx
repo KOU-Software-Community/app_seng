@@ -114,7 +114,7 @@ function ArchiveCard({ event, onPress }: { event: ClubEvent; onPress: () => void
       accessibilityLabel={`${event.title} — etkinlik detayı`}
       style={({ pressed }) => [styles.card, { transform: [{ translateY: pressed ? -2 : 0 }] }]}
     >
-      <PhotoSlot uri={event.photos?.[0]} label="Foto" style={styles.cardPhoto}>
+      <PhotoSlot uri={event.photos?.[0]} label="Foto" resizeMode="contain" style={styles.cardPhoto}>
         {parsed ? (
           <View style={styles.yearBadge}>
             <PixelTxt size={6} color={colors.onNavy}>
@@ -170,7 +170,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  cardPhoto: { height: 112 },
+  // Fotoğraf kırpılmıyor; boş kalan kenar şeritteki gibi açık mavi.
+  cardPhoto: { height: 112, backgroundColor: colors.blue100 },
   cardBody: { paddingHorizontal: 12, paddingTop: 11, paddingBottom: 13 },
   yearBadge: {
     position: 'absolute',
