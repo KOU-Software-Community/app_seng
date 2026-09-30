@@ -18,7 +18,8 @@ const MONTHS_AHEAD = 12;
  *
  * Ekran okuyucu her günü tam tarihle okuyor ("12 Ekim 2026, Pazartesi, etkinlik: …");
  * gün adları satırı ve boş hücreler ondan gizli. Ay değişince yeni ay duyuruluyor:
- * odak düğmede kaldığı için başlığın değiştiği kendiliğinden okunmuyor.
+ * odak düğmede kaldığı için başlığın değiştiği kendiliğinden okunmuyor. Duyuru kuyruğa
+ * giriyor (iOS), VoiceOver düğmenin kendi okumasıyla onu kesmesin.
  */
 export function MonthCalendar({ events, onOpen }: { events: ClubEvent[]; onOpen: (id: string) => void }) {
   const today = clubCalendar(new Date());
@@ -38,7 +39,9 @@ export function MonthCalendar({ events, onOpen }: { events: ClubEvent[]; onOpen:
   const go = (next: number) => {
     setOffset(next);
     const month = addMonths(base.year, base.month, next);
-    AccessibilityInfo.announceForAccessibility(monthLabelOf(month.year, month.month));
+    AccessibilityInfo.announceForAccessibilityWithOptions(monthLabelOf(month.year, month.month), {
+      queue: true,
+    });
   };
 
   // Başa boşluk: ayın 1'i doğru güne düşsün; sona boşluk: son satır tamamlansın.
@@ -52,7 +55,15 @@ export function MonthCalendar({ events, onOpen }: { events: ClubEvent[]; onOpen:
     <Card style={styles.card}>
       <View style={styles.bar}>
         <NavButton label="Önceki ay" glyph="‹" disabled={offset <= 0} onPress={() => go(offset - 1)} />
-        <Txt weight="extrabold" size={15} color={colors.navy900} accessibilityRole="header">
+        {/* En büyük yazı boyutunda da iki düğmeyle aynı satıra sığsın. */}
+        <Txt
+          weight="extrabold"
+          size={15}
+          color={colors.navy900}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={1.6}
+          style={styles.title}
+        >
           {grid.label}
         </Txt>
         <NavButton label="Sonraki ay" glyph="›" disabled={offset >= lastOffset} onPress={() => go(offset + 1)} />
@@ -144,7 +155,7 @@ function NavButton({
       accessibilityState={{ disabled }}
       style={({ pressed }) => [styles.nav, { opacity: disabled ? 0.35 : pressed ? 0.7 : 1 }]}
     >
-      <Txt weight="extrabold" size={18} color={colors.navy900}>
+      <Txt weight="extrabold" size={18} color={colors.navy900} maxFontSizeMultiplier={1.3}>
         {glyph}
       </Txt>
     </Pressable>
@@ -159,6 +170,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
+  title: { flexShrink: 1, textAlign: 'center' },
   // 44 pt: dokunma hedefinin alt sınırı.
   nav: {
     width: 44,

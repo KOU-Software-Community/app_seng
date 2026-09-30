@@ -9289,7 +9289,7 @@
       "file_type": "code",
       "norm_label": "monthcalendar()",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L23"
+      "source_location": "L24"
     },
     {
       "id": "src_components_monthcalendar_navbutton",
@@ -9301,7 +9301,7 @@
       "file_type": "code",
       "norm_label": "navbutton()",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L127"
+      "source_location": "L138"
     },
     {
       "id": "src_eventschema_addmonths",
@@ -21579,7 +21579,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L154"
+      "source_location": "L165"
     },
     {
       "id": "src_eventschema",
@@ -30779,7 +30779,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -30791,7 +30791,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L29",
+      "source_location": "L30",
       "weight": 1.0
     },
     {
@@ -30803,7 +30803,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -30815,7 +30815,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -30827,7 +30827,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L41",
+      "source_location": "L42",
       "weight": 1.0
     },
     {
@@ -30839,7 +30839,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L87",
+      "source_location": "L98",
       "weight": 1.0
     },
     {
@@ -78678,7 +78678,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L127",
+      "source_location": "L138",
       "weight": 1.0
     },
     {
@@ -78689,7 +78689,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L154",
+      "source_location": "L165",
       "weight": 1.0
     },
     {
@@ -78700,7 +78700,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/MonthCalendar.tsx",
-      "source_location": "L23",
+      "source_location": "L24",
       "weight": 1.0
     },
     {
@@ -92169,5 +92169,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "95ef078276fbb130b0df897cadeb7d99608612ce"
+  "built_at_commit": "d241d897e4c2b6a74d33b1182705aa4061469350"
 }

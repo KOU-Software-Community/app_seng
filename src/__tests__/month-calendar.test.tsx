@@ -28,11 +28,12 @@ it('etkinlik yokken bu ay açılıyor, bugün işaretli, geriye gidilmiyor', asy
 
 it('ileri geri geçiyor, ayı duyuruyor, 12 ay sonra duruyor', async () => {
   at('2026-09-30T09:00:00Z');
-  const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+  // Kuyruğa: VoiceOver düğmenin kendi okumasıyla duyuruyu kesmesin.
+  const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
   await render(<MonthCalendar events={[]} onOpen={jest.fn()} />);
   await next();
   expect(header('Ekim 2026')).toBeTruthy();
-  expect(announce).toHaveBeenLastCalledWith('Ekim 2026');
+  expect(announce).toHaveBeenLastCalledWith('Ekim 2026', { queue: true });
   await prev();
   expect(header('Eylül 2026')).toBeTruthy();
   for (let i = 0; i < 12; i += 1) await next();
@@ -76,4 +77,14 @@ it('gün dönümü kulüp saatinde: UTC 21:30 ertesi gün', async () => {
   await render(<MonthCalendar events={[]} onOpen={jest.fn()} />);
   expect(header('Ekim 2026')).toBeTruthy();
   expect(screen.getByLabelText('1 Ekim 2026, Perşembe, bugün')).toBeTruthy();
+});
+
+it('en büyük yazı boyutunda başlık satırı taşmıyor', async () => {
+  at('2026-09-30T09:00:00Z');
+  await render(<MonthCalendar events={[]} onOpen={jest.fn()} />);
+  const title = screen.getByRole('header', { name: 'Eylül 2026' });
+  expect(title).toHaveProp('maxFontSizeMultiplier', 1.6);
+  expect(title).toHaveStyle({ flexShrink: 1 });
+  expect(screen.getByText('›')).toHaveProp('maxFontSizeMultiplier', 1.3);
+  expect(screen.getByText('‹')).toHaveProp('maxFontSizeMultiplier', 1.3);
 });
