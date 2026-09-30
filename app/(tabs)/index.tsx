@@ -44,8 +44,8 @@ export default function HomeRoute() {
     loading: announcementsLoading,
     refresh: refreshAnnouncements,
   } = useAnnouncements();
-  const { slides, error: slidesError, refresh: refreshSlides } = useSlides();
-  const { sponsors, error: sponsorsError, refresh: refreshSponsors } = useSponsors();
+  const { slides, refresh: refreshSlides } = useSlides();
+  const { sponsors, refresh: refreshSponsors } = useSponsors();
 
   // Aşağı çekmek ana sayfadaki her şeyi yeniler. Duyurular daha önce burada
   // yenilenmiyordu; çeken kişi hepsinin tazelendiğini sanıyordu.
@@ -135,10 +135,11 @@ export default function HomeRoute() {
 
       {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
-      {/* Hata ya da boşken hiç çizilmiyor: bir süs, ana sayfayı bekletmemeli. */}
-      {!slidesError ? <HomeSlider slides={slides} /> : null}
+      {/* Boşken çizilmiyor: bir süs, ana sayfayı bekletmemeli. Okuma düşerse
+          cihazdaki kopya görünüyor (`src/vitrinCache.ts`). */}
+      <HomeSlider slides={slides} />
 
-      {!sponsorsError && sponsors.length ? (
+      {sponsors.length ? (
         <>
           <SectionTitle
             icon="grid"

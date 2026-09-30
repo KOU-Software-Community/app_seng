@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { act, render, screen } from '@testing-library/react-native';
+import React from 'react';
+import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import { toSlide, toSponsor } from '../vitrinSchema';
 
@@ -11,6 +14,28 @@ import { toSlide, toSponsor } from '../vitrinSchema';
  * `jest.isolateModulesAsync` ile her seferinde taze bir kopya ve taze bir
  * AsyncStorage taklidi alıyor.
  */
+
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    useRouter: () => ({ push: jest.fn(), navigate: jest.fn() }),
+    useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]),
+  };
+});
+// Ana sayfanın vitrin dışındaki kaynakları: boş ve hatasız.
+jest.mock('../content', () => ({
+  useContent: () => ({ events: [], archive: [], error: null, loading: false, refresh: jest.fn() }),
+}));
+jest.mock('../announcements', () => ({
+  useAnnouncements: () => ({ announcements: [], error: null, loading: false, refresh: jest.fn() }),
+  formatAnnouncementDate: () => '',
+}));
+jest.mock('../store', () => ({ useAppStore: () => ({ registrations: [] }) }));
+
+const METRICS: Metrics = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 47, left: 0, right: 0, bottom: 34 },
+};
 
 const SLIDES_KEY = 'kyk.vitrin.slides.v1';
 const SPONSORS_KEY = 'kyk.vitrin.sponsors.v1';
@@ -83,4 +108,27 @@ it('sunucu boş liste döndürünce kopya boşalıyor; geç biten açılış oku
     expect(cache.cachedSlides()).toEqual([]);
     expect(await storage.getItem(SLIDES_KEY)).toBe('[]');
   });
+});
+
+it('okuma düşerken ana sayfa slider ve sponsorları cihazdan çiziyor, süresi geçmiş slaytı değil', async () => {
+  // Jest'te Firestore okuması hep hata yolunda: bu, çevrimdışı açılışın kendisi.
+  await AsyncStorage.setItem(SLIDES_KEY, JSON.stringify([SLIDE, EXPIRED]));
+  await AsyncStorage.setItem(SPONSORS_KEY, JSON.stringify([SPONSOR]));
+  // Uygulamadaki sıra: kopya açılışta okunuyor, ana sayfa girişten sonra çiziliyor.
+  await (require('../vitrinCache') as Cache).cacheReady;
+  const { SponsorsProvider } = require('../sponsors') as typeof import('../sponsors');
+  const Home = (require('../../app/(tabs)/index') as typeof import('../../app/(tabs)/index')).default;
+
+  await render(
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <SponsorsProvider>
+        <Home />
+      </SponsorsProvider>
+    </SafeAreaProvider>,
+  );
+  await act(async () => {});
+
+  expect(screen.getByText('Hackathon')).toBeTruthy();
+  expect(screen.queryByText('Geçen haftanın etkinliği')).toBeNull();
+  expect(screen.getByText('Acme Yazılım')).toBeTruthy();
 });

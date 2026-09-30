@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { isFirebaseConfigured } from './firebaseConfig';
+import { cacheReady, cachedSponsors, saveCache } from './vitrinCache';
 import type { Sponsor } from './vitrinSchema';
 
 /**
@@ -10,6 +11,9 @@ import type { Sponsor } from './vitrinSchema';
  * Durum makinesi `AnnouncementsProvider` ile aynı: iptal bayrağı, `nonce` ile
  * yenileme, hata olunca eldeki liste korunuyor. Okuma `fetchContent`'ten ayrı:
  * `sponsors` kuralı henüz yayınlanmadıysa etkinlikler bundan etkilenmiyor.
+ *
+ * İlk durum cihazdaki kopya (`vitrinCache.ts`), yani hata olunca eldeki liste o
+ * kopya. Bu modül kökte içe aktarıldığı için kopyanın okunması açılışta başlıyor.
  */
 type SponsorsValue = {
   sponsors: Sponsor[];
@@ -23,10 +27,16 @@ type SponsorsValue = {
 const Ctx = createContext<SponsorsValue | null>(null);
 
 export function SponsorsProvider({ children }: { children: React.ReactNode }) {
-  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>(cachedSponsors);
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+
+  // Açılış okuması ilk render'a yetişmediyse bitince. Taze liste bellekte
+  // olduğundan geç gelse de eskiyi geri getirmiyor.
+  useEffect(() => {
+    void cacheReady.then(() => setSponsors(cachedSponsors()));
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -44,6 +54,7 @@ export function SponsorsProvider({ children }: { children: React.ReactNode }) {
       .then((list) => {
         if (cancelled) return;
         setSponsors(list);
+        saveCache('sponsors', list);
         setError(null);
       })
       .catch((err: unknown) => {
