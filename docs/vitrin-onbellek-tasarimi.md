@@ -95,10 +95,13 @@ Kapsam dışı:
   1. Önbellekteki liste ayrıştırıcıdan aynen geçiyor, bozuk kayıt atlanıyor
      (`toSlide`/`toSponsor` kendi çıktısını kabul etmezse önbellek sessizce
      boşalırdı).
-  2. Okuma düşerken `/sponsorlar` cihazdaki sponsoru gösteriyor.
-  3. `useSlides` ilk render'da cihazdaki slaytı döndürüyor.
+  2. Yarım yazılmış JSON boş liste, çökme yok.
+  3. Sunucu boş liste döndürünce kopya boşalıyor; geç biten açılış okuması onu
+     ezmiyor.
+  4. Okuma düşerken ana sayfa slider ve sponsorları cihazdan çiziyor; süresi
+     geçmiş slayt görünmüyor.
 - Jest'te Firestore okuması her zaman hata yolunda (yapılandırma yok, dinamik
-  `import('./firebase')` çalışmıyor); 2 ve 3 bu yüzden aynı zamanda çevrimdışı
+  `import('./firebase')` çalışmıyor); 4 bu yüzden aynı zamanda çevrimdışı
   senaryosu. Başarılı okumanın `set` + `saveCache` iki satırı ayrıca sınanmıyor.
 - Her iki adımda `npm run check:all`, `npx expo export --platform ios`,
   `npm run check:bundle`.
