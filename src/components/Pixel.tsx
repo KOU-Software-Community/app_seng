@@ -134,8 +134,18 @@ export function PixelRefresh({ visible, top }: { visible: boolean; top?: number 
   );
 }
 
-/** `RefreshControl`'e yayılır: hareket kalır, native gösterge görünmez. */
+/**
+ * `RefreshControl`'e yayılır: çekme hareketi kalır, native gösterge ne görünüyor ne
+ * de "yenileniyor" durumuna geçiyor — yükleme `PixelRefresh`'te.
+ *
+ * `refreshing` hep false, çünkü iOS'ta kullanıcı çekmeden true olan yenileme RN'de
+ * içeriği kontrolün boyu kadar aşağı itiyor (`beginRefreshingProgrammatically`).
+ * `loading` sekmeler arasında ortak; sekme arkadayken açılıp kapanan yenileme bu
+ * kaymayı geri almıyor, her turda bir kat daha — Takvim ve Arşiv açılışta üstte beyaz
+ * bir bantla kalıyordu. Kullanıcı çekince RN native kontrolü hemen false'a eşitliyor.
+ */
 export const hiddenSpinner = {
+  refreshing: false,
   tintColor: 'transparent',
   colors: ['transparent'],
   progressBackgroundColor: 'transparent',

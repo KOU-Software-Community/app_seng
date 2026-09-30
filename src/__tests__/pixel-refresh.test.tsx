@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 import React from 'react';
+import { RefreshControl, type RefreshControlProps } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import { PixelRefresh } from '../components/Pixel';
@@ -34,7 +35,10 @@ it('yenilenirken üstte PixelLoader, bitince hiçbir şey', async () => {
   expect(screen.queryByLabelText('Yenileniyor')).toBeNull();
 });
 
-it('Arşiv yüklenirken göstergeyi gösteriyor', async () => {
+// Native kontrol yüklenirken de "yenileniyor"a geçmiyor: iOS'ta kullanıcı çekmeden
+// açılan yenileme içeriği kontrolün boyu kadar aşağı itiyor, sekme arkadayken
+// biterse geri gelmiyordu (açılışta üstte beyaz bant).
+it('Arşiv yüklenirken göstergeyi gösteriyor, native kontrol yenilemeye geçmiyor', async () => {
   const Arsiv = (require('../../app/(tabs)/arsiv') as typeof import('../../app/(tabs)/arsiv')).default;
   await render(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -42,4 +46,7 @@ it('Arşiv yüklenirken göstergeyi gösteriyor', async () => {
     </SafeAreaProvider>,
   );
   expect(screen.getByLabelText('Yenileniyor')).toBeTruthy();
+  // RN'in Jest taklidi prop'ları host'a geçirmiyor; son bağlananı `latestRef` tutuyor.
+  const native = (RefreshControl as unknown as { latestRef: { props: RefreshControlProps } | null }).latestRef;
+  expect(native?.props.refreshing).toBe(false);
 }, 30000);

@@ -70,10 +70,9 @@ export default function HomeRoute() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
             onRefresh={onRefresh}
-            // Native gösterge saydam: açık zeminde görünmüyordu (iOS'ta renk ilk çekişte
-            // uygulanmayabiliyor, Android beyaz daire). Yerine üstte `PixelRefresh`.
+            // Native gösterge saydam ve hiç "yenileniyor"a geçmiyor (gerekçe
+            // `hiddenSpinner`'da); yükleme üstte `PixelRefresh`.
             {...hiddenSpinner}
           />
         }

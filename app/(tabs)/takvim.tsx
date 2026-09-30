@@ -36,7 +36,7 @@ export default function TakvimRoute() {
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} {...hiddenSpinner} />
+          <RefreshControl onRefresh={refresh} {...hiddenSpinner} />
         }
       >
         <GradientHeader gradient={gradients.calendar}>

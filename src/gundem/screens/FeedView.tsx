@@ -126,7 +126,6 @@ export function FeedView() {
         )}
         refreshControl={
           <RefreshControl
-            refreshing={feed.isRefetching && !feed.isFetchingNextPage}
             onRefresh={() => void feed.refetch()}
             {...hiddenSpinner}
           />

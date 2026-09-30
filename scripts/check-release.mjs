@@ -1420,6 +1420,36 @@ check(
 );
 
 check(
+  'aşağı çekip yenileme programla açılmıyor',
+  'iOS\u2019ta `refreshing` kullanıcı çekmeden true olunca RN içeriği kontrolün boyu ' +
+    'kadar aşağı itiyor (`beginRefreshingProgrammatically`). `loading` sekmeler arasında ' +
+    'ortak: sekme arkadayken açılıp kapanan yenileme bu kaymayı geri almıyor, her turda ' +
+    'bir kat daha — sayfa açılışta üstte beyaz bir bantla kalıyordu. Gösterge ' +
+    '`PixelRefresh`; native kontrol yalnız çekme hareketi (`hiddenSpinner`).',
+  () => {
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const hits = [];
+    const walk = (d) => {
+      for (const e of readdirSync(join(root, d), { withFileTypes: true })) {
+        const rel = `${d}/${e.name}`;
+        if (e.isDirectory()) {
+          if (e.name !== '__tests__') walk(rel);
+        } else if (/\.tsx$/.test(e.name)) {
+          for (const [, attrs] of strip(read(rel)).matchAll(/<RefreshControl\b([\s\S]*?)\/>/g)) {
+            if (/\brefreshing=/.test(attrs) || !/\.\.\.hiddenSpinner\b/.test(attrs)) hits.push(rel);
+          }
+        }
+      }
+    };
+    for (const dir of ['app', 'src']) walk(dir);
+    if (!/refreshing: false/.test(strip(read('src/components/Pixel.tsx')))) {
+      return '`hiddenSpinner` yenilemeyi kapalı tutmuyor';
+    }
+    return hits.length ? `programla açılabilen RefreshControl: ${hits.join(', ')}` : null;
+  },
+);
+
+check(
   'yükleme yetim dosya bırakmıyor',
   'Doğrulama başarısız olursa yüklenen dosyalar Storage’da kalır ve hiçbir etkinlik ' +
     'onlara işaret etmez — kota onlara da ödenir ve kimse fark etmez. Silinen görsel ' +

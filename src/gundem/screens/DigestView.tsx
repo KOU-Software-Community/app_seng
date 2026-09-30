@@ -41,7 +41,6 @@ export function DigestView() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={digest.isRefetching}
             onRefresh={() => void digest.refetch()}
             {...hiddenSpinner}
           />

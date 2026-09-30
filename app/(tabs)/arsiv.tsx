@@ -51,7 +51,7 @@ export default function ArsivRoute() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} {...hiddenSpinner} />
+          <RefreshControl onRefresh={refresh} {...hiddenSpinner} />
         }
       >
         <GradientHeader gradient={gradients.section} style={{ paddingBottom: 16 }}>

@@ -53,7 +53,6 @@ export function SavedView() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={feed.isRefetching}
             onRefresh={() => void feed.refetch()}
             {...hiddenSpinner}
           />
