@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ContentNotice, EmptyState, PixelTxt } from '../../components/ui';
+import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors } from '../../theme';
 import { ArticleCard } from '../components/ArticleCard';
 import { useSavedArticlesFeed } from '../data-access/hooks';
@@ -46,57 +47,60 @@ export function SavedView() {
   const items = orderBySaved(articles, savedIds);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={feed.isRefetching}
-          onRefresh={() => void feed.refetch()}
-          tintColor={colors.blue500}
-        />
-      }
-    >
-      {feed.isError && items.length === 0 ? (
-        <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
-      ) : null}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={feed.isRefetching}
+            onRefresh={() => void feed.refetch()}
+            {...hiddenSpinner}
+          />
+        }
+      >
+        {feed.isError && items.length === 0 ? (
+          <ContentNotice onRetry={() => void feed.refetch()} retrying={feed.isRefetching} />
+        ) : null}
 
-      {savedIds.length > 0 && feed.isPending ? (
-        <PixelTxt size={9} style={styles.loading}>
-          YUKLENIYOR
-        </PixelTxt>
-      ) : null}
+        {savedIds.length > 0 && feed.isPending ? (
+          <PixelTxt size={9} style={styles.loading}>
+            YUKLENIYOR
+          </PixelTxt>
+        ) : null}
 
-      {(savedIds.length === 0 || !feed.isPending) && items.length === 0 ? (
-        <EmptyState
-          title="Kaydedilen haber yok"
-          body="Bir haberi açıp kaydettiğinde burada birikecek."
-          style={styles.empty}
-        />
-      ) : null}
+        {(savedIds.length === 0 || !feed.isPending) && items.length === 0 ? (
+          <EmptyState
+            title="Kaydedilen haber yok"
+            body="Bir haberi açıp kaydettiğinde burada birikecek."
+            style={styles.empty}
+          />
+        ) : null}
 
-      {items.map((article) => (
-        <ArticleCard
-          key={article.id}
-          article={article}
-          unread={!isRead(article.id)}
-          onPress={() => {
-            markRead(article.id);
-            router.push(`/gundem/${article.id}`);
-          }}
-        />
-      ))}
+        {items.map((article) => (
+          <ArticleCard
+            key={article.id}
+            article={article}
+            unread={!isRead(article.id)}
+            onPress={() => {
+              markRead(article.id);
+              router.push(`/gundem/${article.id}`);
+            }}
+          />
+        ))}
 
-      {/*
-        Kaydı kaldırma makale ekranında: burada bir çöp kutusu koymak, listeyi
-        kaydırırken yanlışlıkla silinen ve geri alınamayan bir kayıt demekti.
-      */}
-      {items.length > 0 ? (
-        <PixelTxt size={7} style={styles.note}>
-          KALDIRMAK ICIN HABERI AC
-        </PixelTxt>
-      ) : null}
-    </ScrollView>
+        {/*
+          Kaydı kaldırma makale ekranında: burada bir çöp kutusu koymak, listeyi
+          kaydırırken yanlışlıkla silinen ve geri alınamayan bir kayıt demekti.
+        */}
+        {items.length > 0 ? (
+          <PixelTxt size={7} style={styles.note}>
+            KALDIRMAK ICIN HABERI AC
+          </PixelTxt>
+        ) : null}
+      </ScrollView>
+      <PixelRefresh visible={feed.isRefetching} top={8} />
+    </View>
   );
 }
 

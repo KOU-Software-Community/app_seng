@@ -17,6 +17,7 @@ import { asDataError, useFeed } from '../data-access/hooks';
 import type { Article } from '../domain/types';
 import { useEnabledSources, useReadArticles } from '../user-state/hooks';
 import { clubCalendar } from '../../eventSchema';
+import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors } from '../../theme';
 
 /** "Tümü" artı prototipin beş kategorisi. */
@@ -127,7 +128,7 @@ export function FeedView() {
           <RefreshControl
             refreshing={feed.isRefetching && !feed.isFetchingNextPage}
             onRefresh={() => void feed.refetch()}
-            tintColor={colors.blue500}
+            {...hiddenSpinner}
           />
         }
         onEndReachedThreshold={0.4}
@@ -192,6 +193,7 @@ export function FeedView() {
           )
         }
       />
+      <PixelRefresh visible={feed.isRefetching && !feed.isFetchingNextPage} top={8} />
     </View>
   );
 }

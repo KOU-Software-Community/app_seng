@@ -17,6 +17,7 @@ import { useContent } from '../../src/content';
 import { ClubEvent, WEEKDAYS } from '../../src/data';
 import { monthGrids, monthOrder, type MonthGrid } from '../../src/eventSchema';
 import { useAppStore } from '../../src/store';
+import { PixelRefresh, hiddenSpinner } from '../../src/components/Pixel';
 import { colors, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
 
@@ -30,66 +31,68 @@ export default function TakvimRoute() {
   const hasEvents = events.length > 0;
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingBottom: 20 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} colors={[colors.blue500]} />
-      }
-    >
-      <GradientHeader gradient={gradients.calendar}>
-        <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
-          Etkinlik Takvimi
-        </Txt>
-        <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
-          {/* The month range used to be hardcoded to "Mart – Nisan 2026" and was
-              still on screen months after those events had passed. */}
-          {hasEvents ? `${events.length} etkinlik` : 'Şu an planlanmış etkinlik yok'}
-        </Txt>
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} {...hiddenSpinner} />
+        }
+      >
+        <GradientHeader gradient={gradients.calendar}>
+          <Txt weight="extrabold" size={24} color="#fff" tracking={-0.5}>
+            Etkinlik Takvimi
+          </Txt>
+          <Txt size={12.5} color={colors.blue200} style={{ marginTop: 4 }}>
+            {/* The month range used to be hardcoded to "Mart – Nisan 2026" and was
+                still on screen months after those events had passed. */}
+            {hasEvents ? `${events.length} etkinlik` : 'Şu an planlanmış etkinlik yok'}
+          </Txt>
 
-        <DottedRule style={{ marginTop: 12 }} />
+          <DottedRule style={{ marginTop: 12 }} />
 
-        {/* Nothing to switch between when the calendar is empty. */}
-        {hasEvents ? (
-          <Segmented
-            onNavy
-            value={view}
-            onChange={(v) => setView(v as View_)}
-            options={[
-              { label: 'Liste', value: 'list' },
-              { label: 'Takvim', value: 'grid' },
-            ]}
-            style={{ marginTop: 16 }}
-          />
-        ) : null}
-      </GradientHeader>
+          {/* Nothing to switch between when the calendar is empty. */}
+          {hasEvents ? (
+            <Segmented
+              onNavy
+              value={view}
+              onChange={(v) => setView(v as View_)}
+              options={[
+                { label: 'Liste', value: 'list' },
+                { label: 'Takvim', value: 'grid' },
+              ]}
+              style={{ marginTop: 16 }}
+            />
+          ) : null}
+        </GradientHeader>
 
-      {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
+        {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
-      {!hasEvents ? (
-        // An empty calendar and a failed fetch look the same on screen, so the
-        // copy has to say which one it is — otherwise a connection problem reads
-        // as "the club has nothing planned".
-        error ? (
-          <EmptyState
-            title="Etkinlikler yüklenemedi"
-            body="Bağlantı kurulduğunda program burada görünecek. Yukarıdan yenileyebilir ya da aşağı çekebilirsin."
-          />
+        {!hasEvents ? (
+          // An empty calendar and a failed fetch look the same on screen, so the
+          // copy has to say which one it is — otherwise a connection problem reads
+          // as "the club has nothing planned".
+          error ? (
+            <EmptyState
+              title="Etkinlikler yüklenemedi"
+              body="Bağlantı kurulduğunda program burada görünecek. Yukarıdan yenileyebilir ya da aşağı çekebilirsin."
+            />
+          ) : (
+            <EmptyState
+              title="Takvim henüz boş"
+              body="Yeni dönemin etkinlikleri planlanıyor. Bildirimleri açarsan program açıklandığında ilk sen haberdar olursun."
+              ctaLabel="Bildirimleri aç"
+              onPress={() => router.push('/bildirim-ayarlari')}
+            />
+          )
+        ) : view === 'list' ? (
+          <ListView onOpen={openEvent} />
         ) : (
-          <EmptyState
-            title="Takvim henüz boş"
-            body="Yeni dönemin etkinlikleri planlanıyor. Bildirimleri açarsan program açıklandığında ilk sen haberdar olursun."
-            ctaLabel="Bildirimleri aç"
-            onPress={() => router.push('/bildirim-ayarlari')}
-          />
-        )
-      ) : view === 'list' ? (
-        <ListView onOpen={openEvent} />
-      ) : (
-        <GridView onOpen={openEvent} />
-      )}
-    </ScrollView>
+          <GridView onOpen={openEvent} />
+        )}
+      </ScrollView>
+      <PixelRefresh visible={loading} />
+    </View>
   );
 }
 
