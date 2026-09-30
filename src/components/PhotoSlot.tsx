@@ -19,6 +19,10 @@ import { PixelTxt } from './ui';
  * Görsel expo-image'la: disk önbelleği (varsayılan `cachePolicy: 'disk'`, anahtarı
  * URI). Panel her görseli yeni adla yüklediği için diskteki kopya hiçbir zaman bayat
  * değil; RN `Image`'ın iOS'taki küçük paylaşılan URL önbelleğine bırakılmıyor.
+ *
+ * Kopyanın ömrü: iOS'ta 7 gün (SDWebImage `maxDiskAge`; okumak tazelemiyor,
+ * expo-image yaş ayarı açmıyor), Android'de 250 MB LRU. Süresi dolan görsel
+ * çevrimiçiyken yeniden iniyor, çevrimdışıyken boş kalıyor.
  */
 export function PhotoSlot({
   uri,

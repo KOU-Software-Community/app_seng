@@ -4,9 +4,12 @@ import React from 'react';
 import { PhotoSlot } from '../components/PhotoSlot';
 
 /**
- * `PhotoSlot` görseli expo-image ile çiziyor: disk önbelleği, anahtarı URI.
- * Logo kırpılmıyor (`contain` — kırpılan logo başka bir marka gibi okunur),
- * fotoğraf alanı dolduruyor (`cover`).
+ * `PhotoSlot` görseli expo-image ile çiziyor. Logo kırpılmıyor (`contain` — kırpılan
+ * logo başka bir marka gibi okunur), fotoğraf alanı dolduruyor (`cover`).
+ *
+ * Disk önbelleği burada sınanmıyor: `cachePolicy` native varsayılan, prop olarak
+ * ağaca hiç gitmiyor. Test yalnız `resizeMode` → `contentFit` eşlemesini ve
+ * görselin expo-image üzerinden çizildiğini doğruluyor.
  */
 
 type HostNode = { props?: Record<string, unknown>; children?: unknown };

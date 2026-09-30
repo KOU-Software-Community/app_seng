@@ -30,7 +30,8 @@ Sürümler `package.json`'dan.
   (typed routes), TypeScript ~6.0.3 (`strict`). Expo değişti; kod yazmadan önce
   https://docs.expo.dev/versions/v57.0.0/
 - Firebase JS SDK ^12.17.1 — yalnız **Firestore + Auth**. Firebase Storage ve FCM kodda
-  yok: fotoğraflar Supabase Storage'da (`admin/photos.ts`), push Expo Push Service'ten
+  yok: fotoğraflar Supabase Storage'da (`admin/photos.ts`), uygulamada `expo-image` ile
+  diskten (`src/components/PhotoSlot.tsx`; iOS'ta kopya 7 gün), push Expo Push Service'ten
   (`expo-notifications` ~57.0.15 → `getExpoPushTokenAsync`; panel
   `exp.host/--/api/v2/push/send`).
 - State: **Zustand yok.** React Context + AsyncStorage: `src/store.tsx` (kayıtlar,

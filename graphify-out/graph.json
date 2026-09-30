@@ -1496,7 +1496,7 @@
       "file_type": "code",
       "norm_label": "hostnode",
       "source_file": "src/__tests__/photo-slot.test.tsx",
-      "source_location": "L12"
+      "source_location": "L15"
     },
     {
       "id": "src_vitrinschema_kicker",
@@ -7679,7 +7679,7 @@
       "file_type": "code",
       "norm_label": "photoslot()",
       "source_file": "src/components/PhotoSlot.tsx",
-      "source_location": "L23"
+      "source_location": "L27"
     },
     {
       "id": "src_components_ui_contentnotice",
@@ -7775,7 +7775,7 @@
       "file_type": "code",
       "norm_label": "fits()",
       "source_file": "src/__tests__/photo-slot.test.tsx",
-      "source_location": "L15"
+      "source_location": "L18"
     },
     {
       "id": "src_useopenevent_useopenevent",
@@ -14670,7 +14670,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/components/PhotoSlot.tsx",
-      "source_location": "L68"
+      "source_location": "L72"
     },
     {
       "id": "src_components_pixel",
@@ -15338,7 +15338,7 @@
       "node_kind": "heading",
       "norm_label": "veri: kim neyi okuyor, kim yaz\u0131yor",
       "source_file": "CLAUDE.md",
-      "source_location": "L92"
+      "source_location": "L93"
     },
     {
       "id": "docs_sponsorlar_ve_slider_tasarimi_4_1_okuma_ve_durum",
@@ -16661,7 +16661,7 @@
       "node_kind": "heading",
       "norm_label": "graphify",
       "source_file": "CLAUDE.md",
-      "source_location": "L179"
+      "source_location": "L180"
     },
     {
       "id": "docs_sponsorlar_ve_slider_plani_task_12_\u00f6d\u00fcl\u00fc_sa\u011flayan_prizeproviders",
@@ -18422,7 +18422,7 @@
       "node_kind": "heading",
       "norm_label": "kurallar ve tuzaklar",
       "source_file": "CLAUDE.md",
-      "source_location": "L139"
+      "source_location": "L140"
     },
     {
       "id": "docs_sponsorlar_ve_slider_plani_global_constraints",
@@ -23408,7 +23408,7 @@
       "node_kind": "heading",
       "norm_label": "dag\u0131t\u0131m yuzeyleri",
       "source_file": "CLAUDE.md",
-      "source_location": "L126"
+      "source_location": "L127"
     },
     {
       "id": "claude_git",
@@ -23420,7 +23420,7 @@
       "node_kind": "heading",
       "norm_label": "git",
       "source_file": "CLAUDE.md",
-      "source_location": "L194"
+      "source_location": "L195"
     },
     {
       "id": "claude_i_\u00e7erik_giri\u015fi",
@@ -23432,7 +23432,7 @@
       "node_kind": "heading",
       "norm_label": "icerik girisi",
       "source_file": "CLAUDE.md",
-      "source_location": "L115"
+      "source_location": "L116"
     },
     {
       "id": "claude_klas\u00f6rler",
@@ -23444,7 +23444,7 @@
       "node_kind": "heading",
       "norm_label": "klasorler",
       "source_file": "CLAUDE.md",
-      "source_location": "L69"
+      "source_location": "L70"
     },
     {
       "id": "claude_komutlar",
@@ -23456,7 +23456,7 @@
       "node_kind": "heading",
       "norm_label": "komutlar",
       "source_file": "CLAUDE.md",
-      "source_location": "L47"
+      "source_location": "L48"
     },
     {
       "id": "claude_ko\u00fc_yaz\u0131l\u0131m_kul\u00fcb\u00fc_mobil_uygulama_kou_seng",
@@ -32858,7 +32858,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/__tests__/photo-slot.test.tsx",
-      "source_location": "L20",
+      "source_location": "L23",
       "weight": 1.0
     },
     {
@@ -33986,7 +33986,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/__tests__/photo-slot.test.tsx",
-      "source_location": "L15",
+      "source_location": "L18",
       "weight": 1.0
     },
     {
@@ -68402,7 +68402,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L115",
+      "source_location": "L116",
       "weight": 1.0
     },
     {
@@ -68424,7 +68424,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L126",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -68435,7 +68435,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L139",
+      "source_location": "L140",
       "weight": 1.0
     },
     {
@@ -68446,7 +68446,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L179",
+      "source_location": "L180",
       "weight": 1.0
     },
     {
@@ -68457,7 +68457,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L194",
+      "source_location": "L195",
       "weight": 1.0
     },
     {
@@ -68479,7 +68479,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L47",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -68490,7 +68490,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L69",
+      "source_location": "L70",
       "weight": 1.0
     },
     {
@@ -68501,7 +68501,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "CLAUDE.md",
-      "source_location": "L92",
+      "source_location": "L93",
       "weight": 1.0
     },
     {
@@ -74661,7 +74661,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/PhotoSlot.tsx",
-      "source_location": "L23",
+      "source_location": "L27",
       "weight": 1.0
     },
     {
@@ -74672,7 +74672,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/PhotoSlot.tsx",
-      "source_location": "L68",
+      "source_location": "L72",
       "weight": 1.0
     },
     {
@@ -80788,7 +80788,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/__tests__/photo-slot.test.tsx",
-      "source_location": "L12",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -82793,7 +82793,7 @@
       "confidence_score": 0.95,
       "context": "GradientStops",
       "source_file": "CLAUDE.md",
-      "source_location": "L160",
+      "source_location": "L161",
       "weight": 1.0
     },
     {
@@ -82865,7 +82865,7 @@
       "confidence_score": 0.95,
       "context": "NotificationSync",
       "source_file": "CLAUDE.md",
-      "source_location": "L110",
+      "source_location": "L111",
       "weight": 1.0
     },
     {
@@ -83045,7 +83045,7 @@
       "confidence_score": 0.95,
       "context": "PixelTxt",
       "source_file": "CLAUDE.md",
-      "source_location": "L78",
+      "source_location": "L79",
       "weight": 1.0
     },
     {
@@ -83057,7 +83057,7 @@
       "confidence_score": 0.95,
       "context": "PixelTxt",
       "source_file": "CLAUDE.md",
-      "source_location": "L158",
+      "source_location": "L159",
       "weight": 1.0
     },
     {
@@ -83417,7 +83417,7 @@
       "confidence_score": 0.95,
       "context": "Txt",
       "source_file": "CLAUDE.md",
-      "source_location": "L78",
+      "source_location": "L79",
       "weight": 1.0
     },
     {
@@ -83429,7 +83429,7 @@
       "confidence_score": 0.95,
       "context": "Txt",
       "source_file": "CLAUDE.md",
-      "source_location": "L158",
+      "source_location": "L159",
       "weight": 1.0
     },
     {
@@ -83549,7 +83549,7 @@
       "confidence_score": 0.95,
       "context": "announce()",
       "source_file": "CLAUDE.md",
-      "source_location": "L120",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -83645,7 +83645,7 @@
       "confidence_score": 0.95,
       "context": "buildEvent",
       "source_file": "CLAUDE.md",
-      "source_location": "L119",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -83657,7 +83657,7 @@
       "confidence_score": 0.95,
       "context": "buildEvent",
       "source_file": "CLAUDE.md",
-      "source_location": "L77",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -84053,7 +84053,7 @@
       "confidence_score": 0.95,
       "context": "clubCalendar",
       "source_file": "CLAUDE.md",
-      "source_location": "L77",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -84065,7 +84065,7 @@
       "confidence_score": 0.95,
       "context": "clubCalendar",
       "source_file": "CLAUDE.md",
-      "source_location": "L144",
+      "source_location": "L145",
       "weight": 1.0
     },
     {
@@ -84101,7 +84101,7 @@
       "confidence_score": 0.95,
       "context": "clubHour",
       "source_file": "CLAUDE.md",
-      "source_location": "L77",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -84113,7 +84113,7 @@
       "confidence_score": 0.95,
       "context": "clubHour",
       "source_file": "CLAUDE.md",
-      "source_location": "L144",
+      "source_location": "L145",
       "weight": 1.0
     },
     {
@@ -84353,7 +84353,7 @@
       "confidence_score": 0.95,
       "context": "fetchContent",
       "source_file": "CLAUDE.md",
-      "source_location": "L102",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
@@ -84413,7 +84413,7 @@
       "confidence_score": 0.95,
       "context": "fetchSlides",
       "source_file": "CLAUDE.md",
-      "source_location": "L112",
+      "source_location": "L113",
       "weight": 1.0
     },
     {
@@ -84473,7 +84473,7 @@
       "confidence_score": 0.95,
       "context": "fetchSponsors",
       "source_file": "CLAUDE.md",
-      "source_location": "L111",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -84581,7 +84581,7 @@
       "confidence_score": 0.95,
       "context": "get()",
       "source_file": "CLAUDE.md",
-      "source_location": "L185",
+      "source_location": "L186",
       "weight": 1.0
     },
     {
@@ -84833,7 +84833,7 @@
       "confidence_score": 0.95,
       "context": "loadProfile",
       "source_file": "CLAUDE.md",
-      "source_location": "L107",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -85085,7 +85085,7 @@
       "confidence_score": 0.95,
       "context": "pushRaffleEntry",
       "source_file": "CLAUDE.md",
-      "source_location": "L106",
+      "source_location": "L107",
       "weight": 1.0
     },
     {
@@ -85133,7 +85133,7 @@
       "confidence_score": 0.95,
       "context": "pushRegistration",
       "source_file": "CLAUDE.md",
-      "source_location": "L105",
+      "source_location": "L106",
       "weight": 1.0
     },
     {
@@ -85265,7 +85265,7 @@
       "confidence_score": 0.95,
       "context": "rescheduleReminders",
       "source_file": "CLAUDE.md",
-      "source_location": "L150",
+      "source_location": "L151",
       "weight": 1.0
     },
     {
@@ -85589,7 +85589,7 @@
       "confidence_score": 0.95,
       "context": "signUp",
       "source_file": "CLAUDE.md",
-      "source_location": "L107",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -85649,7 +85649,7 @@
       "confidence_score": 0.95,
       "context": "splitByDate",
       "source_file": "CLAUDE.md",
-      "source_location": "L77",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -85661,7 +85661,7 @@
       "confidence_score": 0.95,
       "context": "splitByDate",
       "source_file": "CLAUDE.md",
-      "source_location": "L94",
+      "source_location": "L95",
       "weight": 1.0
     },
     {
@@ -85793,7 +85793,7 @@
       "confidence_score": 0.95,
       "context": "startSlideSweeper",
       "source_file": "CLAUDE.md",
-      "source_location": "L112",
+      "source_location": "L113",
       "weight": 1.0
     },
     {
@@ -86093,7 +86093,7 @@
       "confidence_score": 0.95,
       "context": "todayLocal",
       "source_file": "CLAUDE.md",
-      "source_location": "L77",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -86105,7 +86105,7 @@
       "confidence_score": 0.95,
       "context": "todayLocal",
       "source_file": "CLAUDE.md",
-      "source_location": "L144",
+      "source_location": "L145",
       "weight": 1.0
     },
     {
@@ -86189,7 +86189,7 @@
       "confidence_score": 0.95,
       "context": "upsertDevice",
       "source_file": "CLAUDE.md",
-      "source_location": "L110",
+      "source_location": "L111",
       "weight": 1.0
     },
     {
@@ -86225,7 +86225,7 @@
       "confidence_score": 0.95,
       "context": "useAppStore()",
       "source_file": "CLAUDE.md",
-      "source_location": "L186",
+      "source_location": "L187",
       "weight": 1.0
     },
     {
@@ -86237,7 +86237,7 @@
       "confidence_score": 0.95,
       "context": "useContent",
       "source_file": "CLAUDE.md",
-      "source_location": "L102",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
@@ -86285,7 +86285,7 @@
       "confidence_score": 0.95,
       "context": "useContent()",
       "source_file": "CLAUDE.md",
-      "source_location": "L186",
+      "source_location": "L187",
       "weight": 1.0
     },
     {
@@ -86417,7 +86417,7 @@
       "confidence_score": 0.95,
       "context": "useSlides",
       "source_file": "CLAUDE.md",
-      "source_location": "L112",
+      "source_location": "L113",
       "weight": 1.0
     },
     {
@@ -86537,7 +86537,7 @@
       "confidence_score": 0.95,
       "context": "useSponsors",
       "source_file": "CLAUDE.md",
-      "source_location": "L111",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -86765,10 +86765,10 @@
       "confidence_score": 0.95,
       "context": "yoklamaVer",
       "source_file": "CLAUDE.md",
-      "source_location": "L109",
+      "source_location": "L110",
       "weight": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "57f595b06aa9e49e774ffb981abdcdc1fced4c67"
+  "built_at_commit": "6dd93e792d21b70ad9d6f85df3a11aab8150a72e"
 }

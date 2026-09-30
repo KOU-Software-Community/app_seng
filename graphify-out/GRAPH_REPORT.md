@@ -1,7 +1,7 @@
 # Graph Report - app_seng  (2026-09-30)
 
 ## Corpus Check
-- 232 files · ~296,270 words
+- 232 files · ~296,332 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 4, .ttf 4, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `57f595b0`
+- Built from commit: `6dd93e79`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -450,9 +450,9 @@ Nodes (9): Dağıtım yüzeyleri, Git, İçerik girişi, Klasörler, Komutlar, K
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `data.ts`, `theme.ts`, `data-access/hooks.ts`, `package.json`, `store.ts`, `useEnrichmentWarmup.ts`, `ui.tsx`, `useEnrichmentWarmup.test.tsx`, `QueryProvider.tsx`, `kv.ts`, `(tabs)/index.tsx`, `cekilis-kurallari.tsx`, `sponsors.tsx`, `integration.test.tsx`, `app/_layout.tsx`, `vitrin-cache.test.tsx`, `enrichment-unavailable.test.tsx`, `article-summary.test.tsx`, `store.tsx`, `announcements.tsx`?**
-  _High betweenness centrality (0.137) - this node is a cross-community bridge._
+  _High betweenness centrality (0.135) - this node is a cross-community bridge._
 - **Why does `err()` connect `enrichment-unavailable.test.tsx` to `check-panel.ts`, `send-push.ts`, `server.ts`, `data-access/index.ts`, `export-registrations.ts`, `supabase/repositories.ts`, `mock/repositories.ts`, `demo-account.ts`?**
-  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
 - **Why does `Load-bearing decisions — the why log` connect `Load-bearing decisions — the why log` to `Bildirim otomasyonu — kime, neye göre, ve neyin gitmemesi gerektiği`, `readingText.ts`, `check-security.ts`, `check-panel.ts`, `push.ts`, `qr.ts`, `esc`, `store.ts`, `env.ts`, `mock/repositories.ts`, `pdf.ts`, `demo-account.ts`, `accountSchema.ts`, `README.md`, `app/_layout.tsx`, `check-release.mjs`, `QueryProvider.tsx`?**
   _High betweenness centrality (0.042) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `Txt()` (e.g. with `Conventions` and `Klasörler`) actually correct?**
