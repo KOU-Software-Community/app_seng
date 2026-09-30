@@ -5,9 +5,10 @@ Dal `fix/galeri-yenileme-karsilama`, `fix/gorsel-onbellek` üzerine yığınlı.
 
 Karar özeti:
 
-- Etkinlik detayının ana fotoğrafı bir slider; dokununca tam ekran görüntüleyici o
-  fotoğrafta açılıyor. Görüntüleyicide parmakla kaydırma, iki parmakla ve çift
-  dokunmayla yakınlaştırma var; ‹ › tuşları ve alttaki "Fotoğraflar" şeridi kalkıyor.
+- Etkinlik detayının ana fotoğrafı kendiliğinden kayan bir slider; dokununca tam ekran
+  görüntüleyici o fotoğrafta açılıyor ve açık kaldıkça slider duruyor. Görüntüleyici
+  kendiliğinden kaymıyor: parmakla kaydırma (tuşsuz), iki parmakla ve çift dokunmayla
+  yakınlaştırma. ‹ › tuşları ve alttaki "Fotoğraflar" şeridi kalkıyor.
 - Aşağı çekip yenilemede RN'in göstergesi gizleniyor, ekranın üstünde ilk açılıştaki
   `PixelLoader` çıkıyor — altı ekranda aynı bileşen.
 - Giriş yapmış kişiye "Ahmet, hoş geldin 👋".
@@ -36,6 +37,12 @@ Yapı taşları uygulamada: `react-native-gesture-handler` 2.32, `react-native-r
 - `src/components/PhotoHero.tsx`: hero'daki yatay sayfalı slider, birden fazla
   fotoğrafta noktalar; sayfaya dokununca `onOpen(index)`. Fotoğraf yoksa bugünkü
   gradyan yer tutucu. Geri düğmesi, karartma ve başlık üstünde duruyor.
+- Hero kendiliğinden ilerliyor — Ana Sayfa slider'ıyla aynı kurallar: 4,5 sn; tek
+  fotoğrafta, ekran odakta değilken, kullanıcı kaydırırken, "hareketi azalt" ya da
+  ekran okuyucu açıkken durur. Ek kural: görüntüleyici açıkken durur (`paused`),
+  kapanınca devam eder. Görüntüleyici hiç kendiliğinden kaymaz.
+- Zamanlayıcı mantığı `HomeSlider`'dan `src/useAutoAdvance.ts`'e taşınıyor; iki slider
+  aynı kodu kullanıyor, `HomeSlider`'ın mevcut testleri taşımanın güvencesi.
 - Görseller expo-image (`cover` hero'da, `contain` görüntüleyicide) — disk önbelleği.
 - `PhotoGallery.tsx` siliniyor: slider bütün fotoğrafları gösteriyor, şerit tekrar.
 
@@ -79,7 +86,9 @@ Altı ekran: Ana Sayfa, Takvim, Arşiv; AI Gündem Özet, Akış, Kaydedilenler.
 - `PixelRefresh` görünür/gizli; Arşiv yüklenirken gösterge.
 - `clampOffset` tablo testi; `ZoomableImage` iki parmak ve çift dokunmayla
   `onZoomChange`; `PhotoViewer` açılış fotoğrafı, tuş yok, kaydırınca sayaç, yakınken
-  kaydırma kilidi, kapat; `PhotoHero` sayfa/nokta/dokunma, tek ve sıfır fotoğraf.
+  kaydırma kilidi, kapat; `PhotoHero` sayfa/nokta/dokunma, kendiliğinden ilerleme,
+  `paused` iken durma, tek ve sıfır fotoğraf; etkinlik ekranında görüntüleyici açıkken
+  hero'nun durup kapanınca devam etmesi.
 - Hareketler Jest'te RNGH'nin `jest-utils`'iyle sınanıyor; cihazdaki his (hız, sınır)
   elle denenir.
 

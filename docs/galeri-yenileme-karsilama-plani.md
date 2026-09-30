@@ -5,13 +5,14 @@
 > istemiyor). Adımlar `- [ ]` ile işaretli. Son inceleme `fable-reviewer` alt ajanına
 > yaptırılır, Critical maddeler düzeltilir.
 
-**Goal:** Etkinlik fotoğrafları kaydırılabilir bir hero slider'da ve dokununca
-yakınlaştırılabilen tam ekran görüntüleyicide; aşağı çekip yenilemede `PixelLoader`;
+**Goal:** Etkinlik fotoğrafları kendiliğinden kayan bir hero slider'da ve dokununca
+açılan, parmakla kaydırılıp yakınlaştırılan tam ekran görüntüleyicide; aşağı çekip yenilemede `PixelLoader`;
 giriş yapmış kişiye "Ahmet, hoş geldin 👋".
 
 **Architecture:** `ZoomableImage` (RNGH + Reanimated) tek fotoğrafın yakınlaştırmasını,
 `PhotoViewer` tam ekran sayfalı listeyi, `PhotoHero` etkinlik detayındaki slider'ı
-taşıyor; `PhotoGallery` şeridi siliniyor. `PixelRefresh` + `hiddenSpinner`
+taşıyor; `PhotoGallery` şeridi siliniyor. Otomatik kaydırma `HomeSlider`'dan
+`useAutoAdvance`'e (`src/useAutoAdvance.ts`) taşınıyor, iki slider onu kullanıyor. `PixelRefresh` + `hiddenSpinner`
 (`src/components/Pixel.tsx`) altı ekranın yenileme göstergesi. `firstName`
 (`src/accountSchema.ts`) karşılamanın adı.
 
@@ -37,10 +38,10 @@ jest-expo + RNTL 14 + RNGH `jest-utils`.
 ## Review Focus
 
 1. Yakınken yatay kaydırma kilitli, geri dönünce açık — Task 4 testi.
-2. Tek fotoğraflı ve fotoğrafsız etkinlik: nokta yok / yer tutucu, çökme yok — Task 5 testi.
+2. Tek fotoğraflı ve fotoğrafsız etkinlik: nokta yok / yer tutucu, çökme yok — Task 6 testi.
 3. Görüntüleyici başka bir fotoğrafla yeniden açılınca sayaç oradan başlıyor — Task 4 testi.
 4. Giriş yapmış ama adı boş ya da yalnız boşluk: "Hoş geldin 👋" — Task 1 testi.
-5. Yenileme bitince gösterge kayboluyor — Task 2 testi.
+5. Görüntüleyici açıkken hero arkada kaymıyor, kapanınca devam ediyor — Task 6 testi.
 
 ---
 
@@ -391,7 +392,75 @@ git add src/components/PhotoViewer.tsx src/__tests__/photo-viewer.test.tsx graph
 git commit -m "feat(galeri): kaydırılan ve yakınlaştırılan tam ekran görüntüleyici; tuşlar kalktı"
 ```
 
-### Task 5: Hero slider ve etkinlik detayı
+### Task 5: Otomatik kaydırma ortak hook'a
+
+**Files:**
+- Create: `src/useAutoAdvance.ts`
+- Modify: `src/components/HomeSlider.tsx` (zamanlayıcı, odak, sürükleme ve "hareketi
+  azalt" mantığı hook'a taşınıyor; `SLIDE_INTERVAL_MS` hook'tan yeniden dışa aktarılıyor)
+- Test: Create `src/__tests__/auto-advance.test.tsx`; `src/__tests__/home-slider.test.tsx`
+  değişmeden yeşil kalmalı
+
+**Interfaces:**
+- Produces: `SLIDE_INTERVAL_MS = 4500`;
+  `useAutoAdvance<T>(count: number, step: number, paused?: boolean): { list: React.RefObject<FlatList<T> | null>; current: number; go: (next: number) => void; onScrollBeginDrag: () => void; onScrollEndDrag: () => void; onMomentumScrollEnd: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }`
+  — `paused` iken zamanlayıcı kurulmuyor; kurallar bugünkü `HomeSlider`'ınki.
+
+- [ ] **Step 1: Taban çizgisi**
+
+Run: `npx jest src/__tests__/home-slider.test.tsx`
+Expected: PASS — taşınan davranışı bu testler tutuyor (4,5 sn'de ilerleme, sonda başa
+dönüş, tek slayt ve "hareketi azalt"ta durma, liste kısalınca nokta).
+
+- [ ] **Step 2: Failing test — `auto-advance.test.tsx`**
+
+```tsx
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return { useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]) };
+});
+
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => jest.useRealTimers());
+
+it.each([
+  [false, 1],
+  [true, 0],
+])('paused=%p iken 4,5 sn sonra sıra %p', async (paused, want) => {
+  const { result } = await renderHook(() => useAutoAdvance(3, 100, paused));
+  await act(async () => {});
+  await act(async () => {
+    jest.advanceTimersByTime(SLIDE_INTERVAL_MS);
+  });
+  expect(result.current.current).toBe(want);
+});
+```
+
+- [ ] **Step 3: Kırmızıyı gör**
+
+Run: `npx jest src/__tests__/auto-advance.test.tsx`
+Expected: FAIL — `Cannot find module '../useAutoAdvance'`.
+
+- [ ] **Step 4: Hook'u `HomeSlider`'dan çıkar**
+
+`HomeSlider`'daki `list`, `index`, `focused`, `dragging`, `still`, `current`, `go` ve
+zamanlayıcı effect'i hook'a taşınır; effect'in koşuluna `paused` eklenir. `HomeSlider`
+hook'u `paused` vermeden kullanır, yorumları hook'a gider.
+
+- [ ] **Step 5: Yeşili gör**
+
+Run: `npx jest src/__tests__/auto-advance.test.tsx src/__tests__/home-slider.test.tsx && npm run typecheck`
+Expected: PASS; typecheck 0.
+
+- [ ] **Step 6: Commit**
+
+```bash
+graphify update .
+git add src/useAutoAdvance.ts src/components/HomeSlider.tsx src/__tests__/auto-advance.test.tsx graphify-out/
+git commit -m "refactor(slider): otomatik kaydırma useAutoAdvance'e; durdurulabilir"
+```
+
+### Task 6: Hero slider ve etkinlik detayı
 
 **Files:**
 - Create: `src/components/PhotoHero.tsx`
@@ -400,39 +469,73 @@ git commit -m "feat(galeri): kaydırılan ve yakınlaştırılan tam ekran gör�
 - Test: Create `src/__tests__/photo-hero.test.tsx`, `src/__tests__/event-photos.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 4 `PhotoViewer`.
-- Produces: `PhotoHero({ photos, height, onOpen, children }: { photos: string[]; height: number; onOpen: (index: number) => void; children?: React.ReactNode })`
-  — sayfa `accessibilityLabel={`Fotoğraf ${i + 1} / ${n}, büyüt`}`; nokta `testID="hero-nokta"`.
+- Consumes: Task 4 `PhotoViewer`; Task 5 `useAutoAdvance`, `SLIDE_INTERVAL_MS`.
+- Produces: `PhotoHero({ photos, height, onOpen, paused, children }: { photos: string[]; height: number; onOpen: (index: number) => void; paused: boolean; children?: React.ReactNode })`
+  — sayfa `accessibilityLabel={`Fotoğraf ${i + 1} / ${n}, büyüt`}`; nokta `Pressable`,
+  `accessibilityLabel={`${i + 1}. fotoğrafa git`}`, `accessibilityState={{ selected }}`.
 
 - [ ] **Step 1: Failing test — `photo-hero.test.tsx`**
 
 ```tsx
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return { useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]) };
+});
+
 const PHOTOS = ['https://ornek.com/1.jpg', 'https://ornek.com/2.jpg', 'https://ornek.com/3.jpg'];
-const hero = (photos: string[], onOpen = jest.fn()) => (
+const hero = (photos: string[], { onOpen = jest.fn(), paused = false } = {}) => (
   <SafeAreaProvider initialMetrics={METRICS}>
-    <PhotoHero photos={photos} height={280} onOpen={onOpen}>
+    <PhotoHero photos={photos} height={280} onOpen={onOpen} paused={paused}>
       <Txt>Başlık</Txt>
     </PhotoHero>
   </SafeAreaProvider>
 );
+const dot = (n: number, selected: boolean) =>
+  screen.queryByRole('button', { name: `${n}. fotoğrafa git`, selected });
+const settle = () => act(async () => {});
 
-it('her fotoğraf bir sayfa, noktalar sayfa kadar, dokununca o fotoğraf açılıyor', async () => {
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => jest.useRealTimers());
+
+it('her fotoğraf bir sayfa, dokununca o fotoğraf açılıyor', async () => {
   const onOpen = jest.fn();
-  await render(hero(PHOTOS, onOpen));
-  expect(screen.getAllByTestId('hero-nokta')).toHaveLength(3);
+  await render(hero(PHOTOS, { onOpen }));
+  await settle();
+  expect(screen.getAllByRole('button', { name: /fotoğrafa git/ })).toHaveLength(3);
   fireEvent.press(screen.getByLabelText('Fotoğraf 2 / 3, büyüt'));
   expect(onOpen).toHaveBeenCalledWith(1);
   expect(screen.getByText('Başlık')).toBeTruthy();
 });
 
+it('etkinlik ekranında kendiliğinden ilerliyor', async () => {
+  await render(hero(PHOTOS));
+  await settle();
+  expect(dot(1, true)).toBeTruthy();
+  await act(async () => {
+    jest.advanceTimersByTime(SLIDE_INTERVAL_MS);
+  });
+  expect(dot(2, true)).toBeTruthy();
+});
+
+it('görüntüleyici açıkken ilerlemiyor', async () => {
+  await render(hero(PHOTOS, { paused: true }));
+  await settle();
+  await act(async () => {
+    jest.advanceTimersByTime(SLIDE_INTERVAL_MS * 2);
+  });
+  expect(dot(1, true)).toBeTruthy();
+});
+
 it('tek fotoğrafta nokta yok', async () => {
   await render(hero([PHOTOS[0]]));
-  expect(screen.queryAllByTestId('hero-nokta')).toHaveLength(0);
+  await settle();
+  expect(screen.queryAllByRole('button', { name: /fotoğrafa git/ })).toHaveLength(0);
   expect(screen.getByLabelText('Fotoğraf 1 / 1, büyüt')).toBeTruthy();
 });
 
 it('fotoğraf yoksa yer tutucu; dokunulacak sayfa yok, başlık duruyor', async () => {
   await render(hero([]));
+  await settle();
   expect(screen.queryByLabelText(/büyüt/)).toBeNull();
   expect(screen.getByText('Başlık')).toBeTruthy();
 });
@@ -441,10 +544,14 @@ it('fotoğraf yoksa yer tutucu; dokunulacak sayfa yok, başlık duruyor', async 
 - [ ] **Step 2: Failing test — `event-photos.test.tsx`**
 
 ```tsx
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ id: 'e1' }),
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
-}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    useLocalSearchParams: () => ({ id: 'e1' }),
+    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    useFocusEffect: (cb: () => void | (() => void)) => useEffect(cb, [cb]),
+  };
+});
 jest.mock('../content', () => ({
   useEvent: () => mockEvent,
   useContent: () => ({ getRaffle: () => undefined, registeredCount: () => 0 }),
@@ -460,17 +567,33 @@ const mockEvent = {
   soon: false, badge: 'ARSIV', desc: '', tags: [], speaker: '', speakerRole: '', facts: [],
   photos: ['https://ornek.com/1.jpg', 'https://ornek.com/2.jpg', 'https://ornek.com/3.jpg'],
 };
+const selectedDot = (n: number) => screen.getByRole('button', { name: `${n}. fotoğrafa git`, selected: true });
 
-it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; şerit yok', async () => {
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => jest.useRealTimers());
+
+it('ana fotoğrafa dokununca görüntüleyici o fotoğrafta açılıyor; açıkken hero durur, kapanınca devam eder; şerit yok', async () => {
   const Detail = (require('../../app/etkinlik/[id]') as typeof import('../../app/etkinlik/[id]')).default;
   await render(
     <SafeAreaProvider initialMetrics={METRICS}>
       <Detail />
     </SafeAreaProvider>,
   );
+  await act(async () => {});
   expect(screen.queryByText('Fotoğraflar')).toBeNull();
+
   fireEvent.press(screen.getByLabelText('Fotoğraf 2 / 3, büyüt'));
   expect(screen.getByText('2 / 3')).toBeTruthy();
+  await act(async () => {
+    jest.advanceTimersByTime(SLIDE_INTERVAL_MS);
+  });
+  expect(selectedDot(1)).toBeTruthy();
+
+  fireEvent.press(screen.getByLabelText('Kapat'));
+  await act(async () => {
+    jest.advanceTimersByTime(SLIDE_INTERVAL_MS);
+  });
+  expect(selectedDot(2)).toBeTruthy();
 }, 30000);
 ```
 
@@ -486,18 +609,20 @@ ya da `Fotoğraf 2 / 3, büyüt` bulunamıyor.
 - [ ] **Step 4: `PhotoHero`**
 
 Fotoğraf yoksa bugünkü `PhotoSlot` (`gradients.hero`, `showLabel={false}`) ve
-`children`. Varsa: yatay `FlatList`, `pagingEnabled`, sayfa genişliği pencere; sayfa
-`Pressable` → `onOpen(i)`, içinde expo-image `cover`. Birden fazla fotoğrafta noktalar
-(`HomeSlider` biçimi, `colors.dotIdle` / `colors.blue500`), sağ üstte
-(`top: insets.top + 26`, `right: 20`); etkin nokta `onMomentumScrollEnd`'den.
-`children` `StyleSheet.absoluteFill` + `pointerEvents="box-none"` bir katmanda.
+`children`. Varsa: `useAutoAdvance(n, genişlik, paused)`; yatay `FlatList`,
+`pagingEnabled`, sayfa genişliği pencere; sayfa `Pressable` → `onOpen(i)`, içinde
+expo-image `cover`. Birden fazla fotoğrafta noktalar (`HomeSlider` biçimi,
+`colors.dotIdle` / `colors.blue500`, dokununca `go(i)`) sağ üstte
+(`top: insets.top + 26`, `right: 20`). `children` `StyleSheet.absoluteFill` +
+`pointerEvents="box-none"` bir katmanda.
 
 - [ ] **Step 5: Etkinlik detayını bağla**
 
 `PhotoSlot` hero'su `PhotoHero` olur (`photos={event.photos ?? []}`, `height={280}`,
-`onOpen={setViewer}`); karartma, geri düğmesi ve başlık `children` — geri düğmesinin
-kabı `pointerEvents="box-none"`. `const [viewer, setViewer] = useState<number | null>(null)`
-erken `return`'den önce; ekranın sonunda
+`onOpen={setViewer}`, `paused={viewer !== null}`); karartma, geri düğmesi ve başlık
+`children` — geri düğmesinin kabı `pointerEvents="box-none"`.
+`const [viewer, setViewer] = useState<number | null>(null)` erken `return`'den önce;
+ekranın sonunda
 `<PhotoViewer photos={event.photos ?? []} index={viewer} onClose={() => setViewer(null)} />`.
 `PhotoGallery` importu ve kullanımı çıkar, dosya silinir; çevresindeki yorum güncellenir.
 
@@ -511,10 +636,10 @@ Expected: PASS; typecheck 0.
 ```bash
 graphify update .
 git add src/components/PhotoHero.tsx 'app/etkinlik/[id].tsx' src/components/PhotoGallery.tsx src/__tests__/photo-hero.test.tsx src/__tests__/event-photos.test.tsx graphify-out/
-git commit -m "feat(etkinlik): ana fotoğraf slider, dokununca tam ekran; alttaki şerit kalktı"
+git commit -m "feat(etkinlik): ana fotoğraf kendiliğinden kayan slider, dokununca tam ekran; alttaki şerit kalktı"
 ```
 
-### Task 6: Kapanış
+### Task 7: Kapanış
 
 - [ ] **Step 1: CI'ın koştuğu kontroller**
 
@@ -535,6 +660,7 @@ git push -u origin fix/galeri-yenileme-karsilama
 Taslak PR, taban `fix/gorsel-onbellek`. Gövde: ne değişti; test planı; iOS arşiv
 değerlendirmesi ve cihaz kontrol listesi (spec §4); cihazda denenecekler (iki parmakla
 yakınlaştırma, çift dokunma, yakınken kaydırmama, hero'yu kaydırma ve dokunma,
-altı ekranda aşağı çekme — Android'de native gölge kalıyor mu); dağıtım yüzeyleri
+hero'nun kendiliğinden kayması ve görüntüleyici açıkken durması, altı ekranda aşağı
+çekme — Android'de native gölge kalıyor mu); dağıtım yüzeyleri
 (Mobil uygulama: 1.1.6 build'ine biner, native modül yok; Panel / kurallar / AI Gündem:
 gerekmiyor).
