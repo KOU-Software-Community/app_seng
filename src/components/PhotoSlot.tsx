@@ -1,6 +1,7 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { gradientDirection, gradients, type GradientStops } from '../theme';
 import { PixelIcon } from './Pixel';
@@ -14,6 +15,14 @@ import { PixelTxt } from './ui';
  * archive is wired to a backend, pass the photo URL and the placeholder drops out.
  *
  * Logolar `contain` kullanıyor: kırpılan bir logo başka bir marka gibi okunur.
+ *
+ * Görsel expo-image'la: disk önbelleği (varsayılan `cachePolicy: 'disk'`, anahtarı
+ * URI). Panel her görseli yeni adla yüklediği için diskteki kopya hiçbir zaman bayat
+ * değil; RN `Image`'ın iOS'taki küçük paylaşılan URL önbelleğine bırakılmıyor.
+ *
+ * Kopyanın ömrü: iOS'ta 7 gün (SDWebImage `maxDiskAge`; okumak tazelemiyor,
+ * expo-image yaş ayarı açmıyor), Android'de 250 MB LRU. Süresi dolan görsel
+ * çevrimiçiyken yeniden iniyor, çevrimdışıyken boş kalıyor.
  */
 export function PhotoSlot({
   uri,
@@ -35,7 +44,7 @@ export function PhotoSlot({
   return (
     <View style={[styles.root, style]}>
       {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={resizeMode} />
+        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit={resizeMode} />
       ) : (
         <LinearGradient
           colors={gradient}
