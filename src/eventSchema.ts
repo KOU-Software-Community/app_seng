@@ -341,7 +341,7 @@ export function buildEvent(input: EventInput): BuildResult {
     {
       icon: 'cal',
       label: 'Tarih',
-      value: `${day} ${MONTHS_LONG[month - 1]} ${year}, ${WEEKDAYS_LONG[wdIndex]}`,
+      value: dayLabelOf(year, month, day),
     },
     { icon: 'clock', label: 'Saat', value: timeRange },
     { icon: 'pin', label: 'Yer', value: venue },

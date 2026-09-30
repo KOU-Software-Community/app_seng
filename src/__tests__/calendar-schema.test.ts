@@ -1,5 +1,5 @@
 import type { ClubEvent } from '../data';
-import { addMonths, dayLabelOf, monthGrid, monthGrids, monthLabelOf } from '../eventSchema';
+import { addMonths, buildEvent, dayLabelOf, monthGrid, monthGrids, monthLabelOf } from '../eventSchema';
 
 /**
  * Takvimin saf hesabı: tek ayın ızgarası (etkinliksiz de), ekran okuyucunun okuduğu
@@ -55,4 +55,23 @@ it.each([
   [2026, 9, 0, { year: 2026, month: 9 }],
 ])('addMonths(%p, %p, %p) → %p', (year, month, delta, want) => {
   expect(addMonths(year, month, delta)).toEqual(want);
+});
+
+it('etkinlik detayındaki "Tarih", takvimin gün etiketiyle aynı metin', () => {
+  const built = buildEvent({
+    id: 'e1',
+    startsAt: '2026-10-12T18:00:00+03:00',
+    endsAt: '20:00',
+    venue: 'Konferans Salonu',
+    title: 'Hackathon',
+    tag: 'Yarışma',
+    desc: 'Yirmi dört saatlik takım yarışması.',
+    speaker: 'Ada Yılmaz',
+    speakerRole: 'Mühendis',
+    tags: [],
+    soon: false,
+    badge: 'YENI',
+  });
+  if (!built.ok) throw new Error(JSON.stringify(built));
+  expect(built.event.facts.find((f) => f.label === 'Tarih')?.value).toBe('12 Ekim 2026, Pazartesi');
 });
