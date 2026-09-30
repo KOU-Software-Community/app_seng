@@ -15,6 +15,7 @@ import {
 import { useContent } from '../../src/content';
 import { ARCHIVE_CATEGORIES, ClubEvent } from '../../src/data';
 import { parseIso } from '../../src/eventSchema';
+import { PixelRefresh, hiddenSpinner } from '../../src/components/Pixel';
 import { colors, gradients, radius } from '../../src/theme';
 
 /*
@@ -50,7 +51,7 @@ export default function ArsivRoute() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.blue500} colors={[colors.blue500]} />
+          <RefreshControl onRefresh={refresh} {...hiddenSpinner} />
         }
       >
         <GradientHeader gradient={gradients.section} style={{ paddingBottom: 16 }}>
@@ -98,6 +99,7 @@ export default function ArsivRoute() {
           </View>
         )}
       </ScrollView>
+      <PixelRefresh visible={loading} />
     </View>
   );
 }

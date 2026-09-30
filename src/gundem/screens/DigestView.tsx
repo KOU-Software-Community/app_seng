@@ -3,6 +3,7 @@ import React from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Card, ContentNotice, EmptyState, PixelTxt, Txt } from '../../components/ui';
+import { PixelRefresh, hiddenSpinner } from '../../components/Pixel';
 import { colors, radius } from '../../theme';
 import { useDigest } from '../data-access/hooks';
 
@@ -34,78 +35,80 @@ export function DigestView() {
   const snapshot = digest.data;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={digest.isRefetching}
-          onRefresh={() => void digest.refetch()}
-          tintColor={colors.blue500}
-        />
-      }
-    >
-      {digest.isError ? (
-        <ContentNotice onRetry={() => void digest.refetch()} retrying={digest.isRefetching} />
-      ) : null}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void digest.refetch()}
+            {...hiddenSpinner}
+          />
+        }
+      >
+        {digest.isError ? (
+          <ContentNotice onRetry={() => void digest.refetch()} retrying={digest.isRefetching} />
+        ) : null}
 
-      {digest.isPending ? (
-        <PixelTxt size={9} style={styles.loading}>
-          YUKLENIYOR
-        </PixelTxt>
-      ) : null}
-
-      {/*
-        "Hazırlanıyor" bir hata değil, birinci sınıf bir durum: bülten her sabah
-        sunucuda üretiliyor ve üretilene kadar gösterilecek bir şey yok. Hata
-        gibi göstermek, kullanıcıyı olmayan bir sorunu aramaya yollardı.
-      */}
-      {snapshot?.status === 'preparing' ? (
-        <EmptyState
-          title="Bülten hazırlanıyor"
-          body="Günün bülteni her sabah derleniyor. Birazdan burada olacak."
-          style={styles.empty}
-        />
-      ) : null}
-
-      {snapshot?.status === 'ready' ? (
-        <>
-          <PixelTxt size={8} style={styles.dateLine}>
-            {digestDateLine(snapshot.digest.date)}
+        {digest.isPending ? (
+          <PixelTxt size={9} style={styles.loading}>
+            YUKLENIYOR
           </PixelTxt>
+        ) : null}
 
-          {snapshot.digest.items.map((item) => (
-            <Pressable
-              key={item.articleId}
-              onPress={() => router.push(`/gundem/${item.articleId}`)}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            >
-              <Card style={styles.card}>
-                <View style={styles.head}>
-                  <View style={styles.position}>
-                    <Txt weight="extrabold" size={12} color="#fff">
-                      {item.position}
+        {/*
+          "Hazırlanıyor" bir hata değil, birinci sınıf bir durum: bülten her sabah
+          sunucuda üretiliyor ve üretilene kadar gösterilecek bir şey yok. Hata
+          gibi göstermek, kullanıcıyı olmayan bir sorunu aramaya yollardı.
+        */}
+        {snapshot?.status === 'preparing' ? (
+          <EmptyState
+            title="Bülten hazırlanıyor"
+            body="Günün bülteni her sabah derleniyor. Birazdan burada olacak."
+            style={styles.empty}
+          />
+        ) : null}
+
+        {snapshot?.status === 'ready' ? (
+          <>
+            <PixelTxt size={8} style={styles.dateLine}>
+              {digestDateLine(snapshot.digest.date)}
+            </PixelTxt>
+
+            {snapshot.digest.items.map((item) => (
+              <Pressable
+                key={item.articleId}
+                onPress={() => router.push(`/gundem/${item.articleId}`)}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Card style={styles.card}>
+                  <View style={styles.head}>
+                    <View style={styles.position}>
+                      <Txt weight="extrabold" size={12} color="#fff">
+                        {item.position}
+                      </Txt>
+                    </View>
+                    <Txt weight="bold" size={12} color={colors.muted} numberOfLines={1}>
+                      {item.sourceName}
                     </Txt>
                   </View>
-                  <Txt weight="bold" size={12} color={colors.muted} numberOfLines={1}>
-                    {item.sourceName}
-                  </Txt>
-                </View>
 
-                <Txt weight="semibold" size={15} color={colors.text} style={styles.title}>
-                  {item.title}
-                </Txt>
-                <Txt size={13} color={colors.textBody} style={styles.blurb}>
-                  {item.blurb}
-                </Txt>
-              </Card>
-            </Pressable>
-          ))}
-        </>
-      ) : null}
-    </ScrollView>
+                  <Txt weight="semibold" size={15} color={colors.text} style={styles.title}>
+                    {item.title}
+                  </Txt>
+                  <Txt size={13} color={colors.textBody} style={styles.blurb}>
+                    {item.blurb}
+                  </Txt>
+                </Card>
+              </Pressable>
+            ))}
+          </>
+        ) : null}
+      </ScrollView>
+      <PixelRefresh visible={digest.isRefetching} top={8} />
+    </View>
   );
 }
 

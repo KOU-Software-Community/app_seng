@@ -3,6 +3,7 @@ import {
   MIN_PASSWORD,
   ageOn,
   digits,
+  firstName,
   joinDate,
   splitDate,
   formatPhone,
@@ -233,5 +234,19 @@ describe('toProfile', () => {
     const p = toProfile(gecerli, now);
     expect(p.kvkkOnayAt).toBe('2026-09-12T10:00:00.000Z');
     expect(p.kosullarOnayAt).toBe('2026-09-12T10:00:00.000Z');
+  });
+});
+
+describe('firstName', () => {
+  it.each([
+    ['ahmet yılmaz', 'Ahmet'],
+    ['  Ayşe   Nur Kaya ', 'Ayşe'],
+    ['irem', 'İrem'],
+    ['ışıl', 'Işıl'],
+    ['', null],
+    ['   ', null],
+    [undefined, null],
+  ])('%p → %p', (adSoyad, want) => {
+    expect(firstName(adSoyad)).toBe(want);
   });
 });

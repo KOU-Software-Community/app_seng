@@ -217,6 +217,16 @@ export type Profile = {
 };
 
 /**
+ * Karşılamadaki ad: `adSoyad`'ın ilk kelimesi, baş harfi Türkçe kurala göre büyük
+ * ("irem" → "İrem"). Kayıt baş harfi düzeltmiyor. Boşsa `null` — ekran o zaman adsız
+ * karşılıyor.
+ */
+export function firstName(adSoyad: string | undefined): string | null {
+  const word = adSoyad?.trim().split(/\s+/)[0];
+  return word ? word.charAt(0).toLocaleUpperCase('tr') + word.slice(1) : null;
+}
+
+/**
  * Formdan profile. Doğrulama **çağıranın işi** — burada tekrar edilmiyor,
  * çünkü aynı kararı iki yerde uygulamak ikisinin ayrışmasının tek sebebi
  * (bu defterde `pushRecentSearch` maddesi aynı hatanın kaydı).

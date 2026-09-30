@@ -32,3 +32,26 @@ jest.mock('expo-crypto', () => ({
     return array;
   },
 }));
+
+/**
+ * Galeri hareketleri (`src/components/ZoomableImage.tsx`): gesture-handler'ın
+ * native modülü, Reanimated ve worklets Jest'te yok; üçü de kendi taklidini
+ * gönderiyor. Taklitlerde `scheduleOnRN` çağrıyı bir mikro göreve bırakıyor —
+ * hareketten sonraki beklenti `await act(async () => {})` ister.
+ */
+require('react-native-gesture-handler/jestSetup');
+// Taklidin `useSharedValue`'su her render'da yeni bir nesne kuruyor; gerçeği
+// bileşen yaşadıkça aynı değeri tutuyor. Yakınlık bir render'dan sonrakine taşınsın.
+jest.mock('react-native-reanimated', () => {
+  const mock = require('react-native-reanimated/mock');
+  const { useRef } = require('react');
+  return {
+    ...mock,
+    useSharedValue: (init) => {
+      const ref = useRef(null);
+      if (ref.current === null) ref.current = mock.useSharedValue(init);
+      return ref.current;
+    },
+  };
+});
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));

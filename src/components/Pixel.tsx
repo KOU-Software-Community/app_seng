@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleProp, View, ViewStyle } from 'react-native';
+import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { ICON, IconName, PIXEL_ART_VIEWBOX, PixelArtLayer } from '../icons';
+import { colors, radius, shadow } from '../theme';
 
 type PixelIconProps = {
   name: IconName;
@@ -105,3 +107,58 @@ export function PixelLoader({
     </View>
   );
 }
+
+/**
+ * Aşağı çekip yenilemenin göstergesi: ilk açılıştaki `PixelLoader`, ekranın üstünde.
+ *
+ * RN'in kendi göstergesi (`hiddenSpinner` ile saydam) iOS'ta rengini ilk çekişte
+ * uygulamayabiliyor, Android'de beyaz bir dairede dönüyor — açık zeminde görünmüyor,
+ * uygulama takılmış gibi duruyordu. Çekme hareketi native kalıyor (Android'de üstten
+ * taşma yok, kendi hareketimiz yapılamıyor); yalnız göstergesi bu.
+ *
+ * `top` varsayılanı durum çubuğunun altı: listesi ekranın tepesinden başlayan sekmeler
+ * için. Gündem'in listeleri sekme başlığının altında, onlar `top={8}` veriyor.
+ */
+export function PixelRefresh({ visible, top }: { visible: boolean; top?: number }) {
+  const insets = useSafeAreaInsets();
+  if (!visible) return null;
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityLabel="Yenileniyor"
+      accessibilityLiveRegion="polite"
+      style={[refreshStyles.pill, { top: top ?? insets.top + 8 }]}
+    >
+      <PixelLoader size={6} gap={4} />
+    </View>
+  );
+}
+
+/**
+ * `RefreshControl`'e yayılır: çekme hareketi kalır, native gösterge ne görünüyor ne
+ * de "yenileniyor" durumuna geçiyor — yükleme `PixelRefresh`'te.
+ *
+ * `refreshing` hep false, çünkü iOS'ta kullanıcı çekmeden true olan yenileme RN'de
+ * içeriği kontrolün boyu kadar aşağı itiyor (`beginRefreshingProgrammatically`).
+ * `loading` sekmeler arasında ortak; sekme arkadayken açılıp kapanan yenileme bu
+ * kaymayı geri almıyor, her turda bir kat daha — Takvim ve Arşiv açılışta üstte beyaz
+ * bir bantla kalıyordu. Kullanıcı çekince RN native kontrolü hemen false'a eşitliyor.
+ */
+export const hiddenSpinner = {
+  refreshing: false,
+  tintColor: 'transparent',
+  colors: ['transparent'],
+  progressBackgroundColor: 'transparent',
+};
+
+const refreshStyles = StyleSheet.create({
+  pill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    ...shadow.card,
+  },
+});

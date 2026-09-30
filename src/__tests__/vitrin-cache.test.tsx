@@ -43,6 +43,7 @@ jest.mock('../announcements', () => ({
   formatAnnouncementDate: () => '',
 }));
 jest.mock('../store', () => ({ useAppStore: () => ({ registrations: [] }) }));
+jest.mock('../authStore', () => ({ useAuth: () => ({ user: null, profile: null, loading: false }) }));
 
 const METRICS: Metrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },

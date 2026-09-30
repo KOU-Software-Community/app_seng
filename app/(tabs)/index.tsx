@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeSlider } from '../../src/components/HomeSlider';
 import { PhotoSlot } from '../../src/components/PhotoSlot';
-import { PixelIcon } from '../../src/components/Pixel';
+import { PixelIcon, PixelRefresh, hiddenSpinner } from '../../src/components/Pixel';
 import {
   Card,
   ContentNotice,
@@ -15,11 +15,13 @@ import {
   SectionTitle,
   Txt,
 } from '../../src/components/ui';
+import { firstName } from '../../src/accountSchema';
 import {
   Announcement,
   formatAnnouncementDate,
   useAnnouncements,
 } from '../../src/announcements';
+import { useAuth } from '../../src/authStore';
 import { useContent } from '../../src/content';
 import { ClubEvent } from '../../src/data';
 import { useSlides } from '../../src/slides';
@@ -37,6 +39,9 @@ export default function HomeRoute() {
   const router = useRouter();
   const openEvent = useOpenEvent();
   const { registrations } = useAppStore();
+  const { profile } = useAuth();
+  // Oturum yoksa ya da profil henüz yüklenmediyse adsız karşılama.
+  const name = firstName(profile?.adSoyad);
   const { events, archive, error, loading, refresh } = useContent();
   const {
     announcements,
@@ -59,193 +64,194 @@ export default function HomeRoute() {
   const upcoming = events.slice(0, EVENT_COUNT);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingBottom: 24 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={onRefresh}
-          // blue200 açık zeminde görünmüyordu. `tintColor` yalnız iOS; Android `colors` okuyor.
-          tintColor={colors.blue500}
-          colors={[colors.blue500]}
-        />
-      }
-    >
-      <LinearGradient
-        colors={gradients.home}
-        start={gradientDirection.diagonal.start}
-        end={gradientDirection.diagonal.end}
-        style={[styles.header, { paddingTop: insets.top + 14 }]}
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            onRefresh={onRefresh}
+            // Native gösterge saydam ve hiç "yenileniyor"a geçmiyor (gerekçe
+            // `hiddenSpinner`'da); yükleme üstte `PixelRefresh`.
+            {...hiddenSpinner}
+          />
+        }
       >
-        <View style={styles.identity}>
-          <Image source={require('../../assets/brand/logo.png')} style={styles.avatar} />
-          <View style={{ flex: 1 }}>
-            <Txt weight="semibold" size={11.5} color={colors.blue200} tracking={0.3}>
-              Hoş geldin 👋
-            </Txt>
-            <Txt weight="bold" size={16.5} color="#fff" tracking={-0.3}>
-              KOÜ Yazılım Kulübü
-            </Txt>
+        <LinearGradient
+          colors={gradients.home}
+          start={gradientDirection.diagonal.start}
+          end={gradientDirection.diagonal.end}
+          style={[styles.header, { paddingTop: insets.top + 14 }]}
+        >
+          <View style={styles.identity}>
+            <Image source={require('../../assets/brand/logo.png')} style={styles.avatar} />
+            <View style={{ flex: 1 }}>
+              <Txt weight="semibold" size={11.5} color={colors.blue200} tracking={0.3}>
+                {name ? `${name}, hoş geldin 👋` : 'Hoş geldin 👋'}
+              </Txt>
+              <Txt weight="bold" size={16.5} color="#fff" tracking={-0.3}>
+                KOÜ Yazılım Kulübü
+              </Txt>
+            </View>
+
+            {/*
+              QR yoklaması ana sayfadan da açılıyor.
+
+              Tek giriş etkinlik ekranıydı: öğrenci salonda telefonu açıyor,
+              önce doğru etkinliği bulması, sonra oradaki düğmeyi görmesi
+              gerekiyordu. Sekme çubuğuna altıncı bir sekme koymak yerine
+              buraya kondu — yoklama günde bir kez yapılan bir eylem, kalıcı bir
+              sekme değil. Etkinlik ekranındaki düğme DURUYOR: oradan gelen
+              okutma `eventId` taşıyor ve yanlış etkinliğin kodunu reddediyor.
+            */}
+            <Pressable
+              onPress={() => router.push('/qr')}
+              accessibilityRole="button"
+              accessibilityLabel="QR ile yoklama"
+              style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <PixelIcon name="qr" size={16} color={colors.onNavy} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/bildirim-ayarlari')}
+              accessibilityRole="button"
+              accessibilityLabel="Bildirim ayarları"
+              style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <PixelIcon name="bell" size={16} color={colors.onNavy} />
+              {/* The red dot used to be unconditional, so it always claimed there
+                  was something unread. Nothing tracks read state, so there is
+                  nothing honest to show here until something does. */}
+            </Pressable>
           </View>
 
-          {/*
-            QR yoklaması ana sayfadan da açılıyor.
+          <View style={styles.stats}>
+            <Stat value={String(events.length)} label="Yaklaşan etkinlik" />
+            <Stat value={String(registrations.length)} label="Kaydın var" />
+            {/* Sabit 38'di ve hiçbir şeyden türemiyordu. Artık gerçekten arşivde
+                olan etkinlik sayısı. */}
+            <Stat value={String(archive.length)} label="Arşiv etkinliği" />
+          </View>
 
-            Tek giriş etkinlik ekranıydı: öğrenci salonda telefonu açıyor,
-            önce doğru etkinliği bulması, sonra oradaki düğmeyi görmesi
-            gerekiyordu. Sekme çubuğuna altıncı bir sekme koymak yerine
-            buraya kondu — yoklama günde bir kez yapılan bir eylem, kalıcı bir
-            sekme değil. Etkinlik ekranındaki düğme DURUYOR: oradan gelen
-            okutma `eventId` taşıyor ve yanlış etkinliğin kodunu reddediyor.
-          */}
-          <Pressable
-            onPress={() => router.push('/qr')}
-            accessibilityRole="button"
-            accessibilityLabel="QR ile yoklama"
-            style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <PixelIcon name="qr" size={16} color={colors.onNavy} />
-          </Pressable>
+          <DottedRule style={{ marginTop: 16 }} />
+        </LinearGradient>
 
-          <Pressable
-            onPress={() => router.push('/bildirim-ayarlari')}
-            accessibilityRole="button"
-            accessibilityLabel="Bildirim ayarları"
-            style={({ pressed }) => [styles.bell, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <PixelIcon name="bell" size={16} color={colors.onNavy} />
-            {/* The red dot used to be unconditional, so it always claimed there
-                was something unread. Nothing tracks read state, so there is
-                nothing honest to show here until something does. */}
-          </Pressable>
-        </View>
+        {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
 
-        <View style={styles.stats}>
-          <Stat value={String(events.length)} label="Yaklaşan etkinlik" />
-          <Stat value={String(registrations.length)} label="Kaydın var" />
-          {/* Sabit 38'di ve hiçbir şeyden türemiyordu. Artık gerçekten arşivde
-              olan etkinlik sayısı. */}
-          <Stat value={String(archive.length)} label="Arşiv etkinliği" />
-        </View>
+        {/* Boşken çizilmiyor: bir süs, ana sayfayı bekletmemeli. Okuma düşerse
+            cihazdaki kopya görünüyor (`src/vitrinCache.ts`). */}
+        <HomeSlider slides={slides} />
 
-        <DottedRule style={{ marginTop: 16 }} />
-      </LinearGradient>
+        {sponsors.length ? (
+          <>
+            <SectionTitle
+              icon="grid"
+              style={{ paddingTop: 20 }}
+              trailing={
+                <Pressable
+                  onPress={() => router.push('/sponsorlar')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tüm sponsorlar"
+                >
+                  <Txt weight="semibold" size={12} color={colors.blue500}>
+                    Tümü →
+                  </Txt>
+                </Pressable>
+              }
+            >
+              Sponsorlarımız
+            </SectionTitle>
 
-      {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
-
-      {/* Boşken çizilmiyor: bir süs, ana sayfayı bekletmemeli. Okuma düşerse
-          cihazdaki kopya görünüyor (`src/vitrinCache.ts`). */}
-      <HomeSlider slides={slides} />
-
-      {sponsors.length ? (
-        <>
-          <SectionTitle
-            icon="grid"
-            style={{ paddingTop: 20 }}
-            trailing={
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sponsorRail}>
+              {sponsors.map((s) => (
+                <Pressable
+                  key={s.id}
+                  onPress={() => router.push(`/sponsor/${s.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.name}
+                >
+                  <Card style={styles.sponsorCard}>
+                    <PhotoSlot uri={s.logo} resizeMode="contain" showLabel={false} style={styles.sponsorLogo} />
+                    <Txt weight="bold" size={12} numberOfLines={1} style={{ marginTop: 8 }}>
+                      {s.name}
+                    </Txt>
+                  </Card>
+                </Pressable>
+              ))}
               <Pressable
                 onPress={() => router.push('/sponsorlar')}
                 accessibilityRole="button"
-                accessibilityLabel="Tüm sponsorlar"
+                accessibilityLabel="Sponsor ol"
+                style={({ pressed }) => [styles.sponsorJoin, pressed && { opacity: 0.7 }]}
               >
-                <Txt weight="semibold" size={12} color={colors.blue500}>
-                  Tümü →
+                <Txt weight="bold" size={18} color={colors.blue500}>
+                  +
+                </Txt>
+                <Txt weight="bold" size={12} color={colors.blue500}>
+                  Sponsor ol
                 </Txt>
               </Pressable>
-            }
-          >
-            Sponsorlarımız
-          </SectionTitle>
+            </ScrollView>
+          </>
+        ) : null}
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sponsorRail}>
-            {sponsors.map((s) => (
-              <Pressable
-                key={s.id}
-                onPress={() => router.push(`/sponsor/${s.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={s.name}
-              >
-                <Card style={styles.sponsorCard}>
-                  <PhotoSlot uri={s.logo} resizeMode="contain" showLabel={false} style={styles.sponsorLogo} />
-                  <Txt weight="bold" size={12} numberOfLines={1} style={{ marginTop: 8 }}>
-                    {s.name}
-                  </Txt>
-                </Card>
-              </Pressable>
-            ))}
-            <Pressable
-              onPress={() => router.push('/sponsorlar')}
-              accessibilityRole="button"
-              accessibilityLabel="Sponsor ol"
-              style={({ pressed }) => [styles.sponsorJoin, pressed && { opacity: 0.7 }]}
-            >
-              <Txt weight="bold" size={18} color={colors.blue500}>
-                +
-              </Txt>
-              <Txt weight="bold" size={12} color={colors.blue500}>
-                Sponsor ol
+        <SectionTitle
+          icon="lines"
+          trailing={
+            <Pressable onPress={() => router.navigate('/(tabs)/takvim')} accessibilityRole="button">
+              <Txt weight="semibold" size={12} color={colors.blue500}>
+                Takvim →
               </Txt>
             </Pressable>
-          </ScrollView>
-        </>
-      ) : null}
-
-      <SectionTitle
-        icon="lines"
-        trailing={
-          <Pressable onPress={() => router.navigate('/(tabs)/takvim')} accessibilityRole="button">
-            <Txt weight="semibold" size={12} color={colors.blue500}>
-              Takvim →
-            </Txt>
-          </Pressable>
-        }
-      >
-        Yaklaşan Etkinlikler
-      </SectionTitle>
-
-      {upcoming.length ? (
-        <View style={styles.feed}>
-          {upcoming.map((event) => (
-            <EventRow key={event.id} event={event} onPress={() => openEvent(event.id)} />
-          ))}
-        </View>
-      ) : (
-        <SectionEmpty
-          text={
-            error
-              ? 'Etkinlikler yüklenemedi. Aşağı çekerek tekrar deneyebilirsin.'
-              : 'Yeni dönemin programı henüz açıklanmadı.'
           }
-        />
-      )}
+        >
+          Yaklaşan Etkinlikler
+        </SectionTitle>
 
-      <SectionTitle icon="star">Duyurular</SectionTitle>
+        {upcoming.length ? (
+          <View style={styles.feed}>
+            {upcoming.map((event) => (
+              <EventRow key={event.id} event={event} onPress={() => openEvent(event.id)} />
+            ))}
+          </View>
+        ) : (
+          <SectionEmpty
+            text={
+              error
+                ? 'Etkinlikler yüklenemedi. Aşağı çekerek tekrar deneyebilirsin.'
+                : 'Yeni dönemin programı henüz açıklanmadı.'
+            }
+          />
+        )}
 
-      {announcements.length ? (
-        <View style={styles.feed}>
-          {announcements.slice(0, ANNOUNCEMENT_COUNT).map((item) => (
-            <AnnouncementRow
-              key={item.id}
-              item={item}
-              onPress={() => router.navigate(`/duyuru/${item.id}`)}
-            />
-          ))}
-        </View>
-      ) : (
-        <SectionEmpty
-          text={
-            announcementsError
-              ? 'Duyurulara ulaşılamadı. Kulüp sitesi yanıt vermiyor olabilir.'
-              : announcementsLoading
-                ? 'Duyurular yükleniyor…'
-                : 'Şu an yayınlanmış duyuru yok.'
-          }
-        />
-      )}
+        <SectionTitle icon="star">Duyurular</SectionTitle>
 
-    </ScrollView>
+        {announcements.length ? (
+          <View style={styles.feed}>
+            {announcements.slice(0, ANNOUNCEMENT_COUNT).map((item) => (
+              <AnnouncementRow
+                key={item.id}
+                item={item}
+                onPress={() => router.navigate(`/duyuru/${item.id}`)}
+              />
+            ))}
+          </View>
+        ) : (
+          <SectionEmpty
+            text={
+              announcementsError
+                ? 'Duyurulara ulaşılamadı. Kulüp sitesi yanıt vermiyor olabilir.'
+                : announcementsLoading
+                  ? 'Duyurular yükleniyor…'
+                  : 'Şu an yayınlanmış duyuru yok.'
+            }
+          />
+        )}
+
+      </ScrollView>
+      <PixelRefresh visible={loading} />
+    </View>
   );
 }
 

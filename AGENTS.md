@@ -2458,3 +2458,25 @@ yeni testler `check:security` (panel) ve `check:rules`'un ikinci yarısı.
 - **`grep -c "assert("` fonksiyonun tanım satırını da sayıyor.** Rapor 32
   dedi, gerçek 31'di ve bunu bir inceleyici yakaladı. Raporun kendi sayısı da
   bir ölçümdür: `^\s*assert(` ile sayın, ya da grubu tek tek toplayın.
+
+### Takvim ve Arşiv açılışta üstte beyaz bantla kalıyordu — programla açılan yenileme
+
+- **Belirti (iOS, cihazdan).** Sekme açılınca başlık ~90 pt aşağıda (Arşiv'de ~180 pt),
+  üstte açık zemin, durum çubuğunun beyaz yazısı görünmüyor; kaydırınca düzeliyor.
+  Yenilerken değil, sayfayı açarken ve nadiren.
+- **Sebep (RN kaynağından; cihazda ölçülmedi).** `RefreshControl`'ün `refreshing`'i
+  kullanıcı çekmeden true olunca Fabric'in
+  `RCTPullToRefreshViewComponentView.beginRefreshingProgrammatically`'si
+  `contentOffset.y`'yi kontrolün boyu kadar azaltıp `beginRefreshing` çağırıyor; false
+  olunca yalnız `endRefreshing` — elle yapılan kaydırmayı geri almıyor.
+  `useContent().loading` bütün sekmelerde ortak: Ana Sayfa'daki yenileme ya da ilk
+  yükleme arkadaki sekmelerin kontrolünü de açıp kapatıyor. Pencerede olmayan sekmede
+  UIKit yenilemeyi başlatmıyor, `isRefreshing` NO kalıyor ve bir sonraki turda kayma
+  bir kat daha ekleniyor — Arşiv'deki bant Takvim'dekinin iki katıydı. Kaydırma, scroll
+  view'u sınırına geri çektiği için düzeltiyor. `refreshing={loading}` bu dalın
+  öncesinde de vardı; hata yeni değil, fark edilmemişti.
+- **Çözüm.** Native kontrol yalnız çekme hareketi: `hiddenSpinner` `refreshing: false`
+  taşıyor, ekranlar `refreshing` vermiyor. Kullanıcı çekince RN
+  (`RefreshControl.componentDidUpdate`) native'i hemen false'a eşitliyor; yükleme
+  `PixelRefresh`'te. `check:release`, `app/` ve `src/`'de `refreshing=` alan ya da
+  `hiddenSpinner` yaymayan bir `RefreshControl` bırakmıyor.
