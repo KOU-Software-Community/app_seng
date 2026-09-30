@@ -15,11 +15,13 @@ import {
   SectionTitle,
   Txt,
 } from '../../src/components/ui';
+import { firstName } from '../../src/accountSchema';
 import {
   Announcement,
   formatAnnouncementDate,
   useAnnouncements,
 } from '../../src/announcements';
+import { useAuth } from '../../src/authStore';
 import { useContent } from '../../src/content';
 import { ClubEvent } from '../../src/data';
 import { useSlides } from '../../src/slides';
@@ -37,6 +39,9 @@ export default function HomeRoute() {
   const router = useRouter();
   const openEvent = useOpenEvent();
   const { registrations } = useAppStore();
+  const { profile } = useAuth();
+  // Oturum yoksa ya da profil henüz yüklenmediyse adsız karşılama.
+  const name = firstName(profile?.adSoyad);
   const { events, archive, error, loading, refresh } = useContent();
   const {
     announcements,
@@ -83,7 +88,7 @@ export default function HomeRoute() {
           <Image source={require('../../assets/brand/logo.png')} style={styles.avatar} />
           <View style={{ flex: 1 }}>
             <Txt weight="semibold" size={11.5} color={colors.blue200} tracking={0.3}>
-              Hoş geldin 👋
+              {name ? `${name}, hoş geldin 👋` : 'Hoş geldin 👋'}
             </Txt>
             <Txt weight="bold" size={16.5} color="#fff" tracking={-0.3}>
               KOÜ Yazılım Kulübü
