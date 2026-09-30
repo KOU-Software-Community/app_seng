@@ -84,3 +84,18 @@ it('başka bir fotoğrafla yeniden açılınca sayaç oradan başlıyor', async 
   await rerender(viewer(2));
   expect(screen.getByText('3 / 3')).toBeTruthy();
 });
+
+it('soluk alana dokunuş görüntüleyiciyi kapatıyor', async () => {
+  const onClose = jest.fn();
+  const { root } = await render(viewer(0, onClose));
+  // Pencere 750×1334; yatay fotoğraf kadrajda 750×500 → üstte 417 pt soluk alan.
+  const [image] = root!.queryAll((node) => node.type === 'ViewManagerAdapter_ExpoImage');
+  await fireEvent(image, 'load', { nativeEvent: { source: { width: 1200, height: 800 } } });
+  fireGestureHandler(getByGestureTestId('foto-0-tap'), [
+    { state: State.BEGAN, x: 375, y: 100 },
+    { state: State.ACTIVE, x: 375, y: 100 },
+    { state: State.END, x: 375, y: 100 },
+  ]);
+  await act(async () => {});
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

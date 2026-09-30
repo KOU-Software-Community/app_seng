@@ -22,6 +22,31 @@ export function clampOffset(offset: number, scale: number, content: number, fram
   return Math.min(limit, Math.max(-limit, offset));
 }
 
+/**
+ * Fotoğrafın çevresindeki ölü bant (pt): buradaki dokunuş kapatmıyor, yani kenara yakın
+ * ıskalamalar görüntüleyiciyi kapatmıyor. Cihazda dar ya da geniş gelirse bu sayı değişir.
+ */
+export const BACKDROP_MARGIN = 24;
+
+/**
+ * Dokunuş fotoğrafın görünen dikdörtgeninin (kadrajda ortalanmış `content`) en az
+ * `margin` kadar dışında mı — soluk alanda mı.
+ */
+export function isBackdropTap(
+  x: number,
+  y: number,
+  frameW: number,
+  frameH: number,
+  contentW: number,
+  contentH: number,
+  margin = BACKDROP_MARGIN,
+): boolean {
+  'worklet';
+  const left = (frameW - contentW) / 2 - margin;
+  const top = (frameH - contentH) / 2 - margin;
+  return x < left || x > frameW - left || y < top || y > frameH - top;
+}
+
 type Props = {
   uri: string;
   width: number;
@@ -29,8 +54,13 @@ type Props = {
   /** Görüntüleyici yakınken sayfa kaydırmasını kapatıyor: sürükleme görseli gezdirsin. */
   onZoomChange: (zoomed: boolean) => void;
   accessibilityLabel: string;
-  /** Hareket kimlikleri bundan türüyor: `-pinch`, `-pan`, `-doubleTap`. */
+  /** Hareket kimlikleri bundan türüyor: `-pinch`, `-pan`, `-doubleTap`, `-tap`. */
   testID: string;
+  /**
+   * Fotoğrafın dışındaki soluk alana tek, temiz dokunuş (1×'te, `BACKDROP_MARGIN`
+   * dışında): görüntüleyici kapanıyor.
+   */
+  onBackdropPress?: () => void;
 };
 
 /**
@@ -40,7 +70,15 @@ type Props = {
  * ponytail: yakınlaşma görselin ortasından, parmakların arasından değil; cihazda
  * yetmezse `focalX/Y` ile odak noktası hesabı eklenir.
  */
-export function ZoomableImage({ uri, width, height, onZoomChange, accessibilityLabel, testID }: Props) {
+export function ZoomableImage({
+  uri,
+  width,
+  height,
+  onZoomChange,
+  accessibilityLabel,
+  testID,
+  onBackdropPress,
+}: Props) {
   // Görselin kadrajdaki boyu en-boy oranından; oran yüklenene dek kadrajın kendisi.
   const [aspect, setAspect] = useState(0);
   const cw = aspect ? Math.min(width, height * aspect) : width;
@@ -110,9 +148,24 @@ export function ZoomableImage({ uri, width, height, onZoomChange, accessibilityL
       settle(saved.value > 1 ? 1 : DOUBLE_TAP_SCALE);
     });
 
+  // Kapatma: 10 pt'den az kayan, kısa (varsayılan 500 ms) tek dokunuş. Yakınken kapalı:
+  // görsel ekranı kaplıyor, dokunuş gezinme.
+  const backdrop = () => onBackdropPress?.();
+  const tap = Gesture.Tap()
+    .withTestId(`${testID}-tap`)
+    .enabled(onBackdropPress !== undefined && !zoomed)
+    .maxDistance(10)
+    .onEnd((e, success) => {
+      if (success && saved.value <= 1 && isBackdropTap(e.x, e.y, width, height, cw, ch)) {
+        scheduleOnRN(backdrop);
+      }
+    });
+
   // Race: çift dokunma varsayılanda parmak kaymasıyla düşmüyor (maxDist yok);
-  // Exclusive'de iki parmak ve sürükleme onun 500 ms'lik süresini beklerdi.
-  const gesture = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
+  // Exclusive'de iki parmak ve sürükleme onun 500 ms'lik süresini beklerdi. Tek
+  // dokunuş ise çift dokunmanın düşmesini bekliyor (Exclusive): ikinci dokunuş
+  // yakınlaştırsın, kapatmasın.
+  const gesture = Gesture.Race(Gesture.Exclusive(doubleTap, tap), Gesture.Simultaneous(pinch, pan));
 
   // Uzaklaşırken kaydırma da sınıra çekiliyor: kenar hareket bitene dek görünmesin.
   const moved = useAnimatedStyle(() => ({
