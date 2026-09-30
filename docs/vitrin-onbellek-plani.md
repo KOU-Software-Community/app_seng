@@ -55,7 +55,7 @@ bölümü yalnız boşken gizliyor. Adım 2'de `PhotoSlot` expo-image'a geçiyor
 
 ## Adım 1 — liste önbelleği (dal `fix/vitrin-onbellek`, OTA)
 
-### Görev 1: `src/vitrinCache.ts`
+### Task 1: `src/vitrinCache.ts`
 
 **Files:**
 - Create: `src/vitrinCache.ts`
@@ -198,7 +198,7 @@ git add src/vitrinCache.ts src/__tests__/vitrin-cache.test.tsx graphify-out/
 git commit -m "feat(vitrin): slider ve sponsor listesinin cihazdaki kopyası"
 ```
 
-### Görev 2: Hook'lar ve ana sayfa kopyayla açılıyor
+### Task 2: Hook'lar ve ana sayfa kopyayla açılıyor
 
 **Files:**
 - Modify: `src/slides.ts` (`useSlides`), `src/sponsors.tsx` (`SponsorsProvider`),
@@ -311,7 +311,7 @@ git add src/slides.ts src/sponsors.tsx 'app/(tabs)/index.tsx' src/__tests__/vitr
 git commit -m "fix(ana sayfa): slider ve sponsorlar cihazdaki kopyayla açılıyor, çevrimdışı da"
 ```
 
-### Görev 3: Adım 1'i kapat
+### Task 3: Adım 1'i kapat
 
 - [ ] **Step 1: CI'ın koştuğu kontroller**
 
@@ -342,7 +342,7 @@ veritabanı: gerekmiyor) ve operatör notu:
 
 Ön koşul: Adım 1 PR'ı main'e birleşti ve operatör OTA'yı yayınladı.
 
-### Görev 4: expo-image ve sürüm 1.1.6
+### Task 4: expo-image ve sürüm 1.1.6
 
 **Files:**
 - Modify: `package.json`, `package-lock.json`, `app.json`, `CLAUDE.md:5`,
