@@ -13,15 +13,15 @@ import { Txt } from './ui';
  * fotoğraf" gösteren, arkasında hiçbir şey olmayan bir görüntüleyici. Buradaki
  * önizlemeler gerçekten var olan dosyalar.
  *
- * Kapak ayrı çiziliyor (detayın hero'su), o yüzden burada gösterilmiyor.
+ * Kapak dâhil hepsi: hero kendiliğinden kaydığı için şerit, hangi fotoğrafların
+ * olduğunu bir bakışta gösteren dizin. Tek fotoğrafta şerit yok; hero'ya dokunmak yeter.
  */
 export function PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (index: number) => void }) {
   if (photos.length < 2) return null;
-  const rest = photos.slice(1);
 
   return (
     <View style={styles.block}>
-      <Txt weight="extrabold" size={16} color={colors.navy900} style={{ marginBottom: 10 }}>
+      <Txt weight="extrabold" size={16} color={colors.navy900} style={styles.title}>
         Fotoğraflar
       </Txt>
 
@@ -30,13 +30,12 @@ export function PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (in
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.strip}
       >
-        {rest.map((uri, i) => (
+        {photos.map((uri, i) => (
           <Pressable
-            key={uri}
+            key={`${i}-${uri}`}
             accessibilityRole="button"
-            accessibilityLabel={`Fotoğraf ${i + 2}`}
-            // +1: kapak dizinin başında ve tam ekranda o da geziliyor.
-            onPress={() => onOpen(i + 1)}
+            accessibilityLabel={`Fotoğraf ${i + 1}`}
+            onPress={() => onOpen(i)}
             style={({ pressed }) => [styles.thumb, { opacity: pressed ? 0.75 : 1 }]}
           >
             <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -49,6 +48,8 @@ export function PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (in
 
 const styles = StyleSheet.create({
   block: { paddingTop: 22 },
+  // Şerit kenara kadar kayıyor, başlık sayfanın geri kalanıyla aynı hizada.
+  title: { marginBottom: 10, paddingHorizontal: 20 },
   strip: { paddingHorizontal: 20, gap: 10 },
   thumb: {
     width: 132,

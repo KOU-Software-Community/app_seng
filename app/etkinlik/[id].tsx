@@ -224,9 +224,9 @@ export default function EventDetailRoute() {
         </View>
 
         {/* Konuşmacı bloğunun dışında: şerit kenara kadar kayabilsin diye kendi
-            yatay boşluğunu kendi veriyor. Kapak hero'da çiziliyor, şerit
-            kalanları gösteriyor ve tek görsel varsa hiç çıkmıyor; ikisi de aynı
-            görüntüleyiciyi açıyor. */}
+            yatay boşluğunu kendi veriyor. Hero fotoğrafları kendiliğinden
+            kaydırıyor, şerit hepsini bir arada gösteriyor ve tek görsel varsa hiç
+            çıkmıyor; ikisi de aynı görüntüleyiciyi açıyor. */}
         <PhotoGallery photos={event.photos ?? []} onOpen={setViewer} />
       </ScrollView>
 

@@ -45,8 +45,9 @@ Yapı taşları uygulamada: `react-native-gesture-handler` 2.32, `react-native-r
 - Zamanlayıcı mantığı `HomeSlider`'dan `src/useAutoAdvance.ts`'e taşınıyor; iki slider
   aynı kodu kullanıyor, `HomeSlider`'ın mevcut testleri taşımanın güvencesi.
 - Görseller expo-image (`cover` hero'da, `contain` görüntüleyicide) — disk önbelleği.
-- `PhotoGallery` şeridi kalıyor (kullanıcı kararı): kapaktan sonraki fotoğrafların
-  önizlemeleri, expo-image; dokununca kendi tam ekranı yerine `PhotoViewer` o fotoğrafta
+- `PhotoGallery` şeridi kalıyor (kullanıcı kararı): kapak dâhil bütün fotoğrafların
+  önizlemeleri (cihaz testinden sonra: kapağı atlayınca 3 fotoğrafın 2'si görünüyordu),
+  expo-image; dokununca kendi tam ekranı yerine `PhotoViewer` o fotoğrafta
   açılıyor. Şeridin kendi `Modal`'ı ve ‹ › tuşları siliniyor.
 
 ## 2. Yenileme göstergesi
