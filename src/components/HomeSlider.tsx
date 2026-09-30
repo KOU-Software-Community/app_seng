@@ -1,25 +1,17 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  FlatList,
-  Linking,
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { FlatList, Linking, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import type { IconName } from '../icons';
 import { colors, gradients, shadow } from '../theme';
+import { useAutoAdvance } from '../useAutoAdvance';
 import { useOpenEvent } from '../useOpenEvent';
 import type { Kicker, Slide } from '../vitrinSchema';
 import { PhotoSlot } from './PhotoSlot';
 import { PixelBadge, Txt } from './ui';
 
-/** Otomatik geçiş aralığı. */
-export const SLIDE_INTERVAL_MS = 4500;
+export { SLIDE_INTERVAL_MS } from '../useAutoAdvance';
 
 const SIDE = 20;
 const GAP = 12;
@@ -39,65 +31,18 @@ const KICKER: Record<Kicker, { icon: IconName; spoken: string }> = {
  * Ana sayfanın slider'ı.
  *
  * Kart genişliği ekran − 40 ve kaydırma `snapToInterval` ile: `pagingEnabled`
- * ekran genişliğinde sayfalıyor, 20px kenar boşluğuyla uyuşmuyor.
- *
- * Otomatik geçiş dört koşulda duruyor: tek slayt, ekran odakta değil, kullanıcı
- * kaydırıyor, ya da "hareketi azalt" veya ekran okuyucu açık — kendi kendine
- * kayan içerik ekran okuyucuyla gezeni yerinden eder (WCAG 2.2.2).
+ * ekran genişliğinde sayfalıyor, 20px kenar boşluğuyla uyuşmuyor. Otomatik geçişin
+ * kuralları `useAutoAdvance`'te.
  */
 export function HomeSlider({ slides }: { slides: Slide[] }) {
   const { width } = useWindowDimensions();
   const cardWidth = width - SIDE * 2;
   const step = cardWidth + GAP;
-  const list = useRef<FlatList<Slide>>(null);
   const router = useRouter();
   const openEvent = useOpenEvent();
-
-  const [index, setIndex] = useState(0);
-  const [focused, setFocused] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  // Ayar okunana kadar durgun: ilk kareden kaymaya başlamasın.
-  // ponytail: ayar yalnız açılışta okunuyor; uygulama açıkken değişirse bir sonraki açılışta geçerli.
-  const [still, setStill] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([AccessibilityInfo.isReduceMotionEnabled(), AccessibilityInfo.isScreenReaderEnabled()])
-      .then(([reduce, reader]) => {
-        if (alive) setStill(reduce || reader);
-      })
-      .catch(() => {
-        if (alive) setStill(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      setFocused(true);
-      return () => setFocused(false);
-    }, []),
-  );
-
   const count = slides.length;
-  // Yenileme listeyi kısaltırsa kaydırma son sayfaya dayanıyor; nokta da orada.
-  const current = count ? Math.min(index, count - 1) : 0;
-
-  const go = useCallback(
-    (next: number) => {
-      setIndex(next);
-      list.current?.scrollToOffset({ offset: next * step, animated: true });
-    },
-    [step],
-  );
-
-  useEffect(() => {
-    if (count < 2 || still || !focused || dragging) return;
-    const timer = setTimeout(() => go((current + 1) % count), SLIDE_INTERVAL_MS);
-    return () => clearTimeout(timer);
-  }, [count, still, focused, dragging, current, go]);
+  const { list, current, go, onScrollBeginDrag, onScrollEndDrag, onMomentumScrollEnd } =
+    useAutoAdvance<Slide>(count, step);
 
   if (!count) return null;
 
@@ -121,9 +66,9 @@ export function HomeSlider({ slides }: { slides: Slide[] }) {
         decelerationRate="fast"
         contentContainerStyle={{ paddingHorizontal: SIDE }}
         ItemSeparatorComponent={Separator}
-        onScrollBeginDrag={() => setDragging(true)}
-        onScrollEndDrag={() => setDragging(false)}
-        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / step))}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollEnd={onMomentumScrollEnd}
         renderItem={({ item }) => <SlideCard slide={item} width={cardWidth} onPress={() => open(item)} />}
       />
 
