@@ -2,20 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { todayLocal } from './eventSchema';
 import { isFirebaseConfigured } from './firebaseConfig';
+import { cacheReady, cacheSettled, cachedSlides, saveCache } from './vitrinCache';
 import { visibleSlides, type Slide } from './vitrinSchema';
 
 /**
  * Ana sayfanın slaytları. Tek tüketici ana sayfa, o yüzden sağlayıcı yok.
+ *
+ * İlk durum cihazdaki kopya (`vitrinCache.ts`): ana sayfa ağ beklemeden çiziliyor,
+ * okuma düşerse o kopya kalıyor.
  *
  * Bitiş tarihi okuma ve yenileme anında değerlendiriliyor (`nonce` bağımlılık) —
  * takvimdeki `splitByDate` ile aynı: gece yarısını açık geçiren uygulama slaytı
  * bir sonraki yenilemeye kadar gösterir. Panel süresi dolanı zaten siliyor.
  */
 export function useSlides() {
-  const [all, setAll] = useState<Slide[]>([]);
+  const [all, setAll] = useState<Slide[]>(cachedSlides);
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+
+  // Açılış okuması ilk render'a yetişmediyse bitince. Taze liste bellekte
+  // olduğundan geç gelse de eskiyi geri getirmiyor.
+  useEffect(() => {
+    if (!cacheSettled()) void cacheReady.then(() => setAll(cachedSlides()));
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -32,6 +42,7 @@ export function useSlides() {
       .then((list) => {
         if (cancelled) return;
         setAll(list);
+        saveCache('slides', list);
         setError(null);
       })
       .catch((err: unknown) => {
