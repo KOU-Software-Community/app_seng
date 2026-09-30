@@ -34,7 +34,8 @@ Sürümler `package.json`'dan.
   (`expo-notifications` ~57.0.15 → `getExpoPushTokenAsync`; panel
   `exp.host/--/api/v2/push/send`).
 - State: **Zustand yok.** React Context + AsyncStorage: `src/store.tsx` (kayıtlar,
-  çekiliş katılımları, bildirim tercihleri; anahtar `kyk.state.v1`), `src/authStore.tsx`,
+  çekiliş katılımları, bildirim tercihleri; anahtar `kyk.state.v1`), `src/vitrinCache.ts`
+  (slider ve sponsorların son listesi; `kyk.vitrin.slides.v1`, `kyk.vitrin.sponsors.v1`), `src/authStore.tsx`,
   `src/content.tsx`, `src/announcements.tsx`. AI Gündem'de TanStack Query ^5.102.8,
   AsyncStorage'a kalıcı.
 - AI Gündem: ayrı bir Supabase projesi, `@supabase/supabase-js` ^2.112.4.
@@ -107,8 +108,8 @@ Duyurular Firestore'da değil, kulüp sitesinin API'sinde (`https://api.kouseng.
 | `deletionRequests` | yazar ve okur — `hesap-sil` | işler: `admin/deletion.ts` |
 | `attendance` | yazar — `qr` (`yoklamaVer`); okur — `sertifikalarim` (sertifika, satırdaki `certificate` alanı) | yazar: elle yoklama, sertifika yayını |
 | `devices` | yazar — `app/_layout.tsx` → `NotificationSync` → `upsertDevice`; kimlik Expo push jetonu | okur: push gönderimi |
-| `sponsors` | okur — `useSponsors` (`src/sponsors.tsx` → `fetchSponsors`, yalnız `active`): Ana Sayfa, `sponsorlar`, `sponsor/[id]`, `etkinlik/[id]` ("Ödülü sağlayan") | yazar: `/sponsorlar` (`admin/vitrin.ts`) |
-| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi): Ana Sayfa | yazar: `/slider`; süresi dolanı `startSlideSweeper` siliyor |
+| `sponsors` | okur — `useSponsors` (`src/sponsors.tsx` → `fetchSponsors`, yalnız `active`; son liste cihazda, `src/vitrinCache.ts`): Ana Sayfa, `sponsorlar`, `sponsor/[id]`, `etkinlik/[id]` ("Ödülü sağlayan") | yazar: `/sponsorlar` (`admin/vitrin.ts`) |
+| `slides` | okur — `useSlides` (`src/slides.ts` → `fetchSlides`, yalnız `active`, `endsAt` süzmesi; son liste cihazda, `src/vitrinCache.ts`): Ana Sayfa | yazar: `/slider`; süresi dolanı `startSlideSweeper` siliyor |
 | `eventQr`, `emailOtp`, `passwordReset`, `phoneClaims`, `studentClaims`, `pushLog`, `pendingPushes`, `pushState` | kapalı | yalnız panel |
 
 ## İçerik girişi
