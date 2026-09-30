@@ -24,7 +24,10 @@ const MONTHS_AHEAD = 12;
 export function MonthCalendar({ events, onOpen }: { events: ClubEvent[]; onOpen: (id: string) => void }) {
   const today = clubCalendar(new Date());
   const base = { year: today.year, month: today.month + 1 }; // clubCalendar'ın ayı 0–11
-  const [offset, setOffset] = useState(0);
+  // Bakılan ayın kendisi tutuluyor, bu aydan uzaklığı değil: sekme ay dönümünde açık
+  // kalırsa ileri bakılan ay kaymasın. Geride kalmışsa (bu aya bakılıyordu) yeni ay.
+  const [picked, setPicked] = useState(base);
+  const offset = Math.max(0, (picked.year - base.year) * 12 + (picked.month - base.month));
 
   const lastOffset = events.reduce((max, e) => {
     const at = parseIso(e.startsAt ?? '');
@@ -37,8 +40,8 @@ export function MonthCalendar({ events, onOpen }: { events: ClubEvent[]; onOpen:
   const thisMonth = offset === 0;
 
   const go = (next: number) => {
-    setOffset(next);
     const month = addMonths(base.year, base.month, next);
+    setPicked(month);
     AccessibilityInfo.announceForAccessibilityWithOptions(monthLabelOf(month.year, month.month), {
       queue: true,
     });

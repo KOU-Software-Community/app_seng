@@ -88,3 +88,45 @@ it('en büyük yazı boyutunda başlık satırı taşmıyor', async () => {
   expect(screen.getByText('›')).toHaveProp('maxFontSizeMultiplier', 1.3);
   expect(screen.getByText('‹')).toHaveProp('maxFontSizeMultiplier', 1.3);
 });
+
+it('ay dönümünde ileri bakılan ay kaymıyor', async () => {
+  at('2026-09-30T20:50:00Z'); // kulüp saatiyle 23.50
+  const onOpen = jest.fn();
+  const { rerender } = await render(<MonthCalendar events={[]} onOpen={onOpen} />);
+  await next();
+  expect(header('Ekim 2026')).toBeTruthy();
+  jest.setSystemTime(new Date('2026-09-30T21:10:00Z')); // 1 Ekim 00.10
+  await rerender(<MonthCalendar events={[]} onOpen={onOpen} />);
+  expect(header('Ekim 2026')).toBeTruthy();
+  expect(screen.getByLabelText('1 Ekim 2026, Perşembe, bugün')).toBeTruthy();
+});
+
+it('bu aya bakarken ay dönerse yeni ay görünüyor', async () => {
+  at('2026-09-30T20:50:00Z');
+  const onOpen = jest.fn();
+  const { rerender } = await render(<MonthCalendar events={[]} onOpen={onOpen} />);
+  jest.setSystemTime(new Date('2026-09-30T21:10:00Z'));
+  await rerender(<MonthCalendar events={[]} onOpen={onOpen} />);
+  expect(header('Ekim 2026')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Önceki ay' })).toBeDisabled();
+});
+
+it('iki etkinlikli günde hücre ilkini açıyor ve onu söylüyor', async () => {
+  at('2026-09-30T09:00:00Z');
+  const onOpen = jest.fn();
+  await render(
+    <MonthCalendar
+      events={[
+        event('e1', 'Hackathon', '2026-10-12T18:00:00+03:00'),
+        event('e2', 'Atölye', '2026-10-12T20:00:00+03:00'),
+      ]}
+      onOpen={onOpen}
+    />,
+  );
+  await next();
+  await fireEvent.press(
+    screen.getByRole('button', { name: '12 Ekim 2026, Pazartesi, etkinlik: Hackathon' }),
+  );
+  expect(onOpen).toHaveBeenCalledWith('e1');
+  expect(screen.queryByRole('button', { name: /Atölye/ })).toBeNull();
+});
