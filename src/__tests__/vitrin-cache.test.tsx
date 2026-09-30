@@ -9,10 +9,16 @@ import { toSlide, toSponsor } from '../vitrinSchema';
  * Slider ve sponsorlar cihazdaki kopyayla açılıyor (`src/vitrinCache.ts`).
  *
  * Kopya modül içe aktarılınca okunuyor. Bu yüzden `vitrinCache`'i çeken her modül
- * burada `require` ile, depo doldurulduktan SONRA yükleniyor — dosyanın başında
- * içe aktarılsaydı okuma boş depoya yapılırdı. Modül testleri
- * `jest.isolateModulesAsync` ile her seferinde taze bir kopya ve taze bir
- * AsyncStorage taklidi alıyor.
+ * `require` ile, depo doldurulduktan SONRA yükleniyor — dosyanın başında içe
+ * aktarılsaydı okuma boş depoya yapılırdı. Yükleme test gövdesinde değil dosya
+ * düzeyinde: soğuk dönüştürme önbelleğiyle (CI) ana sayfa ağacının dönüştürülmesi
+ * testin 5 sn'lik süresini aşıyordu.
+ *
+ * Modül testleri `jest.isolateModulesAsync` ile her seferinde taze bir
+ * `vitrinCache` alıyor, ama AsyncStorage taklidi ana kayıtla ORTAK: dosyanın başında
+ * içe aktarıldığı için izole kayıt da aynı örneği buluyor. Her test okuduğu
+ * anahtarları kendisi yazıyor; ana sayfa testlerinin kopyası o testlerden önce,
+ * dosya yüklenirken okunmuş oluyor.
  *
  * Başarılı okuma yolu (`setX` + `saveCache`) burada sınanmıyor: Jest'te dinamik
  * `import('./firebase')` gerçek bir dinamik import olarak kalıyor ve reddediliyor
@@ -80,6 +86,15 @@ const yanlisTur = (cache: Cache) =>
   // @ts-expect-error — sponsor listesi slayt anahtarına yazılamaz
   cache.saveCache('slides', [SPONSOR]);
 
+// Ana sayfa testlerinin cihazdaki kopyası. Taklit (`async-storage-mock`) yazmayı
+// çağrı anında yapıyor; modüller bundan sonra yükleniyor, açılış okuması bunu görüyor.
+void AsyncStorage.setItem(SLIDES_KEY, JSON.stringify([SLIDE, EXPIRED]));
+void AsyncStorage.setItem(SPONSORS_KEY, JSON.stringify([SPONSOR]));
+const { cacheReady } = require('../vitrinCache') as Cache;
+const { useSlides } = require('../slides') as typeof import('../slides');
+const { SponsorsProvider, useSponsors } = require('../sponsors') as typeof import('../sponsors');
+const Home = (require('../../app/(tabs)/index') as typeof import('../../app/(tabs)/index')).default;
+
 /** Taze bir modül kaydında depoyu doldurur, kopyayı yükler, `fn`'i çalıştırır. */
 async function fresh(
   seed: Record<string, string>,
@@ -122,14 +137,13 @@ it('sunucu boş liste döndürünce kopya boşalıyor; geç biten açılış oku
   });
 });
 
+// 30 sn, öteki ağır render testleri gibi: soğuk dönüştürme önbelleğinde (CI) RN'nin
+// tembel bileşenleri (FlatList, RefreshControl) render sırasında dönüştürülüyor;
+// tek başına 3,6 sn ölçüldü, CI'da 5 sn'lik varsayılanı aştı.
 it('okuma düşerken ana sayfa slider ve sponsorları cihazdan çiziyor, süresi geçmiş slaytı değil', async () => {
   // Jest'te Firestore okuması hep hata yolunda: bu, çevrimdışı açılışın kendisi.
-  await AsyncStorage.setItem(SLIDES_KEY, JSON.stringify([SLIDE, EXPIRED]));
-  await AsyncStorage.setItem(SPONSORS_KEY, JSON.stringify([SPONSOR]));
   // Uygulamadaki sıra: kopya açılışta okunuyor, ana sayfa girişten sonra çiziliyor.
-  await (require('../vitrinCache') as Cache).cacheReady;
-  const { SponsorsProvider } = require('../sponsors') as typeof import('../sponsors');
-  const Home = (require('../../app/(tabs)/index') as typeof import('../../app/(tabs)/index')).default;
+  await cacheReady;
 
   await render(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -143,16 +157,14 @@ it('okuma düşerken ana sayfa slider ve sponsorları cihazdan çiziyor, süresi
   expect(screen.getByText('Hackathon')).toBeTruthy();
   expect(screen.queryByText('Geçen haftanın etkinliği')).toBeNull();
   expect(screen.getByText('Acme Yazılım')).toBeTruthy();
-});
+}, 30000);
 
 it("kopya mount'tan önce okunduysa liste ikinci kez kurulmuyor", async () => {
   // İkinci kurulum yeni bir dizi: slider'ın FlatList'i ve bütün sponsor
   // tüketicileri açılışta boşuna yeniden çizilirdi. Her render'ın gördüğü dizi
   // toplanıyor — `renderHook` effect'leri dönmeden bitirdiği için ilk değeri
   // sonradan okumak ikinci kurulumu göremezdi.
-  await (require('../vitrinCache') as Cache).cacheReady;
-  const { useSlides } = require('../slides') as typeof import('../slides');
-  const { SponsorsProvider, useSponsors } = require('../sponsors') as typeof import('../sponsors');
+  await cacheReady;
   const slides = new Set<unknown>();
   const sponsors = new Set<unknown>();
 
