@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, render, renderHook, screen } from '@testing-library/react-native';
 import React from 'react';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
@@ -13,6 +13,12 @@ import { toSlide, toSponsor } from '../vitrinSchema';
  * içe aktarılsaydı okuma boş depoya yapılırdı. Modül testleri
  * `jest.isolateModulesAsync` ile her seferinde taze bir kopya ve taze bir
  * AsyncStorage taklidi alıyor.
+ *
+ * Başarılı okuma yolu (`setX` + `saveCache`) burada sınanmıyor: Jest'te dinamik
+ * `import('./firebase')` gerçek bir dinamik import olarak kalıyor ve reddediliyor
+ * (`--experimental-vm-modules` yok), yani `jest.mock('../firebase')` o yola
+ * ulaşamıyor. Okuma her zaman hata yolunda — ana sayfa testi bu yüzden aynı zamanda
+ * çevrimdışı açılış.
  */
 
 jest.mock('expo-router', () => {
@@ -67,6 +73,12 @@ const SPONSOR = toSponsor('p1', {
 
 type Cache = typeof import('../vitrinCache');
 type Storage = typeof AsyncStorage;
+
+// `npm run typecheck` denetliyor, hiç çağrılmıyor: `saveCache`'in türü genişlerse
+// bu yönerge "kullanılmıyor" diye düşer.
+const yanlisTur = (cache: Cache) =>
+  // @ts-expect-error — sponsor listesi slayt anahtarına yazılamaz
+  cache.saveCache('slides', [SPONSOR]);
 
 /** Taze bir modül kaydında depoyu doldurur, kopyayı yükler, `fn`'i çalıştırır. */
 async function fresh(
@@ -131,4 +143,28 @@ it('okuma düşerken ana sayfa slider ve sponsorları cihazdan çiziyor, süresi
   expect(screen.getByText('Hackathon')).toBeTruthy();
   expect(screen.queryByText('Geçen haftanın etkinliği')).toBeNull();
   expect(screen.getByText('Acme Yazılım')).toBeTruthy();
+});
+
+it("kopya mount'tan önce okunduysa liste ikinci kez kurulmuyor", async () => {
+  // İkinci kurulum yeni bir dizi: slider'ın FlatList'i ve bütün sponsor
+  // tüketicileri açılışta boşuna yeniden çizilirdi. Her render'ın gördüğü dizi
+  // toplanıyor — `renderHook` effect'leri dönmeden bitirdiği için ilk değeri
+  // sonradan okumak ikinci kurulumu göremezdi.
+  await (require('../vitrinCache') as Cache).cacheReady;
+  const { useSlides } = require('../slides') as typeof import('../slides');
+  const { SponsorsProvider, useSponsors } = require('../sponsors') as typeof import('../sponsors');
+  const slides = new Set<unknown>();
+  const sponsors = new Set<unknown>();
+
+  await renderHook(
+    () => {
+      slides.add(useSlides().slides);
+      sponsors.add(useSponsors().sponsors);
+    },
+    { wrapper: SponsorsProvider },
+  );
+  await act(async () => {});
+
+  expect(slides.size).toBe(1);
+  expect(sponsors.size).toBe(1);
 });

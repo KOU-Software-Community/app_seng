@@ -18,6 +18,7 @@ const KEYS = { slides: 'kyk.vitrin.slides.v1', sponsors: 'kyk.vitrin.sponsors.v1
 type Kind = keyof typeof KEYS;
 
 const memory: Partial<Record<Kind, unknown>> = {};
+let settled = false;
 
 export const cacheReady: Promise<unknown> = Promise.all(
   (Object.keys(KEYS) as Kind[]).map(async (kind) => {
@@ -29,7 +30,12 @@ export const cacheReady: Promise<unknown> = Promise.all(
       // Okunamayan ya da yarım yazılmış kopya: boş başla, Firestore doldurur.
     }
   }),
-);
+).then(() => {
+  settled = true;
+});
+
+/** Açılış okuması bitti mi — bittiyse ilk durum zaten kopya, bir daha kurulmuyor. */
+export const cacheSettled = (): boolean => settled;
 
 function parsed<T>(kind: Kind, to: (id: string, raw: unknown) => T | null): T[] {
   const list = memory[kind];
@@ -44,7 +50,9 @@ function parsed<T>(kind: Kind, to: (id: string, raw: unknown) => T | null): T[] 
 export const cachedSlides = (): Slide[] => parsed('slides', toSlide);
 export const cachedSponsors = (): Sponsor[] => parsed('sponsors', toSponsor);
 
-export function saveCache(kind: Kind, list: Slide[] | Sponsor[]): void {
+type Lists = { slides: Slide[]; sponsors: Sponsor[] };
+
+export function saveCache<K extends Kind>(kind: K, list: Lists[K]): void {
   memory[kind] = list;
   AsyncStorage.setItem(KEYS[kind], JSON.stringify(list)).catch(() => {});
 }

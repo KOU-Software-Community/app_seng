@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { isFirebaseConfigured } from './firebaseConfig';
-import { cacheReady, cachedSponsors, saveCache } from './vitrinCache';
+import { cacheReady, cacheSettled, cachedSponsors, saveCache } from './vitrinCache';
 import type { Sponsor } from './vitrinSchema';
 
 /**
@@ -35,7 +35,7 @@ export function SponsorsProvider({ children }: { children: React.ReactNode }) {
   // Açılış okuması ilk render'a yetişmediyse bitince. Taze liste bellekte
   // olduğundan geç gelse de eskiyi geri getirmiyor.
   useEffect(() => {
-    void cacheReady.then(() => setSponsors(cachedSponsors()));
+    if (!cacheSettled()) void cacheReady.then(() => setSponsors(cachedSponsors()));
   }, []);
 
   useEffect(() => {

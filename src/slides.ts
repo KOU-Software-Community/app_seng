@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { todayLocal } from './eventSchema';
 import { isFirebaseConfigured } from './firebaseConfig';
-import { cacheReady, cachedSlides, saveCache } from './vitrinCache';
+import { cacheReady, cacheSettled, cachedSlides, saveCache } from './vitrinCache';
 import { visibleSlides, type Slide } from './vitrinSchema';
 
 /**
@@ -24,7 +24,7 @@ export function useSlides() {
   // Açılış okuması ilk render'a yetişmediyse bitince. Taze liste bellekte
   // olduğundan geç gelse de eskiyi geri getirmiyor.
   useEffect(() => {
-    void cacheReady.then(() => setAll(cachedSlides()));
+    if (!cacheSettled()) void cacheReady.then(() => setAll(cachedSlides()));
   }, []);
 
   useEffect(() => {
