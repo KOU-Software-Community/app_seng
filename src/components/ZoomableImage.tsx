@@ -72,6 +72,12 @@ export function ZoomableImage({ uri, width, height, onZoomChange, accessibilityL
 
   const pinch = Gesture.Pinch()
     .withTestId(`${testID}-pinch`)
+    // İkinci parmak iner inmez liste dursun. Android'de yatay liste, iki parmak
+    // yakınlaşma sayılacak kadar açılmadan (≈24 dp) ilk parmağın 8 dp kaymasıyla
+    // dokunmayı alıyor ve bu hareketi iptal ediyor.
+    .onTouchesDown((e) => {
+      if (e.numberOfTouches >= 2) scheduleOnRN(report, true);
+    })
     .onUpdate((e) => {
       scale.value = Math.min(MAX_SCALE, Math.max(1, saved.value * e.scale));
     })
@@ -79,6 +85,10 @@ export function ZoomableImage({ uri, width, height, onZoomChange, accessibilityL
       // Son ölçek bitiş olayından: tek güncellemeli kısa bir hareket de sayılıyor.
       const next = Math.min(MAX_SCALE, Math.max(1, saved.value * e.scale));
       settle(next <= 1.01 ? 1 : next);
+    })
+    // Yakınlaşmadan biten ya da iptal edilen hareket kilidi geri veriyor.
+    .onFinalize(() => {
+      scheduleOnRN(report, saved.value > 1);
     });
 
   const pan = Gesture.Pan()

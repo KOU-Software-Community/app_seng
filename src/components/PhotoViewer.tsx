@@ -72,7 +72,8 @@ function Pages({ photos, start, onClose }: { photos: string[]; start: number; on
         )}
       />
 
-      <View style={[styles.bar, { paddingTop: insets.top + 12 }]}>
+      {/* Çubuk görselin üstünde: boşluğu dokunmayı görsele bırakıyor. */}
+      <View style={[styles.bar, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
         <GlassButton
           label="✕"
           accessibilityLabel="Kapat"

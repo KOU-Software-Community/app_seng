@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
-import { Dimensions } from 'react-native';
+import { DeviceEventEmitter, Dimensions } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
@@ -44,6 +44,38 @@ it('yakınken liste kaymıyor', async () => {
   ]);
   await act(async () => {});
   expect(screen.getByTestId('foto-liste').props.scrollEnabled).toBe(false);
+});
+
+// RNGH `TouchEventType.TOUCHES_DOWN`; paket bu sabiti dışa aktarmıyor.
+const TOUCHES_DOWN = 1;
+
+it('ikinci parmak iner inmez liste duruyor, yakınlaşmadan biterse yine kayıyor', async () => {
+  // Android'de yatay liste, iki parmak yakınlaşma sayılacak kadar açılmadan ilk
+  // parmağın kaymasıyla dokunmayı alıp hareketi iptal ediyor: kilit beklenemez.
+  await render(viewer(0));
+  const { handlerTag } = getByGestureTestId('foto-0-pinch');
+  const scrollEnabled = () => screen.getByTestId('foto-liste').props.scrollEnabled;
+
+  await act(async () => {
+    DeviceEventEmitter.emit('onGestureHandlerEvent', {
+      handlerTag,
+      eventType: TOUCHES_DOWN,
+      numberOfTouches: 2,
+      allTouches: [],
+      changedTouches: [],
+    });
+  });
+  expect(scrollEnabled()).toBe(false);
+
+  await act(async () => {
+    DeviceEventEmitter.emit('onGestureHandlerEvent', { handlerTag, oldState: State.BEGAN, state: State.FAILED });
+  });
+  expect(scrollEnabled()).not.toBe(false);
+});
+
+it('üst çubuk yalnız kendi düğmesini tutuyor, altındaki görsele dokunma geçiyor', async () => {
+  await render(viewer(0));
+  expect(screen.getByLabelText('Kapat').parent?.props.pointerEvents).toBe('box-none');
 });
 
 it('başka bir fotoğrafla yeniden açılınca sayaç oradan başlıyor', async () => {

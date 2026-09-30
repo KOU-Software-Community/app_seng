@@ -12571,7 +12571,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/components/PhotoViewer.tsx",
-      "source_location": "L92"
+      "source_location": "L93"
     },
     {
       "id": "readme_g\u00f6rseller",
@@ -77109,7 +77109,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/PhotoViewer.tsx",
-      "source_location": "L92",
+      "source_location": "L93",
       "weight": 1.0
     },
     {
@@ -89895,5 +89895,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "9a12919d21db3a0ca1e2c096250b74d4c3367dbc"
+  "built_at_commit": "509cb0619d3f35d940f80a2dd54f6323644c0d0b"
 }
