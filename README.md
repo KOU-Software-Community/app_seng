@@ -24,7 +24,13 @@ dosyalar.
 
 ## Ne yapıyor
 
-- **Etkinlik takvimi ve arşiv** — yaklaşan etkinlikler, kontenjan, geçmiş etkinlikler.
+- **Etkinlik takvimi ve arşiv** — her zaman görünen ay takvimi (ekran okuyucu her günü tam
+  tarihle okuyor), yaklaşan etkinlikler, kontenjan, geçmiş etkinlikler.
+- **Etkinlik fotoğrafları** — kendiliğinden kayan ana fotoğraf; kaydırılan, iki parmakla ve
+  çift dokunmayla yakınlaşan, dışına dokununca kapanan tam ekran galeri. Fotoğraflar
+  kırpılmıyor ve cihazda önbellekte duruyor.
+- **Slider ve sponsorlar** — ana sayfada panelden yönetilen slider ve Sponsorlarımız; son
+  liste cihazda, çevrimdışı da açılıyor.
 - **Kayıt** — öğrenci numarası etkinlik başına tek; teklik doküman kimliğiyle zorlanıyor.
 - **QR ile yoklama** — kod yalnızca uygulama içinden okunuyor, jeton hiç kabloya çıkmadan
   Firestore kuralının `get()`'i ile doğrulanıyor.
@@ -43,8 +49,8 @@ dosyalar.
 
 | Sekme | Rota | Not |
 | --- | --- | --- |
-| Ana sayfa | `/(tabs)` | İstatistikler, yaklaşan etkinlikler, duyurular, QR ve bildirim kısayolları |
-| Takvim | `/(tabs)/takvim` | Liste ve takvim (grid) görünümü |
+| Ana sayfa | `/(tabs)` | Adla karşılama, slider, istatistikler, yaklaşan etkinlikler, duyurular, Sponsorlarımız, QR ve bildirim kısayolları |
+| Takvim | `/(tabs)/takvim` | Her zaman görünen ay takvimi (12 ay ileri), altında etkinlik listesi |
 | Arşiv | `/(tabs)/arsiv` | Tarihi geçmiş etkinlikler, kategori filtresi |
 | AI Gündem | `/(tabs)/gundem` | Haber akışı, günün bülteni, kaydedilenler |
 | Hesabım | `/(tabs)/hesap` | Kayıtlar, sertifikalar, yoklama, ayarlar — oturum yokken duvar değil, tanıtım kartı |
@@ -55,7 +61,7 @@ dosyalar.
 | --- | --- | --- |
 | Splash | `/` | Logo + pixel loader, sonra onboarding ya da ana sayfa |
 | Onboarding | `/onboarding` | 3 sayfa, bir kez gösterilir |
-| Etkinlik detay | `/etkinlik/[id]` | Künye, konuşmacı, kontenjan, kayıt ve QR |
+| Etkinlik detay | `/etkinlik/[id]` | Kendiliğinden kayan fotoğraflar ve tam ekran galeri, künye, konuşmacı, kontenjan, kayıt ve QR |
 | Kayıt formu | `/kayit/[id]` | Ad soyad, öğrenci no, bölüm, sınıf, KVKK — giriş ve doğrulanmış e-posta ister |
 | Kayıt başarılı | `/kayit-basarili` | Kayıt kodu ve dönüş aksiyonları |
 | QR yoklama | `/qr` | Kamera; yanlış etkinlik ve kayıtsızlık ayrı ayrı uyarılıyor |
@@ -63,6 +69,8 @@ dosyalar.
 | Duyuru | `/duyuru/[id]` | Kulüp sitesinden gelen duyurunun tam metni |
 | Çekiliş | `/cekilis/[id]` | Katılım formu ve kazanan listesi |
 | Çekiliş kuralları | `/cekilis-kurallari` | Düzenleyen, katılım şartı, kazanan seçimi (App Store 5.3.x) |
+| Sponsorlarımız | `/sponsorlar` | Panelin sırasıyla liste; "Sponsor ol" kartı her durumda en altta |
+| Kurum | `/sponsor/[id]` | Kurumun sayfası; çekilişteki "Ödülü sağlayan" etiketi buraya getiriyor |
 | Haber detay | `/gundem/[id]` | Üç maddelik TR özet, Orijinal/Çeviri geçişi, kaydet |
 | Haber arama | `/gundem/ara` | Başlık, kaynak ve kategoride arama; son aramalar |
 | Giriş | `/giris` | E-posta + parola |
@@ -466,12 +474,15 @@ gerekmiyor.
 ## Görseller
 
 Panelden yükleniyor, **Supabase Storage**'da duruyor. Etkinlik başına en fazla
-altı görsel: ilki kapak (arşiv kartı ve etkinlik detayının üstü), kalanı
-detaydaki galeri. Tek görsel varsa galeri hiç çıkmıyor.
+altı görsel. İlki arşiv kartının kapağı; etkinlik detayının üstünde hepsi
+kendiliğinden kayıyor, alttaki şerit de hepsini gösteriyor (tek görselde şerit
+yok). Dokunulan görsel tam ekran galeride açılıyor. Hiçbir yerde kırpılmıyor
+(`contain`).
 
 Yüklenen dosya 1600 px'e küçültülüp JPEG'e çevriliyor — telefondan çıktığı gibi
 atılabilir. Uygulama hiçbir depolama SDK'sı kullanmıyor; elinde bir adres var ve
-`<Image>` ile çekiyor.
+`expo-image` ile çekiyor. İnen görsel diskte kalıyor (iOS'ta 7 gün, Android'de
+250 MB), çevrimdışıyken de açılıyor.
 
 ### Neden Firebase Storage değil
 
