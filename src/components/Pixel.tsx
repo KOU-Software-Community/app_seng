@@ -78,7 +78,10 @@ function BlinkSquare({
 
 /**
  * The chasing pixel squares used on the splash, the loading overlay and the
- * confirmation screen.
+ * confirmation screen — and wherever something loads.
+ *
+ * `label` verilince ekran okuyucu onu yükleme çubuğu olarak okuyor ("Yükleniyor");
+ * verilmeyince süs, açılış ekranındaki gibi.
  */
 export function PixelLoader({
   size = 10,
@@ -86,15 +89,22 @@ export function PixelLoader({
   duration = 900,
   colors = ['#0389BC', '#0389BC', '#0389BC', '#0389BC'],
   style,
+  label,
 }: {
   size?: number;
   gap?: number;
   duration?: number;
   colors?: string[];
   style?: StyleProp<ViewStyle>;
+  label?: string;
 }) {
   return (
-    <View style={[{ flexDirection: 'row', gap }, style]}>
+    <View
+      style={[{ flexDirection: 'row', gap }, style]}
+      accessible={label !== undefined}
+      accessibilityRole={label !== undefined ? 'progressbar' : undefined}
+      accessibilityLabel={label}
+    >
       {colors.map((color, i) => (
         <BlinkSquare
           key={i}

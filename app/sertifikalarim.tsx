@@ -10,6 +10,7 @@ import {
   sertifikalarimiGetir,
   type Sertifikam,
 } from '../src/certificates';
+import { PixelLoader } from '../src/components/Pixel';
 import { GlassButton, GradientHeader, GroupLabel, PixelTxt, Txt } from '../src/components/ui';
 import { useContent } from '../src/content';
 import { colors, gradients, radius } from '../src/theme';
@@ -100,9 +101,7 @@ export default function CertificatesRoute() {
           </View>
         ) : liste === null ? (
           <View style={styles.card}>
-            <PixelTxt size={10} color={colors.muted}>
-              YÜKLENİYOR
-            </PixelTxt>
+            <PixelLoader label="Yükleniyor" style={{ alignSelf: 'center' }} />
           </View>
         ) : hata ? (
           <View style={styles.card}>

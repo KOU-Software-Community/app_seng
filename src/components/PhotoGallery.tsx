@@ -15,6 +15,7 @@ import { Txt } from './ui';
  *
  * Kapak dâhil hepsi: hero kendiliğinden kaydığı için şerit, hangi fotoğrafların
  * olduğunu bir bakışta gösteren dizin. Tek fotoğrafta şerit yok; hero'ya dokunmak yeter.
+ * Önizleme de kırpılmıyor (`contain`).
  */
 export function PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (index: number) => void }) {
   if (photos.length < 2) return null;
@@ -38,7 +39,7 @@ export function PhotoGallery({ photos, onOpen }: { photos: string[]; onOpen: (in
             onPress={() => onOpen(i)}
             style={({ pressed }) => [styles.thumb, { opacity: pressed ? 0.75 : 1 }]}
           >
-            <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
           </Pressable>
         ))}
       </ScrollView>

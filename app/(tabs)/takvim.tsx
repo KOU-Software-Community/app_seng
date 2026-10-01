@@ -1,30 +1,26 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
+import { MonthCalendar } from '../../src/components/MonthCalendar';
 import {
-  Card,
   ContentNotice,
   DottedRule,
   EmptyState,
   GradientHeader,
   GroupLabel,
   PixelBadge,
-  Segmented,
   Txt,
 } from '../../src/components/ui';
 import { useContent } from '../../src/content';
-import { ClubEvent, WEEKDAYS } from '../../src/data';
-import { monthGrids, monthOrder, type MonthGrid } from '../../src/eventSchema';
+import { ClubEvent } from '../../src/data';
+import { monthOrder } from '../../src/eventSchema';
 import { useAppStore } from '../../src/store';
 import { PixelRefresh, hiddenSpinner } from '../../src/components/Pixel';
 import { colors, gradients, radius, shadow } from '../../src/theme';
 import { useOpenEvent } from '../../src/useOpenEvent';
 
-type View_ = 'list' | 'grid';
-
 export default function TakvimRoute() {
-  const [view, setView] = useState<View_>('list');
   const router = useRouter();
   const openEvent = useOpenEvent();
   const { events, error, loading, refresh } = useContent();
@@ -50,23 +46,15 @@ export default function TakvimRoute() {
           </Txt>
 
           <DottedRule style={{ marginTop: 12 }} />
-
-          {/* Nothing to switch between when the calendar is empty. */}
-          {hasEvents ? (
-            <Segmented
-              onNavy
-              value={view}
-              onChange={(v) => setView(v as View_)}
-              options={[
-                { label: 'Liste', value: 'list' },
-                { label: 'Takvim', value: 'grid' },
-              ]}
-              style={{ marginTop: 16 }}
-            />
-          ) : null}
         </GradientHeader>
 
         {error ? <ContentNotice onRetry={refresh} retrying={loading} /> : null}
+
+        {/* Ay takvimi her zaman görünüyor — boşken de; altında liste ya da boş kart.
+            Liste/Takvim düğmesi bu yüzden yok. */}
+        <View style={styles.calendar}>
+          <MonthCalendar events={events} onOpen={openEvent} />
+        </View>
 
         {!hasEvents ? (
           // An empty calendar and a failed fetch look the same on screen, so the
@@ -85,10 +73,8 @@ export default function TakvimRoute() {
               onPress={() => router.push('/bildirim-ayarlari')}
             />
           )
-        ) : view === 'list' ? (
-          <ListView onOpen={openEvent} />
         ) : (
-          <GridView onOpen={openEvent} />
+          <ListView onOpen={openEvent} />
         )}
       </ScrollView>
       <PixelRefresh visible={loading} />
@@ -179,110 +165,9 @@ function EventRow({ event, onPress }: { event: ClubEvent; onPress: () => void })
   );
 }
 
-function GridView({ onOpen }: { onOpen: (id: string) => void }) {
-  const { events } = useContent();
-  // One card per month that actually has events, instead of a constant pinned to
-  // March 2026 that would have shown the wrong month the moment a real calendar
-  // existed.
-  const grids = useMemo(() => monthGrids(events), [events]);
-
-  return (
-    <View style={{ padding: 20, gap: 16 }}>
-      {grids.map((grid) => (
-        <MonthCard key={grid.key} grid={grid} onOpen={onOpen} />
-      ))}
-
-      <View style={{ marginTop: 16, gap: 10 }}>
-        {events.map((e) => (
-          <Pressable
-            key={e.id}
-            onPress={() => onOpen(e.id)}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.compactRow,
-              pressed && { borderColor: colors.blue200 },
-            ]}
-          >
-            <View style={styles.compactStripe} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt weight="bold" size={14} color={colors.text} tracking={-0.2}>
-                {e.title}
-              </Txt>
-              <Txt size={12} color={colors.muted} style={{ marginTop: 3 }}>
-                {e.short}
-              </Txt>
-            </View>
-            <Txt size={12} color={colors.blue200}>
-              ›
-            </Txt>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function MonthCard({ grid, onOpen }: { grid: MonthGrid; onOpen: (id: string) => void }) {
-  // Leading blanks push the 1st into the correct weekday column.
-  const cells: (number | null)[] = [
-    ...Array.from({ length: grid.leadingBlanks }, () => null),
-    ...Array.from({ length: grid.days }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  // The month name without the year, for the day cell's accessibility label.
-  const monthName = grid.label.split(' ')[0];
-
-  return (
-    <Card style={{ padding: 16 }}>
-      <View style={styles.monthBar}>
-        <Txt weight="extrabold" size={15} color={colors.navy900}>
-          {grid.label}
-        </Txt>
-      </View>
-
-      <View style={styles.weekRow}>
-        {WEEKDAYS.map((w) => (
-          <View key={w} style={styles.weekCell}>
-            <Txt weight="bold" size={10} color={colors.faint}>
-              {w}
-            </Txt>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.grid}>
-        {cells.map((day, i) => {
-          const eventId = day ? grid.eventByDay[day] : undefined;
-          return (
-            <Pressable
-              key={i}
-              disabled={!eventId}
-              onPress={() => eventId && onOpen(eventId)}
-              accessibilityRole={eventId ? 'button' : undefined}
-              accessibilityLabel={eventId ? `${day} ${monthName} etkinliği` : undefined}
-              style={styles.dayCell}
-            >
-              <View style={[styles.dayInner, eventId ? { backgroundColor: colors.blue100 } : null]}>
-                <Txt
-                  weight={eventId ? 'extrabold' : 'medium'}
-                  size={13}
-                  color={day ? (eventId ? colors.navy900 : colors.muted) : 'transparent'}
-                >
-                  {day ?? ''}
-                </Txt>
-                {eventId ? <View style={styles.dayDot} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  calendar: { paddingHorizontal: 20, paddingTop: 20 },
 
   list: { padding: 20, gap: 22 },
   eventRow: {
@@ -316,43 +201,4 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-
-  monthBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  monthNav: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  weekRow: { flexDirection: 'row', marginBottom: 6 },
-  weekCell: { flex: 1, alignItems: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayCell: { width: `${100 / 7}%`, aspectRatio: 1, padding: 2 },
-  dayInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    borderRadius: 9,
-  },
-  dayDot: { width: 5, height: 5, backgroundColor: colors.blue500 },
-
-  compactRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 12,
-  },
-  compactStripe: { width: 4, height: 34, borderRadius: 3, backgroundColor: colors.blue500 },
 });

@@ -66,6 +66,7 @@ function Pages({ photos, start, onClose }: { photos: string[]; start: number; on
             width={width}
             height={height}
             onZoomChange={setZoomed}
+            onBackdropPress={onClose}
             accessibilityLabel={`Fotoğraf ${i + 1} / ${photos.length}`}
             testID={`foto-${i}`}
           />

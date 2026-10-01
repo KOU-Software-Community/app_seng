@@ -158,6 +158,17 @@ export function monthLabelOf(year: number, month: number): string {
   return `${MONTHS_LONG[month - 1]} ${year}`;
 }
 
+/** "12 Ekim 2026, Pazartesi" — takvim hücresinin ekran okuyucu etiketi. */
+export function dayLabelOf(year: number, month: number, day: number): string {
+  return `${day} ${MONTHS_LONG[month - 1]} ${year}, ${WEEKDAYS_LONG[weekdayIndex(year, month, day)]}`;
+}
+
+/** Ay kaydırma, yıl dönümüyle: Aralık 2026 + 1 → Ocak 2027. `month` 1–12. */
+export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
+  const index = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -330,7 +341,7 @@ export function buildEvent(input: EventInput): BuildResult {
     {
       icon: 'cal',
       label: 'Tarih',
-      value: `${day} ${MONTHS_LONG[month - 1]} ${year}, ${WEEKDAYS_LONG[wdIndex]}`,
+      value: dayLabelOf(year, month, day),
     },
     { icon: 'clock', label: 'Saat', value: timeRange },
     { icon: 'pin', label: 'Yer', value: venue },
@@ -526,39 +537,45 @@ export type MonthGrid = {
 };
 
 /**
+ * Tek ayın ızgarası, etkinliği olsun olmasın — kalıcı takvim bunu çiziyor. Yalnız o
+ * aya düşen etkinlikler işaretleniyor. `month` 1–12.
+ *
+ * Events whose `startsAt` will not parse are skipped rather than crashing the tab —
+ * bad data should cost one missing marker, not the whole screen.
+ */
+export function monthGrid(year: number, month: number, events: ClubEvent[]): MonthGrid {
+  const eventByDay: Record<number, string> = {};
+  for (const event of events) {
+    const parsed = parseIso(event.startsAt ?? '');
+    if (!parsed || parsed.year !== year || parsed.month !== month) continue;
+    // Two events on one day: the first keeps the marker, since a day cell can
+    // only link to one of them.
+    if (!eventByDay[parsed.day]) eventByDay[parsed.day] = event.id;
+  }
+  return {
+    key: monthKeyOf(year, month),
+    label: monthLabelOf(year, month),
+    leadingBlanks: weekdayIndex(year, month, 1),
+    days: daysInMonth(year, month),
+    eventByDay,
+  };
+}
+
+/**
  * Builds one grid per month that actually has events, oldest first.
  *
  * This replaces a hardcoded March 2026 constant that would have shown the wrong
- * month the moment a real calendar existed. Events whose `startsAt` will not
- * parse are skipped rather than crashing the tab — bad data should cost one
- * missing marker, not the whole screen.
+ * month the moment a real calendar existed.
  */
 export function monthGrids(events: ClubEvent[]): MonthGrid[] {
-  const byMonth = new Map<string, MonthGrid>();
-
+  const months = new Map<string, { year: number; month: number }>();
   for (const event of events) {
     const parsed = parseIso(event.startsAt ?? '');
-    if (!parsed) continue;
-
-    const { year, month, day } = parsed;
-    const sortKey = `${year}-${pad(month)}`;
-    let grid = byMonth.get(sortKey);
-    if (!grid) {
-      grid = {
-        key: monthKeyOf(year, month),
-        label: monthLabelOf(year, month),
-        leadingBlanks: weekdayIndex(year, month, 1),
-        days: daysInMonth(year, month),
-        eventByDay: {},
-      };
-      byMonth.set(sortKey, grid);
-    }
-    // Two events on one day: the first keeps the marker, since a day cell can
-    // only link to one of them.
-    if (!grid.eventByDay[day]) grid.eventByDay[day] = event.id;
+    if (parsed) months.set(`${parsed.year}-${pad(parsed.month)}`, parsed);
   }
-
-  return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, grid]) => grid);
+  return [...months.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, { year, month }]) => monthGrid(year, month, events));
 }
 
 /** Month keys present in the events, oldest first — what the list groups by. */
